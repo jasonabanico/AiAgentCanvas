@@ -1,4 +1,4 @@
-using AiAgentCanvas.AgentData.Personas;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

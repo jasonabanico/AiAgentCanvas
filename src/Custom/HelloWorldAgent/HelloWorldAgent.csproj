@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

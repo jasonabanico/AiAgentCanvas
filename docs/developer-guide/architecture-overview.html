@@ -83,7 +83,7 @@ src/
                  Abstractions (shared types)
 
             Custom/MCP.MarketData  ----&gt; Microsoft.Extensions.AI
-            Custom/HelloWorldAgent ----&gt; AgentData, Microsoft.Extensions.AI
+            Custom/HelloWorldAgent ----&gt; Abstractions, Microsoft.Extensions.AI
       </div>
 
       <p>Key dependency rules:</p>
@@ -92,7 +92,7 @@ src/
         <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, and <code>IToolGovernanceWrapper</code>.</li>
         <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, and the AG-UI endpoint.</li>
         <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions.</li>
-        <li><strong>Custom projects</strong> reference <code>Microsoft.Extensions.AI</code> (for <code>AIFunctionFactory</code>) and optionally <code>AgentData</code> (for <code>IPersonaSeed</code> to seed personas).</li>
+        <li><strong>Custom projects</strong> reference <code>Abstractions</code> (for <code>IPersonaSeed</code>) and <code>Microsoft.Extensions.AI</code> (for <code>AIFunctionFactory</code>) -- they never reference Core, AgentData, or any other framework project.</li>
         <li><strong>Web</strong> references everything and wires it together in <code>Program.cs</code>.</li>
       </ul>
 

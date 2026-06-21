@@ -1,4 +1,4 @@
-namespace AiAgentCanvas.AgentData.Personas;
+namespace AiAgentCanvas.Abstractions;
 
 public interface IPersonaSeed
 {

@@ -28,7 +28,7 @@
 
       <h3>Step 2: Create the .csproj</h3>
 
-      <p>Add package references for <code>Microsoft.Extensions.AI</code> (for tool creation) and a project reference to <code>AgentData</code> (for persona seeding):</p>
+      <p>Add package references for <code>Microsoft.Extensions.AI</code> (for tool creation) and a project reference to <code>Abstractions</code> (for persona seeding):</p>
 
       <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
 
@@ -44,7 +44,7 @@
   &lt;/ItemGroup&gt;
 
   &lt;ItemGroup&gt;
-    &lt;ProjectReference Include="..\..\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" /&gt;
+    &lt;ProjectReference Include="..\..\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" /&gt;
   &lt;/ItemGroup&gt;
 
 &lt;/Project&gt;</code></pre>
@@ -89,7 +89,7 @@ public sealed class MyAgentToolProvider
 
       <p>Register your tools and seed a persona that tells the LLM its role and which tools to use:</p>
 
-      <pre><code>using AiAgentCanvas.AgentData.Personas;
+      <pre><code>using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
