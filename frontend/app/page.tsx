@@ -22,7 +22,10 @@ export default function Home() {
 
   useEffect(() => {
     const eventSource = new EventSource("/api/notifications");
+    eventSource.onopen = () => console.log("[SSE] Connected to /api/notifications");
+    eventSource.onerror = (e) => console.error("[SSE] Error:", e);
     eventSource.addEventListener("notification", (e) => {
+      console.log("[SSE] Received notification:", e.data);
       try {
         const data = JSON.parse(e.data);
         setMessages((prev) => [

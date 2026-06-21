@@ -37,12 +37,17 @@ public sealed class ScheduledAgentJob
 
         if (_notificationSink is not null)
         {
+            _logger.LogInformation("Sending notification for task {TaskId}", taskId);
             await _notificationSink.SendAsync(new AgentNotification
             {
                 Title = $"Task completed: {description}",
                 Body = resultText.Length > 500 ? resultText[..500] + "..." : resultText,
                 Source = $"scheduler:{taskId}",
             });
+        }
+        else
+        {
+            _logger.LogWarning("No notification sink available for task {TaskId}", taskId);
         }
     }
 }
