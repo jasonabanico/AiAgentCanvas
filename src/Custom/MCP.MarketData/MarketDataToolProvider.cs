@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace MCP.MarketData;
@@ -11,13 +10,11 @@ namespace MCP.MarketData;
 public sealed class MarketDataToolProvider
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string _alphaVantageKey;
     private readonly ILogger<MarketDataToolProvider> _logger;
 
-    public MarketDataToolProvider(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<MarketDataToolProvider> logger)
+    public MarketDataToolProvider(IHttpClientFactory httpClientFactory, ILogger<MarketDataToolProvider> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _alphaVantageKey = configuration["AlphaVantage:ApiKey"] ?? "demo";
         _logger = logger;
     }
 
@@ -26,8 +23,8 @@ public sealed class MarketDataToolProvider
         return
         [
             AIFunctionFactory.Create(EdgarCompanyFactsAsync, "edgar_company_facts", "Fetch SEC EDGAR financial data for a company by ticker symbol"),
-            AIFunctionFactory.Create(StockQuoteAsync, "stock_quote", "Get current stock price and daily change from Alpha Vantage"),
-            AIFunctionFactory.Create(StockTechnicalsAsync, "stock_technicals", "Get technical indicators (RSI, SMA, EMA, MACD) from Alpha Vantage"),
+            AIFunctionFactory.Create(StockQuoteAsync, "stock_quote", "Get current stock price and daily change from Yahoo Finance"),
+            AIFunctionFactory.Create(StockHistoryAsync, "stock_history", "Get historical price data from Yahoo Finance"),
         ];
     }
 
@@ -120,102 +117,133 @@ public sealed class MarketDataToolProvider
         }
     }
 
-    [Description("Get current stock price and daily change from Alpha Vantage")]
+    [Description("Get current stock price and daily change from Yahoo Finance")]
     private async Task<string> StockQuoteAsync(
-        [Description("Stock ticker symbol")] string symbol,
+        [Description("Stock ticker symbol (e.g. AAPL, MSFT)")] string symbol,
         CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
-        _logger.LogDebug("Fetching stock quote for {Symbol}", symbol);
+        _logger.LogDebug("Fetching Yahoo quote for {Symbol}", symbol);
 
         try
         {
             symbol = symbol.ToUpperInvariant();
-            var client = _httpClientFactory.CreateClient("AlphaVantage");
-            var url = $"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={_alphaVantageKey}";
-            var result = await client.GetStringAsync(url, ct);
+            var client = _httpClientFactory.CreateClient("Yahoo");
+            var url = $"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=1d";
+            var json = await client.GetStringAsync(url, ct);
+            var root = JsonSerializer.Deserialize<JsonElement>(json);
 
-            _logger.LogInformation("Stock quote for {Symbol} fetched in {ElapsedMs}ms", symbol, sw.ElapsedMilliseconds);
-            return result;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "Stock quote failed for {Symbol}", symbol);
-            return JsonSerializer.Serialize(new { error = $"Stock quote failed: {ex.Message}" });
-        }
-        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-        {
-            _logger.LogWarning("Stock quote timed out for {Symbol}", symbol);
-            return JsonSerializer.Serialize(new { error = "Stock quote timed out" });
-        }
-    }
+            var result = root.GetProperty("chart").GetProperty("result");
+            if (result.GetArrayLength() == 0)
+                return JsonSerializer.Serialize(new { error = $"No data found for '{symbol}'" });
 
-    [Description("Get technical indicators (RSI, SMA, EMA, MACD) from Alpha Vantage")]
-    private async Task<string> StockTechnicalsAsync(
-        [Description("Stock ticker symbol")] string symbol,
-        [Description("Indicator name: RSI, SMA, EMA, MACD")] string indicator,
-        CancellationToken ct)
-    {
-        var sw = Stopwatch.StartNew();
-        _logger.LogDebug("Fetching {Indicator} for {Symbol}", indicator, symbol);
+            var item = result[0];
+            var meta = item.GetProperty("meta");
 
-        try
-        {
-            symbol = symbol.ToUpperInvariant();
-            indicator = indicator.ToUpperInvariant();
-
-            var client = _httpClientFactory.CreateClient("AlphaVantage");
-
-            var queryParams = indicator switch
+            var quote = new
             {
-                "RSI" => $"function=RSI&symbol={symbol}&interval=daily&time_period=14&series_type=close",
-                "SMA" => $"function=SMA&symbol={symbol}&interval=daily&time_period=50&series_type=close",
-                "EMA" => $"function=EMA&symbol={symbol}&interval=daily&time_period=20&series_type=close",
-                "MACD" => $"function=MACD&symbol={symbol}&interval=daily&series_type=close",
-                _ => $"function=RSI&symbol={symbol}&interval=daily&time_period=14&series_type=close",
+                symbol,
+                currency = meta.GetProperty("currency").GetString(),
+                regularMarketPrice = meta.GetProperty("regularMarketPrice").GetDouble(),
+                previousClose = meta.GetProperty("chartPreviousClose").GetDouble(),
+                change = Math.Round(meta.GetProperty("regularMarketPrice").GetDouble() - meta.GetProperty("chartPreviousClose").GetDouble(), 4),
+                changePercent = Math.Round(
+                    (meta.GetProperty("regularMarketPrice").GetDouble() - meta.GetProperty("chartPreviousClose").GetDouble())
+                    / meta.GetProperty("chartPreviousClose").GetDouble() * 100, 2),
+                exchangeName = meta.TryGetProperty("exchangeName", out var ex) ? ex.GetString() : null,
+                marketState = meta.TryGetProperty("currentTradingPeriod", out var tp) && tp.TryGetProperty("regular", out var reg)
+                    ? "regular" : "unknown",
             };
 
-            var url = $"https://www.alphavantage.co/query?{queryParams}&apikey={_alphaVantageKey}";
-            var response = await client.GetStringAsync(url, ct);
-
-            var json = JsonSerializer.Deserialize<JsonElement>(response);
-            var trimmed = TrimToRecentEntries(json, 10);
-
-            _logger.LogInformation("{Indicator} for {Symbol} fetched in {ElapsedMs}ms", indicator, symbol, sw.ElapsedMilliseconds);
-            return JsonSerializer.Serialize(trimmed, new JsonSerializerOptions { WriteIndented = true });
+            _logger.LogInformation("Yahoo quote for {Symbol} fetched in {ElapsedMs}ms", symbol, sw.ElapsedMilliseconds);
+            return JsonSerializer.Serialize(quote, new JsonSerializerOptions { WriteIndented = true });
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Technicals fetch failed for {Symbol}", symbol);
-            return JsonSerializer.Serialize(new { error = $"Technicals fetch failed: {ex.Message}" });
+            _logger.LogWarning(ex, "Yahoo quote failed for {Symbol}", symbol);
+            return JsonSerializer.Serialize(new { error = $"Yahoo quote failed: {ex.Message}" });
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("Technicals fetch timed out for {Symbol}", symbol);
-            return JsonSerializer.Serialize(new { error = "Technicals fetch timed out" });
+            _logger.LogWarning("Yahoo quote timed out for {Symbol}", symbol);
+            return JsonSerializer.Serialize(new { error = "Yahoo quote timed out" });
         }
     }
 
-    private static JsonElement TrimToRecentEntries(JsonElement root, int count)
+    [Description("Get historical price data from Yahoo Finance")]
+    private async Task<string> StockHistoryAsync(
+        [Description("Stock ticker symbol (e.g. AAPL, MSFT)")] string symbol,
+        [Description("Time range: 5d, 1mo, 3mo, 6mo, 1y, 5y")] string range,
+        CancellationToken ct)
     {
-        var dict = new Dictionary<string, object>();
-        foreach (var prop in root.EnumerateObject())
+        var sw = Stopwatch.StartNew();
+        _logger.LogDebug("Fetching Yahoo history for {Symbol} range={Range}", symbol, range);
+
+        var validRanges = new HashSet<string> { "5d", "1mo", "3mo", "6mo", "1y", "5y" };
+        if (!validRanges.Contains(range))
+            range = "1mo";
+
+        var interval = range switch
         {
-            if (prop.Name.StartsWith("Technical Analysis") || prop.Name.StartsWith("Meta"))
+            "5d" => "1d",
+            "1mo" => "1d",
+            "3mo" => "1wk",
+            "6mo" => "1wk",
+            _ => "1mo",
+        };
+
+        try
+        {
+            symbol = symbol.ToUpperInvariant();
+            var client = _httpClientFactory.CreateClient("Yahoo");
+            var url = $"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range={range}&interval={interval}";
+            var json = await client.GetStringAsync(url, ct);
+            var root = JsonSerializer.Deserialize<JsonElement>(json);
+
+            var result = root.GetProperty("chart").GetProperty("result");
+            if (result.GetArrayLength() == 0)
+                return JsonSerializer.Serialize(new { error = $"No data found for '{symbol}'" });
+
+            var item = result[0];
+            var timestamps = item.GetProperty("timestamp").EnumerateArray().Select(t => t.GetInt64()).ToArray();
+            var indicators = item.GetProperty("indicators").GetProperty("quote")[0];
+            var closes = indicators.GetProperty("close").EnumerateArray()
+                .Select(v => v.ValueKind == JsonValueKind.Null ? (double?)null : v.GetDouble()).ToArray();
+            var volumes = indicators.GetProperty("volume").EnumerateArray()
+                .Select(v => v.ValueKind == JsonValueKind.Null ? (long?)null : v.GetInt64()).ToArray();
+
+            var dataPoints = new List<object>();
+            for (var i = 0; i < timestamps.Length && i < closes.Length; i++)
             {
-                if (prop.Name.StartsWith("Technical Analysis"))
+                if (closes[i] is null) continue;
+                dataPoints.Add(new
                 {
-                    var entries = prop.Value.EnumerateObject()
-                        .Take(count)
-                        .ToDictionary(e => e.Name, e => (object)e.Value.ToString()!);
-                    dict[prop.Name] = entries;
-                }
-                else
-                {
-                    dict[prop.Name] = prop.Value.ToString()!;
-                }
+                    date = DateTimeOffset.FromUnixTimeSeconds(timestamps[i]).ToString("yyyy-MM-dd"),
+                    close = Math.Round(closes[i]!.Value, 2),
+                    volume = i < volumes.Length ? volumes[i] : null,
+                });
             }
+
+            var history = new
+            {
+                symbol,
+                range,
+                interval,
+                dataPoints = dataPoints.TakeLast(50),
+            };
+
+            _logger.LogInformation("Yahoo history for {Symbol} fetched in {ElapsedMs}ms ({Count} points)", symbol, sw.ElapsedMilliseconds, dataPoints.Count);
+            return JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true });
         }
-        return JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(dict));
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Yahoo history failed for {Symbol}", symbol);
+            return JsonSerializer.Serialize(new { error = $"Yahoo history failed: {ex.Message}" });
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Yahoo history timed out for {Symbol}", symbol);
+            return JsonSerializer.Serialize(new { error = "Yahoo history timed out" });
+        }
     }
 }

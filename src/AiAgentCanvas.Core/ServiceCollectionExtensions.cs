@@ -23,7 +23,8 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<AIFoundryOptions>(configuration.GetSection(AIFoundryOptions.SectionName));
         services.AddSingleton<AIFoundryClientFactory>();
-        services.AddSingleton<IChatClient>(sp => sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient());
+        services.AddSingleton<IChatClient>(sp =>
+            new ToolDeduplicatingChatClient(sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient()));
         services.AddHttpClient();
 
         var options = new AiAgentCanvasOptions();

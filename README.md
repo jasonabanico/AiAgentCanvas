@@ -11,10 +11,10 @@ Frontend (Next.js + CopilotKit)
 ASP.NET Core Backend
 ├── AiAgentCanvas.Core ─── engine: orchestrator, AG-UI endpoint, DI
 ├── MyFirstAgent ─────── earnings surprise scanner (custom agent)
-└── MCP Skills ───────── SEC EDGAR + Alpha Vantage (real APIs)
+└── MCP Skills ───────── SEC EDGAR + Yahoo Finance (real APIs)
         │
         ▼
-Azure AI Foundry (ChatCompletionsClient)
+Azure AI Foundry (AzureOpenAIClient)
 ```
 
 ## Project Structure
@@ -25,7 +25,7 @@ src/
 │   ├── AiAgentCanvas.Abstractions/            # IAgentService, IMcpClient, models
 │   └── AiAgentCanvas.Core/                    # AG-UI endpoint, orchestrator, DI extensions
 ├── MCP/                                     # Data connections
-│   └── MCP.MarketData/                      # SEC EDGAR + Alpha Vantage
+│   └── MCP.MarketData/                      # SEC EDGAR + Yahoo Finance
 ├── MyAgents/                                # Custom agent logic (no HTTP, no SDKs)
 │   └── MyFirstAgent/                        # Earnings Surprise Scanner
 └── AiAgentCanvas.Web/                         # Thin composition root
@@ -44,7 +44,7 @@ Three concerns, three folders:
 - [.NET 9 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - An Azure AI Foundry deployment (or any OpenAI-compatible endpoint)
-- A free [Alpha Vantage API key](https://www.alphavantage.co/support/#api-key) (optional, `demo` key works for limited tickers)
+- No additional API keys needed (Yahoo Finance and SEC EDGAR are free, no key required)
 
 ### 1. Configure
 
@@ -52,9 +52,6 @@ Edit `src/AiAgentCanvas.Web/appsettings.Development.json`:
 
 ```json
 {
-  "AlphaVantage": {
-    "ApiKey": "your-alpha-vantage-key"
-  },
   "AIFoundry": {
     "Endpoint": "https://your-resource.openai.azure.com",
     "Key": "your-api-key",
@@ -129,8 +126,8 @@ No orchestrator changes needed -- each agent owns its routing via `CanHandle`.
 | Frontend | Next.js 15, React 19, CopilotKit |
 | Protocol | AG-UI (Server-Sent Events) |
 | Backend | ASP.NET Core 9, Minimal APIs |
-| AI | Azure AI Foundry (`Azure.AI.Inference`) |
-| Data | SEC EDGAR (free), Alpha Vantage (free tier) |
+| AI | Azure AI Foundry (`Azure.AI.OpenAI`) |
+| Data | SEC EDGAR (free), Yahoo Finance (free, no key) |
 | Auth | Azure Identity (DefaultAzureCredential) |
 | Skills | MCP-compatible interface |
 

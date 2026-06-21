@@ -37,7 +37,7 @@ src/
   AiAgentCanvas.Web/            Composition root
   Custom/
     HelloWorldAgent/            Sample agent prompts
-    MCP.MarketData/             SEC EDGAR + Alpha Vantage tools
+    MCP.MarketData/             SEC EDGAR + Yahoo Finance tools
     VectorStore.Sqlite/         SQLite vector store for RAG
       </div>
 
@@ -94,7 +94,7 @@ src/
           </tr>
           <tr>
             <td><code>Services/AIFoundryClientFactory.cs</code></td>
-            <td>Creates <code>ChatCompletionsClient</code> from config</td>
+            <td>Creates <code>AzureOpenAIClient</code> from config</td>
           </tr>
           <tr>
             <td><code>Skills/DynamicToolRegistry.cs</code></td>
@@ -115,7 +115,7 @@ src/
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Azure.AI.Inference</p>
+      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Azure.AI.OpenAI</p>
 
       <h3>AiAgentCanvas.AgentData</h3>
 
@@ -369,7 +369,7 @@ src/
 
       <h3>Custom/MCP.MarketData</h3>
 
-      <p>A data connection providing SEC EDGAR and Alpha Vantage tools. Demonstrates the ToolProvider + ServiceExtensions pattern.</p>
+      <p>A data connection providing SEC EDGAR and Yahoo Finance tools. Demonstrates the ToolProvider + ServiceExtensions pattern.</p>
 
       <table>
         <thead>
@@ -381,7 +381,7 @@ src/
         <tbody>
           <tr>
             <td><code>MarketDataToolProvider.cs</code></td>
-            <td>Three AITools: <code>edgar_company_facts</code>, <code>stock_quote</code>, <code>stock_technicals</code></td>
+            <td>Three AITools: <code>edgar_company_facts</code>, <code>stock_quote</code>, <code>stock_history</code></td>
           </tr>
           <tr>
             <td><code>MarketDataServiceExtensions.cs</code></td>

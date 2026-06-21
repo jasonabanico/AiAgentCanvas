@@ -22,8 +22,7 @@
   "Logging": { ... },
   "AllowedHosts": "*",
   "AIFoundry": { ... },
-  "Security": { ... },
-  "AlphaVantage": { ... }
+  "Security": { ... }
 }</code></pre>
 
       <h2>AIFoundry Section</h2>
@@ -124,31 +123,6 @@
             <td><code>RateLimitPerMinute</code></td>
             <td><code>30</code></td>
             <td>Maximum API requests per minute per client. Returns HTTP 429 when exceeded.</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2>AlphaVantage Section</h2>
-
-      <p>Configures the Alpha Vantage API for market data tools (stock quotes, technicals).</p>
-
-      <pre><code>{
-  "AlphaVantage": {
-    "ApiKey": "demo"
-  }
-}</code></pre>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Setting</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>ApiKey</code></td>
-            <td>Your Alpha Vantage API key. Use <code>"demo"</code> for limited testing. Get a free key at <a href="https://www.alphavantage.co/support/#api-key">alphavantage.co</a>.</td>
           </tr>
         </tbody>
       </table>

@@ -198,9 +198,9 @@ builder.Services.AddWeatherTools();</code></pre>
         AIFunctionFactory.Create(EdgarCompanyFactsAsync, "edgar_company_facts",
             "Fetch SEC EDGAR financial data for a company by ticker symbol"),
         AIFunctionFactory.Create(StockQuoteAsync, "stock_quote",
-            "Get current stock price and daily change from Alpha Vantage"),
-        AIFunctionFactory.Create(StockTechnicalsAsync, "stock_technicals",
-            "Get technical indicators (RSI, SMA, EMA, MACD) from Alpha Vantage"),
+            "Get current stock price from Yahoo Finance"),
+        AIFunctionFactory.Create(StockHistoryAsync, "stock_history",
+            "Get historical stock data from Yahoo Finance with configurable range"),
     ];
 }</code></pre>
 
@@ -226,7 +226,7 @@ builder.Services.AddWeatherTools();</code></pre>
         })
         .AddStandardResilienceHandler();
 
-    services.AddHttpClient("AlphaVantage", client =&gt;
+    services.AddHttpClient("YahooFinance", client =&gt;
         {
             client.Timeout = TimeSpan.FromSeconds(15);
         })

@@ -37,7 +37,7 @@
       <ul>
         <li><strong>stock_quote</strong> --- Retrieves real-time and historical price data for any ticker. Priya asks "What's the current price and 30-day performance of CAT?" and gets a structured response with price, change, volume, and moving averages.</li>
         <li><strong>edgar_company_facts</strong> --- Queries SEC EDGAR for company filings, financial statements, and key metrics. "Pull CAT's latest 10-K revenue breakdown by segment" returns structured data extracted from the filing.</li>
-        <li><strong>stock_technicals</strong> --- Computes technical indicators (RSI, MACD, Bollinger Bands) on demand. "Show me the RSI and MACD for CAT over the last 90 days" returns the computed values with interpretation notes.</li>
+        <li><strong>stock_history</strong> --- Retrieves historical stock data from Yahoo Finance with a configurable range. "Show me the price history for CAT over the last 90 days" returns historical data points for trend analysis.</li>
       </ul>
 
       <h3>Scheduled Tasks</h3>
@@ -95,7 +95,7 @@
           </tr>
           <tr>
             <td><strong>MCP Connections</strong></td>
-            <td>MCP.MarketData (stock_quote, edgar_company_facts, stock_technicals)</td>
+            <td>MCP.MarketData (stock_quote, stock_history, edgar_company_facts)</td>
           </tr>
           <tr>
             <td><strong>Scheduled Tasks</strong></td>

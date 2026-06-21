@@ -15,9 +15,10 @@ public static class MarketDataServiceExtensions
             })
             .AddStandardResilienceHandler();
 
-        services.AddHttpClient("AlphaVantage", client =>
+        services.AddHttpClient("Yahoo", client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(15);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("AiAgentCanvas/1.0");
             })
             .AddStandardResilienceHandler();
 

@@ -29,7 +29,7 @@
 
       <ol>
         <li><strong>AIFoundryOptions</strong> -- binds the <code>AIFoundry</code> configuration section</li>
-        <li><strong>AIFoundryClientFactory</strong> -- singleton that creates <code>ChatCompletionsClient</code></li>
+        <li><strong>AIFoundryClientFactory</strong> -- singleton that creates <code>AzureOpenAIClient</code></li>
         <li><strong>IChatClient</strong> -- via <code>AddChatClient()</code>, resolved from the factory</li>
         <li><strong>DynamicToolRegistry</strong> -- singleton for runtime tool registration</li>
         <li><strong>DefaultSystemPrompt</strong> -- wraps the configured or default system prompt</li>
@@ -82,10 +82,10 @@ var agent = new ChatClientAgent(chatClient, agentOptions, loggerFactory, sp);</c
 {
     var endpoint = new Uri(_options.Endpoint);
     var inner = _options.UseAzureCredential
-        ? new ChatCompletionsClient(endpoint, new DefaultAzureCredential())
-        : new ChatCompletionsClient(endpoint, new AzureKeyCredential(_options.Key!));
+        ? new AzureOpenAIClient(endpoint, new DefaultAzureCredential())
+        : new AzureOpenAIClient(endpoint, new ApiKeyCredential(_options.Key!));
 
-    return inner.AsIChatClient(_options.DeploymentName);
+    return inner.GetChatClient(_options.DeploymentName).AsIChatClient();
 }</code></pre>
 
       <h3>AIFoundryOptions</h3>

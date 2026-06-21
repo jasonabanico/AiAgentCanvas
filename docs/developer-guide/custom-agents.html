@@ -129,8 +129,8 @@ public static class HelloWorldAgentPrompts
         You are a helpful stock market assistant.
 
         You have access to the following tools:
-        - stock_quote: Get the current price and daily change for a ticker
-        - stock_technicals: Get technical indicators (RSI, SMA, EMA, MACD)
+        - stock_quote: Get the current price for a ticker from Yahoo Finance
+        - stock_history: Get historical stock data from Yahoo Finance with configurable range
         - edgar_company_facts: Fetch SEC EDGAR financial data for a company
 
         When a user asks about a stock, use the appropriate tools to fetch live data,
@@ -139,7 +139,7 @@ public static class HelloWorldAgentPrompts
         """;
 }</code></pre>
 
-      <p>The tools referenced in the prompt (<code>stock_quote</code>, <code>stock_technicals</code>, <code>edgar_company_facts</code>) are provided by the <code>MCP.MarketData</code> custom project. They are registered separately via <code>builder.Services.AddMarketDataTools()</code> in <code>Program.cs</code>.</p>
+      <p>The tools referenced in the prompt (<code>stock_quote</code>, <code>stock_history</code>, <code>edgar_company_facts</code>) are provided by the <code>MCP.MarketData</code> custom project. They are registered separately via <code>builder.Services.AddMarketDataTools()</code> in <code>Program.cs</code>.</p>
 
       <h2>Switching Between Agents</h2>
 
