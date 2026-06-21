@@ -23,7 +23,7 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<AIFoundryOptions>(configuration.GetSection(AIFoundryOptions.SectionName));
         services.AddSingleton<AIFoundryClientFactory>();
-        services.AddChatClient(sp => sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient());
+        services.AddSingleton<IChatClient>(sp => sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient());
         services.AddHttpClient();
 
         var options = new AiAgentCanvasOptions();
@@ -47,6 +47,9 @@ public static class ServiceCollectionExtensions
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
             var tools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+            var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
+            toolLogger.LogInformation("Registered {ToolCount} tools: {ToolNames}",
+                tools.Count, string.Join(", ", tools.Select(t => t.Name)));
 
             var agentOptions = new ChatClientAgentOptions
             {

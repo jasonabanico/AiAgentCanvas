@@ -14,9 +14,7 @@ internal sealed class DynamicToolContextProvider : AIContextProvider
         var dynamicTools = _registry.GetAllTools();
         if (dynamicTools.Count > 0)
         {
-            var existing = context.AIContext.Tools?.ToList() ?? [];
-            existing.AddRange(dynamicTools);
-            context.AIContext.Tools = existing;
+            context.AIContext.Tools = dynamicTools;
         }
         return new ValueTask<AIContext>(context.AIContext);
     }
