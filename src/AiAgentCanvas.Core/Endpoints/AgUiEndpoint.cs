@@ -82,11 +82,16 @@ public static class AgUiEndpoint
 
         try
         {
-            var session = await agent.CreateSessionAsync(context.RequestAborted);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(60));
+
+            logger.LogInformation("Creating agent session. ThreadId={ThreadId}", threadId);
+            var session = await agent.CreateSessionAsync(cts.Token);
             session.StateBag.SetValue("conversationId", threadId);
 
+            logger.LogInformation("Starting agent streaming. ThreadId={ThreadId}, Messages={Messages}", threadId, string.Join("; ", chatMessages.Select(m => $"{m.Role}: {m.Text?[..Math.Min(m.Text.Length, 50)]}")));
             var sw = Stopwatch.StartNew();
-            await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: context.RequestAborted))
+            await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
             {
                 if (update.Text is { Length: > 0 } text)
                 {
@@ -95,6 +100,15 @@ public static class AgUiEndpoint
             }
 
             logger.LogInformation("Streaming complete. ThreadId={ThreadId}, RunId={RunId}, ElapsedMs={ElapsedMs}", threadId, runId, sw.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogWarning("Agent execution timed out after 60s. ThreadId={ThreadId}", threadId);
+            await WriteEvent(context, "text.message.content", new
+            {
+                messageId,
+                delta = "\n\n**Error:** Request timed out after 60 seconds. Check your Azure AI endpoint and credentials."
+            });
         }
         catch (Exception ex)
         {

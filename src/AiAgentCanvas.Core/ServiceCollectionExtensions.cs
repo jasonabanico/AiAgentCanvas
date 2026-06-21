@@ -34,14 +34,7 @@ public static class ServiceCollectionExtensions
         var defaultPrompt = options.SystemPrompt ?? "You are a helpful AI assistant. Use the available tools to help answer questions.";
         services.AddSingleton(new DefaultSystemPrompt(defaultPrompt));
 
-        services.AddSingleton<AIContextProvider>(sp =>
-        {
-            var customProvider = sp.GetServices<AIContextProvider>()
-                .FirstOrDefault(p => p is not SystemPromptProvider and not DynamicToolContextProvider);
-            if (customProvider is not null)
-                return new SystemPromptProvider(defaultPrompt);
-            return new SystemPromptProvider(defaultPrompt);
-        });
+        services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
         services.AddSingleton<AIContextProvider>(sp =>
             new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));

@@ -11,9 +11,7 @@ publish/
 **/wwwroot/
 
 ## Hangfire
-hangfire.db
-hangfire.db-shm
-hangfire.db-wal
+hangfire.db*
 
 ## Node / Next.js
 node_modules/
@@ -31,6 +29,7 @@ Thumbs.db
 .DS_Store
 
 ## Secrets
+appsettings.Development.json
 appsettings.*.local.json
 *.pfx
 *.pem

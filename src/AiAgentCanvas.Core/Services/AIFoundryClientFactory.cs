@@ -3,6 +3,7 @@ using Azure;
 using Azure.AI.Inference;
 using Azure.Identity;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AiAgentCanvas.Core.Services;
@@ -10,17 +11,22 @@ namespace AiAgentCanvas.Core.Services;
 public sealed class AIFoundryClientFactory
 {
     private readonly AIFoundryOptions _options;
+    private readonly ILogger<AIFoundryClientFactory> _logger;
 
-    public AIFoundryClientFactory(IOptions<AIFoundryOptions> options)
+    public AIFoundryClientFactory(IOptions<AIFoundryOptions> options, ILogger<AIFoundryClientFactory> logger)
     {
         _options = options.Value;
+        _logger = logger;
     }
 
     public IChatClient CreateChatClient()
     {
+        _logger.LogInformation("Creating chat client. Endpoint={Endpoint}, Deployment={Deployment}, UseAzureCredential={UseAzure}, HasKey={HasKey}",
+            _options.Endpoint, _options.DeploymentName, _options.UseAzureCredential, !string.IsNullOrWhiteSpace(_options.Key));
+
         if (string.IsNullOrWhiteSpace(_options.Endpoint) || _options.Endpoint.Contains("YOUR-RESOURCE"))
             throw new InvalidOperationException(
-                "AIFoundry:Endpoint is not configured. Set a valid Azure AI Foundry endpoint in appsettings.json.");
+                $"AIFoundry:Endpoint is not configured (got: '{_options.Endpoint}'). Set a valid Azure AI Foundry endpoint in appsettings.json or appsettings.Development.json.");
 
         if (!_options.UseAzureCredential && string.IsNullOrWhiteSpace(_options.Key))
             throw new InvalidOperationException(
