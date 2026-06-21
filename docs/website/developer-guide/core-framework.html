@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Core Framework - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Core Framework</h1>
+
+      <p>The <code>AiAgentCanvas.Core</code> project is the orchestration engine. It registers the LLM client, manages tools and context providers, and exposes the AG-UI SSE endpoint that CopilotKit connects to.</p>
+
+      <h2>ServiceCollectionExtensions</h2>
+
+      <p>The <code>AddAiAgentCanvas()</code> extension method is the central registration point. It wires up the chat client, tool registry, context providers, and the ChatClientAgent.</p>
+
+      <pre><code>builder.Services.AddAiAgentCanvas(builder.Configuration, options =&gt;
+{
+    options.AgentName = "AiAgentCanvas";
+    options.AgentDescription = "A multi-tool AI assistant with market data, "
+        + "scheduling, skills, and MCP integration.";
+});</code></pre>
+
+      <h3>What AddAiAgentCanvas() Registers</h3>
+
+      <ol>
+        <li><strong>AIFoundryOptions</strong> -- binds the <code>AIFoundry</code> configuration section</li>
+        <li><strong>AIFoundryClientFactory</strong> -- singleton that creates <code>ChatCompletionsClient</code></li>
+        <li><strong>IChatClient</strong> -- via <code>AddChatClient()</code>, resolved from the factory</li>
+        <li><strong>DynamicToolRegistry</strong> -- singleton for runtime tool registration</li>
+        <li><strong>DefaultSystemPrompt</strong> -- wraps the configured or default system prompt</li>
+        <li><strong>SystemPromptProvider</strong> -- <code>AIContextProvider</code> that sets initial instructions</li>
+        <li><strong>DynamicToolContextProvider</strong> -- <code>AIContextProvider</code> that injects dynamic tools</li>
+        <li><strong>ChatClientAgent</strong> -- the MAF agent with all tools and context providers</li>
+        <li><strong>CORS</strong> -- allows any origin (intended for local CopilotKit development)</li>
+      </ol>
+
+      <p>The agent is constructed with all <code>IReadOnlyList&lt;AITool&gt;</code> services flattened into <code>ChatOptions.Tools</code>, and all <code>AIContextProvider</code> services passed as the context pipeline:</p>
+
+      <pre><code>var tools = sp.GetServices&lt;IReadOnlyList&lt;AITool&gt;&gt;().SelectMany(t =&gt; t).ToList();
+
+var agentOptions = new ChatClientAgentOptions
+{
+    Name = options.AgentName,
+    Description = options.AgentDescription,
+    ChatOptions = new ChatOptions { Tools = tools },
+    AIContextProviders = contextProviders,
+};
+
+var agent = new ChatClientAgent(chatClient, agentOptions, loggerFactory, sp);</code></pre>
+
+      <h3>AiAgentCanvasOptions</h3>
+
+      <pre><code>public sealed class AiAgentCanvasOptions
+{
+    public string AgentName { get; set; } = "AiAgentCanvas";
+    public string AgentDescription { get; set; } = "A multi-tool AI assistant";
+    public string? SystemPrompt { get; set; }
+}</code></pre>
+
+      <h3>UseAiAgentCanvas()</h3>
+
+      <p>The <code>UseAiAgentCanvas()</code> method configures the middleware pipeline:</p>
+
+      <pre><code>public static WebApplication UseAiAgentCanvas(this WebApplication app)
+{
+    app.UseCors();
+    app.MapAgUiEndpoints();
+    app.MapGet("/api/health", () =&gt; Results.Ok(new { status = "healthy" }));
+    return app;
+}</code></pre>
+
+      <h2>AIFoundryClientFactory</h2>
+
+      <p>Creates the Azure AI Foundry chat client from configuration. Supports both API key and Azure credential authentication.</p>
+
+      <pre><code>public IChatClient CreateChatClient()
+{
+    var endpoint = new Uri(_options.Endpoint);
+    var inner = _options.UseAzureCredential
+        ? new ChatCompletionsClient(endpoint, new DefaultAzureCredential())
+        : new ChatCompletionsClient(endpoint, new AzureKeyCredential(_options.Key!));
+
+    return inner.AsIChatClient(_options.DeploymentName);
+}</code></pre>
+
+      <h3>AIFoundryOptions</h3>
+
+      <p>Configured in <code>appsettings.json</code> under the <code>AIFoundry</code> section:</p>
+
+      <pre><code>{
+  "AIFoundry": {
+    "Endpoint": "https://your-resource.services.ai.azure.com/models",
+    "Key": "your-api-key",
+    "DeploymentName": "gpt-4o",
+    "EmbeddingDeploymentName": "text-embedding-3-small",
+    "UseAzureCredential": false
+  }
+}</code></pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Required</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Endpoint</code></td>
+            <td>Yes</td>
+            <td>Azure AI Foundry endpoint URL</td>
+          </tr>
+          <tr>
+            <td><code>Key</code></td>
+            <td>Conditional</td>
+            <td>API key (required when <code>UseAzureCredential</code> is false)</td>
+          </tr>
+          <tr>
+            <td><code>DeploymentName</code></td>
+            <td>Yes</td>
+            <td>Model deployment name</td>
+          </tr>
+          <tr>
+            <td><code>EmbeddingDeploymentName</code></td>
+            <td>No</td>
+            <td>Embedding model for RAG</td>
+          </tr>
+          <tr>
+            <td><code>UseAzureCredential</code></td>
+            <td>No</td>
+            <td>Use <code>DefaultAzureCredential</code> instead of API key</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>AgUiEndpoint</h2>
+
+      <p>The AG-UI endpoint handles the CopilotKit frontend protocol. It accepts POST requests at <code>/api/copilotkit</code>, extracts chat messages, runs the agent, and streams responses as SSE events.</p>
+
+      <pre><code>app.MapPost("/api/copilotkit", HandleCopilotKitRequest);</code></pre>
+
+      <h3>Request Format</h3>
+
+      <p>CopilotKit sends a JSON body with <code>messages</code> and an optional <code>threadId</code>:</p>
+
+      <pre><code>{
+  "threadId": "abc-123",
+  "messages": [
+    { "role": "user", "content": "What is Apple's latest revenue?" }
+  ]
+}</code></pre>
+
+      <h3>SSE Event Sequence</h3>
+
+      <p>The endpoint streams events in this order:</p>
+
+      <pre><code>event: run.started
+data: {"threadId":"abc-123","runId":"def-456"}
+
+event: text.message.start
+data: {"messageId":"ghi-789","role":"assistant","agentName":"AiAgentCanvas"}
+
+event: text.message.content
+data: {"messageId":"ghi-789","delta":"Apple's latest"}
+
+event: text.message.content
+data: {"messageId":"ghi-789","delta":" quarterly revenue was..."}
+
+event: text.message.end
+data: {"messageId":"ghi-789"}
+
+event: run.finished
+data: {"threadId":"abc-123","runId":"def-456"}</code></pre>
+
+      <h3>How It Works</h3>
+
+      <ol>
+        <li>Deserializes the request body and extracts messages</li>
+        <li>Maps each message to a <code>ChatMessage</code> with the appropriate <code>ChatRole</code></li>
+        <li>Creates a new agent session via <code>agent.CreateSessionAsync()</code></li>
+        <li>Sets the response content type to <code>text/event-stream</code></li>
+        <li>Emits <code>run.started</code> and <code>text.message.start</code> events</li>
+        <li>Iterates <code>agent.RunStreamingAsync()</code> and emits <code>text.message.content</code> for each text delta</li>
+        <li>Emits <code>text.message.end</code> and <code>run.finished</code></li>
+      </ol>
+
+      <h2>DynamicToolRegistry</h2>
+
+      <p>A thread-safe registry that allows tools to be added and removed at runtime. Used primarily by <code>McpConnectionManager</code> to register tools from external MCP servers.</p>
+
+      <pre><code>public sealed class DynamicToolRegistry
+{
+    private readonly ConcurrentDictionary&lt;string, List&lt;AITool&gt;&gt; _toolsBySource = new();
+
+    public void Register(string source, IEnumerable&lt;AITool&gt; tools)
+    {
+        _toolsBySource[source] = tools.ToList();
+    }
+
+    public void Unregister(string source)
+    {
+        _toolsBySource.TryRemove(source, out _);
+    }
+
+    public IReadOnlyList&lt;AITool&gt; GetAllTools()
+    {
+        return _toolsBySource.Values.SelectMany(t =&gt; t).ToList();
+    }
+}</code></pre>
+
+      <p>Tools are keyed by a source string (e.g., <code>"mcp:my-server"</code>). When an MCP server connects, its tools are registered under that key. When it disconnects, they are removed.</p>
+
+      <h2>DynamicToolContextProvider</h2>
+
+      <p>An <code>AIContextProvider</code> that merges dynamic tools into the chat options before each LLM call. This ensures tools registered at runtime (via MCP connections) are available to the model.</p>
+
+      <pre><code>internal sealed class DynamicToolContextProvider : AIContextProvider
+{
+    private readonly DynamicToolRegistry _registry;
+
+    protected override ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
+        InvokingContext context, CancellationToken cancellationToken)
+    {
+        var dynamicTools = _registry.GetAllTools();
+        if (dynamicTools.Count &gt; 0)
+        {
+            var existing = context.AIContext.Tools?.ToList() ?? [];
+            existing.AddRange(dynamicTools);
+            context.AIContext.Tools = existing;
+        }
+        return new ValueTask&lt;AIContext&gt;(context.AIContext);
+    }
+}</code></pre>
+
+      <h2>Tool Registration: Two Paths</h2>
+
+      <p>Tools reach the agent through two mechanisms:</p>
+
+      <ol>
+        <li><strong>Startup registration</strong> -- Tool providers register <code>IReadOnlyList&lt;AITool&gt;</code> as singleton services. These are collected once at startup and passed to <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>.</li>
+        <li><strong>Runtime registration</strong> -- Tools registered into <code>DynamicToolRegistry</code> are injected by <code>DynamicToolContextProvider</code> before each LLM call. This is used for MCP connections that can come and go.</li>
+      </ol>
+
+      <p>Both paths result in the LLM seeing all available tools in its context window.</p>
+
+      <h2>Context Provider Pipeline</h2>
+
+      <p><code>AIContextProvider</code> subclasses form a pipeline that runs before each LLM invocation. Each provider can modify the <code>AIContext</code> (instructions, tools, or other metadata). The framework registers several providers:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Source</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SystemPromptProvider</code></td>
+            <td>Core</td>
+            <td>Sets the default system prompt</td>
+          </tr>
+          <tr>
+            <td><code>DynamicToolContextProvider</code></td>
+            <td>Core</td>
+            <td>Injects runtime-registered tools</td>
+          </tr>
+          <tr>
+            <td><code>PersonaContextProvider</code></td>
+            <td>AgentData</td>
+            <td>Appends active persona instructions</td>
+          </tr>
+          <tr>
+            <td><code>GuardrailContextProvider</code></td>
+            <td>AgentData</td>
+            <td>Appends guardrail constraints</td>
+          </tr>
+          <tr>
+            <td><code>EntityContextProvider</code></td>
+            <td>AgentData</td>
+            <td>Appends entity context</td>
+          </tr>
+          <tr>
+            <td><code>PersistentContextProvider</code></td>
+            <td>AgentData</td>
+            <td>Appends persistent context entries</td>
+          </tr>
+          <tr>
+            <td><code>UserProfileContextProvider</code></td>
+            <td>AgentData</td>
+            <td>Appends user profile context</td>
+          </tr>
+          <tr>
+            <td><code>GovernanceContextProvider</code></td>
+            <td>Security</td>
+            <td>Scans for prompt injection</td>
+          </tr>
+          <tr>
+            <td><code>RagContextProvider</code></td>
+            <td>Core</td>
+            <td>Injects RAG search results</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

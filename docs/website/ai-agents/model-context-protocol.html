@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Context Protocol - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Model Context Protocol</h1>
+
+      <p>Model Context Protocol (MCP) is an open standard for connecting LLMs to external data sources, tools, and services. Rather than building custom integrations for every data source, MCP provides a <strong>universal protocol</strong> that any LLM-powered application can use to discover and call tools exposed by any MCP-compliant server.</p>
+
+      <h2>Why MCP Matters</h2>
+
+      <p>Before MCP, connecting an AI agent to a data source required:</p>
+
+      <ol>
+        <li>Writing custom API client code</li>
+        <li>Defining tool schemas manually</li>
+        <li>Handling authentication, serialization, and error handling per integration</li>
+        <li>Rebuilding when the data source API changes</li>
+      </ol>
+
+      <p>MCP standardizes this into a single protocol:</p>
+
+      <div class="diagram"><pre>+----------+          MCP Protocol          +-----------+
+|  Agent   | &lt;----------------------------&gt; | MCP Server|
+| (Client) |   discover tools, call them,   | (Data     |
+|          |   receive results              |  Source)  |
++----------+                                +-----------+</pre></div>
+
+      <p>An MCP server exposes a set of tools with standardized schemas. An MCP client (the agent) discovers those tools at runtime, and the LLM can call them like any local tool. The agent does not need to know the implementation details of the data source.</p>
+
+      <h2>MCP in AI Agent Canvas</h2>
+
+      <p>AI Agent Canvas implements MCP through two main components:</p>
+
+      <ul>
+        <li><strong><code>McpConnectionManager</code></strong> -- Manages the lifecycle of MCP connections (connect, disconnect, list)</li>
+        <li><strong><code>DynamicToolRegistry</code></strong> -- Registers MCP tools so the agent can use them alongside local tools</li>
+      </ul>
+
+      <h3>McpClient and HttpClientTransport</h3>
+
+      <p>The framework uses the <code>ModelContextProtocol.Client</code> library to connect to MCP servers:</p>
+
+      <pre><code>IClientTransport clientTransport = transport.ToLowerInvariant() switch
+{
+    "http" or "sse" =&gt; new HttpClientTransport(
+        new HttpClientTransportOptions
+        {
+            Endpoint = new Uri(endpoint)
+        }),
+    _ =&gt; throw new ArgumentException($"Unsupported transport: {transport}"),
+};
+
+var client = await McpClient.CreateAsync(clientTransport, cancellationToken: ct);</code></pre>
+
+      <p><code>HttpClientTransport</code> handles the HTTP-based communication with MCP servers, supporting both standard HTTP request/response and SSE (Server-Sent Events) streaming for real-time tool execution.</p>
+
+      <h3>Tool Discovery</h3>
+
+      <p>Once connected, the client discovers available tools:</p>
+
+      <pre><code>var mcpTools = await client.ListToolsAsync(cancellationToken: ct);
+var aiTools = mcpTools.Cast&lt;AITool&gt;().ToList();</code></pre>
+
+      <p>MCP tools implement <code>AITool</code>, so they integrate seamlessly with the Microsoft.Extensions.AI tool system. The agent sees no difference between a local tool and an MCP tool -- both appear in the same tool list with the same schema format.</p>
+
+      <h2>Dynamic MCP Connections</h2>
+
+      <p>A key design principle of AI Agent Canvas is that MCP connections are <strong>runtime-dynamic</strong>. The agent itself can connect to and disconnect from MCP servers during a conversation.</p>
+
+      <h3>Connecting</h3>
+
+      <p>The agent exposes a <code>connect_mcp_server</code> tool that users can invoke through natural language:</p>
+
+      <pre><code>User: "Connect to the market data server at https://mcp.example.com/market"</code></pre>
+
+      <p>The agent calls <code>connect_mcp_server</code>, which:</p>
+
+      <ol>
+        <li>Creates an <code>HttpClientTransport</code> with the specified endpoint</li>
+        <li>Establishes the MCP connection via <code>McpClient.CreateAsync</code></li>
+        <li>Discovers available tools via <code>ListToolsAsync</code></li>
+        <li>Registers the tools in <code>DynamicToolRegistry</code> under the source key <code>mcp:{name}</code></li>
+        <li>Returns the list of discovered tools to the LLM</li>
+      </ol>
+
+      <pre><code>_connections[name] = connection;
+_registry.Register($"mcp:{name}", aiTools);</code></pre>
+
+      <p>From this point forward, the agent can call any tool from the connected MCP server.</p>
+
+      <h3>Disconnecting</h3>
+
+      <p>When a connection is no longer needed:</p>
+
+      <pre><code>private async Task&lt;string&gt; DisconnectMcpServer(string name, CancellationToken ct)
+{
+    if (!_connections.TryRemove(name, out var connection))
+        return JsonSerializer.Serialize(new { error = $"Connection '{name}' not found" });
+
+    _registry.Unregister($"mcp:{name}");
+
+    if (connection.Client is not null)
+        await connection.Client.DisposeAsync();
+
+    return JsonSerializer.Serialize(new { status = "disconnected", name });
+}</code></pre>
+
+      <p>Disconnecting removes the tools from the registry and disposes the MCP client. The agent immediately loses access to those tools.</p>
+
+      <h3>Listing Connections</h3>
+
+      <p>The <code>list_mcp_connections</code> tool shows all active connections and their tool counts, giving the agent (and user) visibility into what data sources are available.</p>
+
+      <h2>MCP Tools vs Local Tools</h2>
+
+      <p>AI Agent Canvas uses both MCP tools and local tools. Understanding the distinction helps when designing the system:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>Local Tools</th>
+            <th>MCP Tools</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Definition</td>
+            <td>C# methods via <code>AIFunctionFactory</code></td>
+            <td>Defined by remote MCP server</td>
+          </tr>
+          <tr>
+            <td>Registration</td>
+            <td>At startup in <code>Program.cs</code></td>
+            <td>At runtime via <code>McpConnectionManager</code></td>
+          </tr>
+          <tr>
+            <td>Execution</td>
+            <td>In-process</td>
+            <td>Remote HTTP call to MCP server</td>
+          </tr>
+          <tr>
+            <td>Latency</td>
+            <td>Minimal</td>
+            <td>Network-dependent</td>
+          </tr>
+          <tr>
+            <td>Availability</td>
+            <td>Always available</td>
+            <td>Only while connected</td>
+          </tr>
+          <tr>
+            <td>Schema source</td>
+            <td><code>[Description]</code> attributes</td>
+            <td>MCP server's tool listing</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>From the LLM's perspective, both types are identical. The framework abstracts the execution mechanism, so the agent reasons about tools purely based on their names and descriptions.</p>
+
+      <h2>Tool Composition Example</h2>
+
+      <p>A typical AI Agent Canvas deployment might have:</p>
+
+      <div class="diagram"><pre>Agent Tool List
+|
++-- Local Tools (always available)
+|   +-- create_skill
+|   +-- run_skill
+|   +-- connect_mcp_server
+|   +-- list_mcp_connections
+|
++-- MCP: market-data (connected at runtime)
+|   +-- get_stock_price
+|   +-- get_market_summary
+|   +-- search_tickers
+|
++-- MCP: crm (connected at runtime)
+    +-- search_contacts
+    +-- get_deal_pipeline
+    +-- update_opportunity</pre></div>
+
+      <p>The <code>DynamicToolRegistry</code> merges all sources into a flat list. The LLM sees all tools equally and picks the right one based on the user's request.</p>
+
+      <h2>Security Considerations</h2>
+
+      <p>Dynamic MCP connections introduce security concerns that AI Agent Canvas addresses through its governance layer.</p>
+
+      <h3>SSRF Protection</h3>
+
+      <p>The <code>GovernedMcpGateway</code> evaluates every MCP tool call against a governance policy before execution:</p>
+
+      <pre><code>public sealed class GovernedMcpGateway
+{
+    private readonly McpGateway _gateway;
+
+    public McpGatewayDecision Evaluate(
+        string agentId, string toolName, string? payload = null)
+    {
+        var request = new McpGatewayRequest
+        {
+            AgentId = agentId,
+            ToolName = toolName,
+            Payload = payload ?? "",
+        };
+
+        var decision = _gateway.ProcessRequest(request);
+
+        if (!decision.Allowed)
+        {
+            _logger.LogWarning(
+                "[GOVERNANCE:MCP] Blocked tool={Tool} agent={Agent} status={Status}",
+                toolName, agentId, decision.Status);
+        }
+
+        return decision;
+    }
+}</code></pre>
+
+      <p>This prevents:</p>
+
+      <ul>
+        <li><strong>SSRF attacks</strong> -- An attacker cannot trick the agent into connecting to internal network endpoints</li>
+        <li><strong>Unauthorized tool use</strong> -- Policies can restrict which agents can call which MCP tools</li>
+        <li><strong>Data exfiltration</strong> -- Outbound tool calls are audited and can be blocked based on payload inspection</li>
+      </ul>
+
+      <h3>Best Practices</h3>
+
+      <p>When deploying MCP in production:</p>
+
+      <ol>
+        <li><strong>Allowlist endpoints</strong> -- Only permit connections to known, trusted MCP server URLs</li>
+        <li><strong>Use HTTPS</strong> -- Always require TLS for MCP transport</li>
+        <li><strong>Audit connections</strong> -- Log all connect/disconnect events and tool invocations</li>
+        <li><strong>Scope permissions</strong> -- Use the governance policy to restrict tool access per agent</li>
+        <li><strong>Set timeouts</strong> -- Configure connection and request timeouts to prevent hanging connections</li>
+        <li><strong>Dispose properly</strong> -- The <code>McpConnectionManager</code> implements <code>IAsyncDisposable</code> to clean up connections on shutdown</li>
+      </ol>
+
+      <h2>Summary</h2>
+
+      <p>MCP transforms how AI agents access data. Instead of hardcoded integrations, agents discover and use tools from any MCP-compliant server at runtime. AI Agent Canvas's implementation makes this dynamic and governed:</p>
+
+      <ul>
+        <li><strong><code>McpConnectionManager</code></strong> handles the connection lifecycle</li>
+        <li><strong><code>DynamicToolRegistry</code></strong> merges MCP tools with local tools transparently</li>
+        <li><strong><code>GovernedMcpGateway</code></strong> enforces security policies on MCP tool calls</li>
+        <li>The agent can connect/disconnect MCP servers during a conversation, adapting to the user's needs</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

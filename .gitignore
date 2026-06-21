@@ -1,0 +1,30 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+.vs/
+*.DotSettings.user
+publish/
+
+## Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+
+## IDE
+.idea/
+.vscode/
+*.swp
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Secrets
+appsettings.*.local.json
+*.pfx
+*.pem

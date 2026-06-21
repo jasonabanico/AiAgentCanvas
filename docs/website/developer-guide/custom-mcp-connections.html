@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adding Custom MCP Connections - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Adding Custom MCP Connections</h1>
+
+      <p>Custom MCP connections in AI Agent Canvas are projects that provide tools (data connections, API integrations) to the agent. Each connection is a class library that defines tools using <code>AIFunctionFactory.Create()</code> and registers them as <code>IReadOnlyList&lt;AITool&gt;</code> services.</p>
+
+      <p>The term "MCP connection" here refers to a local tool provider project (not an external MCP server -- for connecting to remote MCP servers at runtime, see <a href="skills-and-mcp.html">Skills and MCP</a>).</p>
+
+      <h2>How Tool Registration Works</h2>
+
+      <p>The Core framework collects all <code>IReadOnlyList&lt;AITool&gt;</code> singleton services at startup and passes them to the <code>ChatClientAgent</code>:</p>
+
+      <pre><code>// Inside AddAiAgentCanvas() in Core:
+var tools = sp.GetServices&lt;IReadOnlyList&lt;AITool&gt;&gt;().SelectMany(t =&gt; t).ToList();
+var agentOptions = new ChatClientAgentOptions
+{
+    ChatOptions = new ChatOptions { Tools = tools },
+};</code></pre>
+
+      <p>Your custom project just needs to register its tools as <code>IReadOnlyList&lt;AITool&gt;</code> and they automatically become available to the LLM.</p>
+
+      <h2>Step-by-Step Guide</h2>
+
+      <h3>Step 1: Create the Project</h3>
+
+      <p>Create a new folder under <code>src/Custom/</code> and a <code>.csproj</code> with the <code>Microsoft.Extensions.AI</code> package:</p>
+
+      <pre><code>src/Custom/MCP.Weather/</code></pre>
+
+      <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net9.0&lt;/TargetFramework&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" /&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;</code></pre>
+
+      <p>Add <code>Microsoft.Extensions.Http.Resilience</code> if you need HTTP clients with retry policies.</p>
+
+      <h3>Step 2: Create a ToolProvider Class</h3>
+
+      <p>Define your tools using <code>AIFunctionFactory.Create()</code>. Each tool is a method decorated with <code>[Description]</code> attributes:</p>
+
+      <pre><code>using System.ComponentModel;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace MCP.Weather;
+
+public sealed class WeatherToolProvider
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _apiKey;
+    private readonly ILogger&lt;WeatherToolProvider&gt; _logger;
+
+    public WeatherToolProvider(
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        ILogger&lt;WeatherToolProvider&gt; logger)
+    {
+        _httpClientFactory = httpClientFactory;
+        _apiKey = configuration["Weather:ApiKey"] ?? "";
+        _logger = logger;
+    }
+
+    public IReadOnlyList&lt;AITool&gt; GetTools()
+    {
+        return
+        [
+            AIFunctionFactory.Create(GetCurrentWeather, "get_current_weather",
+                "Get current weather conditions for a city"),
+            AIFunctionFactory.Create(GetForecast, "get_weather_forecast",
+                "Get a 5-day weather forecast for a city"),
+        ];
+    }
+
+    [Description("Get current weather conditions for a city")]
+    private async Task&lt;string&gt; GetCurrentWeather(
+        [Description("City name (e.g. 'Seattle', 'London')")] string city,
+        CancellationToken ct)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("Weather");
+            var url = $"https://api.weather.example.com/current?q={city}&amp;key={_apiKey}";
+            var result = await client.GetStringAsync(url, ct);
+
+            _logger.LogInformation("Weather fetched for {City}", city);
+            return result;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Weather fetch failed for {City}", city);
+            return JsonSerializer.Serialize(new { error = $"Failed: {ex.Message}" });
+        }
+    }
+
+    [Description("Get a 5-day weather forecast for a city")]
+    private async Task&lt;string&gt; GetForecast(
+        [Description("City name")] string city,
+        [Description("Number of days (1-5)")] int days,
+        CancellationToken ct)
+    {
+        // Implementation similar to above
+        return "...";
+    }
+}</code></pre>
+
+      <p>Key points:</p>
+
+      <ul>
+        <li>The constructor receives dependencies from DI (IHttpClientFactory, IConfiguration, ILogger)</li>
+        <li><code>GetTools()</code> returns the tool list using <code>AIFunctionFactory.Create()</code></li>
+        <li>Each tool method uses <code>[Description]</code> attributes so the LLM understands parameters</li>
+        <li>Tools return JSON strings (the LLM parses the response)</li>
+        <li>Always handle errors gracefully and return error JSON instead of throwing</li>
+      </ul>
+
+      <h3>Step 3: Create ServiceExtensions</h3>
+
+      <p>Create an extension method that registers the HttpClient, the tool provider, and the tools:</p>
+
+      <pre><code>using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+
+namespace MCP.Weather;
+
+public static class WeatherServiceExtensions
+{
+    public static IServiceCollection AddWeatherTools(this IServiceCollection services)
+    {
+        services.AddHttpClient("Weather", client =&gt;
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+            })
+            .AddStandardResilienceHandler();
+
+        services.AddSingleton&lt;WeatherToolProvider&gt;();
+        services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+            sp.GetRequiredService&lt;WeatherToolProvider&gt;().GetTools());
+
+        return services;
+    }
+}</code></pre>
+
+      <p>The critical line is the <code>IReadOnlyList&lt;AITool&gt;</code> registration. This is how the Core framework discovers your tools.</p>
+
+      <h3>Step 4: Wire Up in Program.cs</h3>
+
+      <p>Add the project reference and call your extension method:</p>
+
+      <pre><code>&lt;!-- In AiAgentCanvas.Web.csproj --&gt;
+&lt;ItemGroup&gt;
+  &lt;ProjectReference Include="..\Custom\MCP.Weather\MCP.Weather.csproj" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+
+      <pre><code>// In Program.cs
+using MCP.Weather;
+
+builder.Services.AddWeatherTools();</code></pre>
+
+      <p>Add the project to the solution:</p>
+
+      <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MCP.Weather/MCP.Weather.csproj --solution-folder Custom</code></pre>
+
+      <h2>Full Reference: MCP.MarketData</h2>
+
+      <p>The <code>MCP.MarketData</code> project in <code>src/Custom/MCP.MarketData/</code> is the built-in reference implementation. It provides three tools for stock market data.</p>
+
+      <h3>MarketDataToolProvider.cs</h3>
+
+      <p>The tool provider defines three tools:</p>
+
+      <pre><code>public IReadOnlyList&lt;AITool&gt; GetTools()
+{
+    return
+    [
+        AIFunctionFactory.Create(EdgarCompanyFactsAsync, "edgar_company_facts",
+            "Fetch SEC EDGAR financial data for a company by ticker symbol"),
+        AIFunctionFactory.Create(StockQuoteAsync, "stock_quote",
+            "Get current stock price and daily change from Alpha Vantage"),
+        AIFunctionFactory.Create(StockTechnicalsAsync, "stock_technicals",
+            "Get technical indicators (RSI, SMA, EMA, MACD) from Alpha Vantage"),
+    ];
+}</code></pre>
+
+      <p>Each tool:</p>
+
+      <ul>
+        <li>Takes typed parameters with <code>[Description]</code> attributes</li>
+        <li>Uses <code>IHttpClientFactory</code> to make HTTP requests</li>
+        <li>Returns JSON strings with structured data or error information</li>
+        <li>Logs timing and errors via <code>ILogger</code></li>
+        <li>Accepts <code>CancellationToken</code> for proper cancellation</li>
+      </ul>
+
+      <h3>MarketDataServiceExtensions.cs</h3>
+
+      <pre><code>public static IServiceCollection AddMarketDataTools(this IServiceCollection services)
+{
+    services.AddHttpClient("SEC", client =&gt;
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "AiAgentCanvas/1.0 (contact@example.com)");
+        })
+        .AddStandardResilienceHandler();
+
+    services.AddHttpClient("AlphaVantage", client =&gt;
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        })
+        .AddStandardResilienceHandler();
+
+    services.AddSingleton&lt;MarketDataToolProvider&gt;();
+    services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+        sp.GetRequiredService&lt;MarketDataToolProvider&gt;().GetTools());
+
+    return services;
+}</code></pre>
+
+      <p>Notable patterns:</p>
+
+      <ul>
+        <li>Named HttpClients for different API backends</li>
+        <li><code>AddStandardResilienceHandler()</code> for automatic retry and circuit-breaking</li>
+        <li>Custom User-Agent header for the SEC EDGAR API (which requires identification)</li>
+        <li>Separate timeout values per API</li>
+      </ul>
+
+      <h2>Testing Tools</h2>
+
+      <p>Once registered, your tools are automatically discovered by the agent. To test:</p>
+
+      <ol>
+        <li>Build: <code>dotnet build AiAgentCanvas.sln</code></li>
+        <li>Run: <code>cd src/AiAgentCanvas.Web &amp;&amp; dotnet run</code></li>
+        <li>Open the CopilotKit frontend</li>
+        <li>Ask the agent to use your tool (e.g., "What's the weather in Seattle?")</li>
+        <li>Check the backend console for tool call logs</li>
+      </ol>
+
+      <p>The LLM discovers tools from their names and descriptions. Make sure your tool names are descriptive and your <code>[Description]</code> attributes clearly explain what each parameter expects.</p>
+
+      <h2>Tool Design Guidelines</h2>
+
+      <ol>
+        <li><strong>Return JSON strings</strong> -- The LLM parses your tool's return value. Always return structured JSON.</li>
+        <li><strong>Handle errors gracefully</strong> -- Return <code>{ "error": "..." }</code> instead of throwing exceptions.</li>
+        <li><strong>Use CancellationToken</strong> -- Accept and pass through the cancellation token for proper request cancellation.</li>
+        <li><strong>Log appropriately</strong> -- Use <code>ILogger</code> for timing, errors, and debugging.</li>
+        <li><strong>Keep tools focused</strong> -- One tool per API operation. Let the LLM compose multiple tool calls.</li>
+        <li><strong>Descriptive names</strong> -- Use snake_case names that clearly describe the action (e.g., <code>get_current_weather</code>, not <code>weather</code>).</li>
+        <li><strong>Document parameters</strong> -- Every parameter needs a <code>[Description]</code> attribute with examples.</li>
+      </ol>
+
+      <h2>Tools Without External APIs</h2>
+
+      <p>Not every tool needs HTTP calls. You can create tools that do local computation, file operations, or database queries:</p>
+
+      <pre><code>public IReadOnlyList&lt;AITool&gt; GetTools()
+{
+    return
+    [
+        AIFunctionFactory.Create(CalculateCompoundInterest, "calculate_compound_interest",
+            "Calculate compound interest over a period"),
+    ];
+}
+
+[Description("Calculate compound interest")]
+private string CalculateCompoundInterest(
+    [Description("Principal amount")] decimal principal,
+    [Description("Annual interest rate (e.g. 0.05 for 5%)")] decimal rate,
+    [Description("Number of years")] int years)
+{
+    var result = principal * (decimal)Math.Pow((double)(1 + rate), years);
+    return JsonSerializer.Serialize(new { principal, rate, years, futureValue = result });
+}</code></pre>
+
+      <p>These tools follow the same registration pattern and are automatically available to the agent.</p>
+    </main>
+  </div>
+</body>
+</html>

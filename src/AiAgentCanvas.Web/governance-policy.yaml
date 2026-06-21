@@ -1,0 +1,45 @@
+name: AiAgentCanvas-default
+description: Default governance policy for AiAgentCanvas
+
+rules:
+  - name: block-dangerous-tools
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        in: [run_script]
+    reason: "Shell execution requires explicit approval"
+
+  - name: restrict-file-write-paths
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        equals: write_file
+      path:
+        matches: "^(/etc|/var|C:\\\\Windows|C:\\\\Program Files)"
+    reason: "Writing to system directories is blocked"
+
+  - name: block-private-mcp-endpoints
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        equals: connect_mcp_server
+      endpoint:
+        matches: "(localhost|127\\.0\\.0\\.1|169\\.254\\.169\\.254|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)"
+    reason: "MCP connections to private/internal addresses are blocked (SSRF protection)"
+
+  - name: limit-scheduled-tasks
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        in: [schedule_recurring_task, schedule_one_time_task]
+      rate_exceeded: true
+    reason: "Scheduled task rate limit exceeded"
+
+  - name: allow-all-other
+    scope: tool_call
+    action: allow
+    condition: {}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Intelligence Copilot - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Market Intelligence Copilot</h1>
+
+      <h2>Company Profile</h2>
+
+      <p><strong>Meridian Capital</strong> is a mid-size hedge fund managing $2.4 billion in assets across equity, fixed-income, and alternatives strategies. Based in Boston, the firm employs 45 investment professionals and prides itself on data-driven decision-making. Their edge depends on how fast analysts can synthesize market signals and translate them into actionable research.</p>
+
+      <h2>The Persona</h2>
+
+      <p><strong>Priya Sharma, Junior Portfolio Analyst.</strong> Two years out of her MBA, Priya covers the industrials sector. Her day starts at 6:30 AM reviewing overnight market moves and ends with a stack of research notes that feed the senior portfolio managers' weekly allocation meeting. She juggles Bloomberg terminals, SEC filings, internal models, and Slack threads --- often copying data between systems manually.</p>
+
+      <h2>The Problem</h2>
+
+      <p>Priya spends 60% of her day on data gathering rather than analysis. Pulling a single stock's fundamentals, technicals, and recent SEC filings requires switching between four applications. When the PM asks "What changed overnight in our watchlist?", Priya needs 45 minutes to compile an answer. During earnings season, the backlog becomes unmanageable.</p>
+
+      <p>The compliance team adds another layer: analysts must not share raw trading signals outside approved channels, and every piece of external data used in a recommendation must be traceable to its source.</p>
+
+      <h2>How AI Agent Canvas Solves It</h2>
+
+      <p>Meridian deploys AI Agent Canvas as an internal copilot accessible through a CopilotKit-powered web interface embedded in their research portal.</p>
+
+      <h3>MCP Data Connections</h3>
+
+      <p>The team configures <strong>MCP.MarketData</strong> with three core tools:</p>
+
+      <ul>
+        <li><strong>stock_quote</strong> --- Retrieves real-time and historical price data for any ticker. Priya asks "What's the current price and 30-day performance of CAT?" and gets a structured response with price, change, volume, and moving averages.</li>
+        <li><strong>edgar_company_facts</strong> --- Queries SEC EDGAR for company filings, financial statements, and key metrics. "Pull CAT's latest 10-K revenue breakdown by segment" returns structured data extracted from the filing.</li>
+        <li><strong>stock_technicals</strong> --- Computes technical indicators (RSI, MACD, Bollinger Bands) on demand. "Show me the RSI and MACD for CAT over the last 90 days" returns the computed values with interpretation notes.</li>
+      </ul>
+
+      <h3>Scheduled Tasks</h3>
+
+      <p>Meridian configures two scheduled scans:</p>
+
+      <ul>
+        <li><strong>Morning Watchlist Briefing (6:00 AM ET)</strong> --- The agent iterates through the firm's 85-stock watchlist, pulls overnight price changes, flags any stock that moved more than 2%, and checks for new SEC filings posted after market close. The summary lands in Priya's inbox before she arrives.</li>
+        <li><strong>Earnings Calendar Alert (Weekly, Monday 7:00 AM)</strong> --- Scans the upcoming week's earnings calendar against the watchlist and generates a preparation checklist for each reporting company.</li>
+      </ul>
+
+      <h3>Guardrails</h3>
+
+      <p>Compliance requirements are enforced through two custom guardrails:</p>
+
+      <ul>
+        <li><strong>No Trading Signals</strong> --- The agent is prohibited from generating buy/sell/hold recommendations or price targets. It can present data and flag anomalies, but the investment thesis must come from the analyst. If Priya asks "Should I buy CAT?", the agent responds with relevant data points and declines to make a recommendation.</li>
+        <li><strong>Source Attribution</strong> --- Every data point in the agent's response includes a source tag (e.g., "SEC EDGAR 10-K filed 2026-02-14" or "Market data as of 2026-06-21 09:31 ET"). This creates an audit trail that satisfies the compliance team's traceability requirements.</li>
+      </ul>
+
+      <h3>Personas</h3>
+
+      <p>The agent supports two personas:</p>
+
+      <ul>
+        <li><strong>Research Mode</strong> (default) --- Verbose responses with full data tables, charts descriptions, and contextual notes. Designed for deep analysis sessions.</li>
+        <li><strong>Briefing Mode</strong> --- Concise bullet-point summaries optimized for the morning standup. Priya switches to this mode when preparing materials for the PM meeting.</li>
+      </ul>
+
+      <h2>A Day in the Life</h2>
+
+      <p><strong>6:15 AM</strong> --- Priya opens her laptop to find the morning watchlist briefing already in her inbox. Three stocks moved more than 2% overnight: Caterpillar (CAT) dropped 3.1% on a supplier disruption report, Deere (DE) rose 2.4% on strong Asia-Pacific orders, and United Rentals (URI) filed an 8-K disclosing a new credit facility.</p>
+
+      <p><strong>6:30 AM</strong> --- She opens the copilot and asks: "Deep dive on CAT's supplier disruption. Pull the latest 10-K supply chain risk disclosures and compare current RSI to the last three drawdowns." The agent retrieves the relevant 10-K section, computes the RSI comparison, and presents a structured analysis --- without suggesting whether the dip is a buying opportunity.</p>
+
+      <p><strong>8:00 AM</strong> --- During the morning standup, the PM asks about URI's new credit facility. Priya switches the agent to Briefing Mode and asks: "Summarize URI's 8-K filed yesterday. What are the key terms?" She gets a five-bullet summary she can read aloud.</p>
+
+      <p><strong>10:30 AM</strong> --- Priya is building a sector comparison. She asks: "Compare P/E, EV/EBITDA, and revenue growth for CAT, DE, URI, and PCAR using the most recent quarterly data." The agent pulls EDGAR facts for all four companies and presents a comparison table with source citations.</p>
+
+      <p><strong>2:00 PM</strong> --- She drafts her weekly sector note and asks the agent to verify three specific data points against SEC filings. The agent confirms two and flags that one revenue figure she cited is from the prior quarter, not the most recent.</p>
+
+      <h2>Key Configuration</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Configuration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Agents</strong></td>
+            <td>MarketIntelligenceAgent with <code>CanHandle</code> matching financial queries</td>
+          </tr>
+          <tr>
+            <td><strong>MCP Connections</strong></td>
+            <td>MCP.MarketData (stock_quote, edgar_company_facts, stock_technicals)</td>
+          </tr>
+          <tr>
+            <td><strong>Scheduled Tasks</strong></td>
+            <td>Morning Watchlist Briefing (daily 6:00 AM), Earnings Calendar Alert (weekly Monday 7:00 AM)</td>
+          </tr>
+          <tr>
+            <td><strong>Personas</strong></td>
+            <td>Research Mode (verbose analysis), Briefing Mode (concise bullets)</td>
+          </tr>
+          <tr>
+            <td><strong>Guardrails</strong></td>
+            <td>NoTradingSignals, SourceAttribution</td>
+          </tr>
+          <tr>
+            <td><strong>User Profiles</strong></td>
+            <td>Per-analyst watchlist configuration, sector assignment</td>
+          </tr>
+          <tr>
+            <td><strong>Entity Management</strong></td>
+            <td>Stock tickers, SEC filing references, internal model identifiers</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

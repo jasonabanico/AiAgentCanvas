@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Are AI Agents - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>What Are AI Agents</h1>
+
+      <p>AI agents represent a fundamental shift from traditional chatbots and simple LLM wrappers. Where a chatbot follows scripted flows and an LLM wrapper sends a prompt and returns a response, an AI agent <strong>autonomously reasons, plans, and takes action</strong> to accomplish goals.</p>
+
+      <h2>Chatbots vs LLM Wrappers vs AI Agents</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>Traditional Chatbot</th>
+            <th>LLM Wrapper</th>
+            <th>AI Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Natural language understanding</td>
+            <td>Rule-based / intent matching</td>
+            <td>Full LLM capability</td>
+            <td>Full LLM capability</td>
+          </tr>
+          <tr>
+            <td>Decision making</td>
+            <td>Scripted decision trees</td>
+            <td>Single inference call</td>
+            <td>Multi-step reasoning</td>
+          </tr>
+          <tr>
+            <td>Tool use</td>
+            <td>None or hardcoded</td>
+            <td>None</td>
+            <td>Dynamic tool selection</td>
+          </tr>
+          <tr>
+            <td>Memory</td>
+            <td>Session state only</td>
+            <td>Stateless</td>
+            <td>Persistent context</td>
+          </tr>
+          <tr>
+            <td>Autonomy</td>
+            <td>None</td>
+            <td>None</td>
+            <td>Goal-directed behavior</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>A <strong>traditional chatbot</strong> matches user input against predefined intents and follows scripted flows. It cannot handle novel requests.</p>
+
+      <p>An <strong>LLM wrapper</strong> sends user input to a language model and returns the response. It gains natural language understanding but remains a single request-response cycle with no ability to take action.</p>
+
+      <p>An <strong>AI agent</strong> uses an LLM as its reasoning engine while adding the ability to call tools, maintain context across interactions, and execute multi-step plans autonomously.</p>
+
+      <h2>Key Characteristics of AI Agents</h2>
+
+      <h3>Autonomy</h3>
+
+      <p>Agents decide <strong>what to do next</strong> without explicit human instruction for each step. Given a goal like "find the latest sales data and summarize trends," an agent determines which tools to call, in what order, and how to synthesize the results.</p>
+
+      <h3>Tool Use</h3>
+
+      <p>Agents interact with external systems through <strong>tools</strong> (also called functions). A tool might query a database, call an API, search documents, or perform calculations. The LLM decides which tool to invoke based on the user's request and the tool's description.</p>
+
+      <h3>Reasoning</h3>
+
+      <p>Before acting, agents reason about the problem. Modern LLMs can break down complex requests into sub-tasks, evaluate which approach is most appropriate, and adjust their plan based on intermediate results.</p>
+
+      <h3>Memory and Context</h3>
+
+      <p>Agents maintain context across interactions. This includes conversation history, retrieved documents (RAG), user preferences, and domain-specific knowledge injected through context providers.</p>
+
+      <h2>The Agent Loop</h2>
+
+      <p>Every AI agent follows a fundamental execution cycle:</p>
+
+      <div class="diagram"><pre>                +------------------+
+                |    PERCEIVE      |
+                |  Receive input,  |
+                |  gather context  |
+                +--------+---------+
+                         |
+                         v
+                +------------------+
+                |     REASON       |
+                |  Analyze input,  |
+                |  plan next step  |
+                +--------+---------+
+                         |
+                         v
+                +------------------+
+                |      ACT         |
+                | Call a tool or   |
+                | generate response|
+                +--------+---------+
+                         |
+                         v
+                +------------------+
+                |    OBSERVE       |
+                | Process result,  |
+                | decide if done   |
+                +--------+---------+
+                         |
+                    +----+----+
+                    |         |
+                    v         v
+                Continue    Done
+                (loop)    (respond)</pre></div>
+
+      <ol>
+        <li><strong>Perceive</strong> -- The agent receives user input along with injected context (system prompts, RAG results, entity data, user profile information).</li>
+        <li><strong>Reason</strong> -- The LLM analyzes the input and available tools, then decides on the next action. This may involve breaking a complex request into steps.</li>
+        <li><strong>Act</strong> -- The agent either calls a tool (e.g., querying a database via MCP) or generates a text response. Tool calls are executed by the framework, not the LLM itself.</li>
+        <li><strong>Observe</strong> -- The tool result is fed back to the LLM. If the task is complete, the agent produces a final response. If not, it loops back to the Reason step.</li>
+      </ol>
+
+      <p>This loop continues until the agent determines the task is complete or reaches a configured limit.</p>
+
+      <h2>Where AI Agent Canvas Fits</h2>
+
+      <p>AI Agent Canvas is a <strong>multi-agent enterprise copilot framework</strong> built on three pillars:</p>
+
+      <ul>
+        <li><strong>Microsoft Agent Framework (MAF)</strong> for agent orchestration and the LLM execution loop</li>
+        <li><strong>Azure AI Foundry</strong> as the LLM provider (GPT-4o, GPT-4.1, and other models)</li>
+        <li><strong>CopilotKit</strong> with the AG-UI protocol for real-time streaming to the frontend</li>
+      </ul>
+
+      <p>The framework is designed around separation of concerns:</p>
+
+      <div class="diagram"><pre>+---------------------------------------------+
+|             AiAgentCanvas.Web               |
+|          (Composition Root)                  |
++-----+------------------+--------------------+
+      |                  |                    |
+      v                  v                    v
++----------+     +-----------+     +------------------+
+|   Core   |     |    MCP    |     |   MyAgents       |
+| (Engine) |     |  (Data)   |     | (Custom Logic)   |
++----------+     +-----------+     +------------------+</pre></div>
+
+      <ul>
+        <li><strong>Core</strong> handles the agent execution loop, tool registry, context providers, and AG-UI streaming. It never changes per use case.</li>
+        <li><strong>MCP</strong> provides data connections. Each MCP project implements data access for a specific domain.</li>
+        <li><strong>MyAgents</strong> contains custom agent reasoning logic. Agents are pure reasoning -- no HTTP calls, no SDK imports for data. They access data exclusively through tools provided by MCP connections.</li>
+      </ul>
+
+      <p>This architecture means you can build enterprise copilots by composing <strong>agents</strong> (reasoning), <strong>MCP connections</strong> (data), and <strong>context providers</strong> (behavioral instructions) without modifying the core framework.</p>
+
+      <h2>Next Steps</h2>
+
+      <ul>
+        <li><a href="microsoft-agent-framework.html">Microsoft Agent Framework</a> -- How MAF powers the agent execution loop</li>
+        <li><a href="tools-and-skills.html">Tools and Skills</a> -- How agents interact with external systems</li>
+        <li><a href="model-context-protocol.html">Model Context Protocol</a> -- Connecting agents to data sources</li>
+        <li><a href="context-providers.html">Context Providers</a> -- Shaping agent behavior through injected context</li>
+        <li><a href="ag-ui-protocol.html">AG-UI Protocol</a> -- Streaming agent responses to the frontend</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

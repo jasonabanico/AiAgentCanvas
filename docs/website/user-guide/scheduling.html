@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheduling - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Scheduling</h1>
+
+      <p>AI Agent Canvas includes a task scheduler powered by <a href="https://www.hangfire.io/">Hangfire</a> that runs agent tasks in the background on a schedule or after a delay.</p>
+
+      <h2>What Scheduled Tasks Do</h2>
+
+      <p>A scheduled task runs an agent prompt at a specified time or on a recurring schedule. The agent executes the prompt as if you had typed it in the chat, including access to all tools, personas, and context. Results are stored and can be retrieved later.</p>
+
+      <p>Use cases include:</p>
+
+      <ul>
+        <li>Periodic market data summaries</li>
+        <li>Recurring report generation</li>
+        <li>Timed alerts and checks</li>
+        <li>Batch data processing</li>
+      </ul>
+
+      <h2>Creating a Recurring Task</h2>
+
+      <p>Ask the agent to create a recurring task using natural language:</p>
+
+      <pre><code>Schedule a recurring task every hour to get stock quotes for AAPL and MSFT
+and summarize the price movement</code></pre>
+
+      <p>The agent calls <code>schedule_recurring_task</code> with a cron expression derived from your request. Common schedules:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Cron Expression</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Every hour</td>
+            <td><code>0 * * * *</code></td>
+          </tr>
+          <tr>
+            <td>Every day at 9 AM</td>
+            <td><code>0 9 * * *</code></td>
+          </tr>
+          <tr>
+            <td>Every Monday at 8 AM</td>
+            <td><code>0 8 * * 1</code></td>
+          </tr>
+          <tr>
+            <td>Every 30 minutes</td>
+            <td><code>*/30 * * * *</code></td>
+          </tr>
+          <tr>
+            <td>Every weekday at 6 PM</td>
+            <td><code>0 18 * * 1-5</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>You can also specify a cron expression directly:</p>
+
+      <pre><code>Schedule a recurring task with cron "0 9 * * 1-5" to generate a morning
+market briefing</code></pre>
+
+      <h2>Creating a One-Time Task</h2>
+
+      <p>For tasks that should run once after a delay:</p>
+
+      <pre><code>Schedule a one-time task in 30 minutes to check the current price of GOOGL</code></pre>
+
+      <p>The agent calls <code>schedule_one_time_task</code> with the specified delay. The task runs once and stores its result.</p>
+
+      <h2>Viewing Scheduled Tasks</h2>
+
+      <p>List all scheduled tasks:</p>
+
+      <pre><code>List my scheduled tasks</code></pre>
+
+      <p>The agent calls <code>list_scheduled_tasks</code> and returns the name, schedule, and status of each task.</p>
+
+      <h2>Getting Task Results</h2>
+
+      <p>After a task has run, retrieve its results:</p>
+
+      <pre><code>Get the results of my scheduled tasks</code></pre>
+
+      <p>The agent calls <code>get_task_results</code> and returns the output from completed task executions.</p>
+
+      <h2>Removing a Scheduled Task</h2>
+
+      <pre><code>Remove the market briefing scheduled task</code></pre>
+
+      <p>The agent calls <code>remove_scheduled_task</code> to cancel and delete the task.</p>
+
+      <h2>How It Works</h2>
+
+      <p>The scheduling system uses three components:</p>
+
+      <ol>
+        <li><strong>SchedulerToolProvider</strong> -- Exposes the five scheduling tools to the agent: <code>schedule_recurring_task</code>, <code>schedule_one_time_task</code>, <code>list_scheduled_tasks</code>, <code>remove_scheduled_task</code>, and <code>get_task_results</code>.</li>
+        <li><strong>Hangfire</strong> -- An open-source background job framework for .NET. It manages job queues, scheduling, retries, and persistence.</li>
+        <li><strong>SQLite storage</strong> -- Task state is persisted in <code>hangfire.db</code>, so scheduled tasks survive backend restarts.</li>
+      </ol>
+
+      <p>When a scheduled task fires, Hangfire invokes the agent with the stored prompt. The agent processes it using the same pipeline as a chat message, including tool calls and context injection.</p>
+
+      <h2>The Hangfire Dashboard</h2>
+
+      <p>Hangfire provides a built-in web dashboard for monitoring and managing background jobs. Access it at:</p>
+
+      <pre><code>http://localhost:5000/hangfire</code></pre>
+
+      <p>The dashboard shows:</p>
+
+      <ul>
+        <li><strong>Recurring jobs</strong> -- All recurring tasks with their cron expressions and next run times.</li>
+        <li><strong>Succeeded jobs</strong> -- Completed task executions with timestamps.</li>
+        <li><strong>Failed jobs</strong> -- Tasks that encountered errors, with exception details.</li>
+        <li><strong>Processing jobs</strong> -- Currently running tasks.</li>
+        <li><strong>Scheduled jobs</strong> -- One-time tasks waiting to execute.</li>
+      </ul>
+
+      <p>Use the dashboard to inspect task history, trigger manual reruns, or delete jobs directly.</p>
+
+      <p><strong>Warning:</strong> The Hangfire dashboard is exposed without authentication by default. In production, configure authentication middleware to restrict access. See the <a href="https://docs.hangfire.io/en/latest/configuration/using-dashboard.html#configuring-authorization">Hangfire documentation</a> for details.</p>
+
+      <h2>Tips</h2>
+
+      <ul>
+        <li><strong>Tasks run server-side</strong> -- They execute even when no browser is open.</li>
+        <li><strong>Results are stored</strong> -- You can retrieve results at any time after execution.</li>
+        <li><strong>Tasks use the current agent configuration</strong> -- The active persona, guardrails, and context at the time of execution apply to the task.</li>
+        <li><strong>Monitor via notifications</strong> -- Completed tasks can push results to the notification channel (<code>/api/notifications</code>), which the frontend receives via SSE.</li>
+        <li><strong>SQLite persistence</strong> -- The <code>hangfire.db</code> file stores all job state. Back it up if your scheduled tasks are important.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

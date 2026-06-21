@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Response Agent - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Incident Response Agent</h1>
+
+      <h2>Company Profile</h2>
+
+      <p><strong>CloudScale Systems</strong> is a B2B SaaS platform providing real-time inventory management to mid-market retailers. The platform processes 2.3 million API requests per hour across three AWS regions, serving 340 enterprise customers who depend on sub-second response times for their point-of-sale and e-commerce integrations. The engineering team is 55 people, with a 6-person SRE team responsible for platform reliability.</p>
+
+      <h2>The Persona</h2>
+
+      <p><strong>Jordan Park, Site Reliability Engineer.</strong> Jordan has been an SRE at CloudScale for three years. They are on the on-call rotation every third week and responsible for maintaining the platform's 99.95% uptime SLA. Their toolkit includes Datadog for observability, PagerDuty for alerting, Terraform for infrastructure, and a growing collection of runbooks in Confluence that are perpetually half-updated. Jordan is technically strong but drowning in alert noise --- on a typical on-call shift, they receive 60-80 alerts, of which fewer than 10 require human action.</p>
+
+      <h2>The Problem</h2>
+
+      <p>CloudScale's monitoring stack generates high-quality telemetry, but correlating signals across systems during an incident is entirely manual. When a PagerDuty alert fires at 2 AM, Jordan's workflow looks like this: acknowledge the alert, open Datadog, check the relevant dashboard, correlate with recent deployments, check dependent services, look at the database metrics, review the last similar incident's postmortem, and decide whether to page the application team or handle it directly.</p>
+
+      <p>This triage process takes 10-20 minutes per incident --- time that matters when the SLA clock is ticking. Worse, during cascading failures, multiple alerts fire simultaneously, and Jordan must mentally model dependencies to determine root cause versus symptom.</p>
+
+      <p>The team also struggles with runbook discipline. Runbooks exist for the 15 most common incident types, but they drift out of date as the architecture evolves. During an incident, Jordan often discovers the runbook references a service that was renamed or a metric that was replaced.</p>
+
+      <p>Finally, some remediation actions are dangerous. Restarting a service is safe; scaling down a database cluster is not. The team needs guardrails that prevent well-intentioned but destructive actions during the pressure of a live incident.</p>
+
+      <h2>How AI Agent Canvas Solves It</h2>
+
+      <p>CloudScale deploys AI Agent Canvas as an incident response copilot accessible to the SRE team through their internal tools portal and a dedicated Slack integration.</p>
+
+      <h3>MCP Data Connections</h3>
+
+      <p>A custom <strong>MCP.Observability</strong> connector bridges the monitoring stack:</p>
+
+      <ul>
+        <li><strong>query_metrics</strong> --- Retrieves time-series metrics from Datadog by service, metric name, and time range. "Show me the p99 latency for the inventory-api service over the last 2 hours" returns the metric data with trend analysis and anomaly detection.</li>
+        <li><strong>get_alerts</strong> --- Pulls active and recent alerts from PagerDuty, enriched with Datadog context. "What alerts fired in the last 30 minutes?" returns a correlated view: the PagerDuty alert, the triggering Datadog monitor, the affected service, and related metrics.</li>
+        <li><strong>get_deployment_history</strong> --- Queries the deployment pipeline for recent releases. "What was deployed to production in the last 6 hours?" returns a chronological list of deployments with service name, version, deployer, and commit hash.</li>
+        <li><strong>query_logs</strong> --- Searches centralized logs by service, severity, time range, and keyword. "Show me error logs from order-processor in the last 15 minutes" returns matching log entries with context lines.</li>
+        <li><strong>get_service_dependencies</strong> --- Returns the dependency graph for a given service. "What depends on the inventory-database service?" maps upstream and downstream dependencies, helping Jordan understand blast radius.</li>
+      </ul>
+
+      <h3>Scheduled Health Checks</h3>
+
+      <p>Proactive monitoring runs on automated schedules:</p>
+
+      <ul>
+        <li><strong>SLA Budget Check (Every 15 minutes)</strong> --- Calculates remaining error budget for the current month based on actual downtime and degraded performance windows. When the budget drops below 30%, the agent sends a notification to the SRE channel with a breakdown of budget-consuming incidents.</li>
+        <li><strong>Deployment Correlation Scan (Every 30 minutes)</strong> --- After each production deployment, monitors the deployed service's error rate and latency for 30 minutes. If metrics deviate beyond baseline thresholds, the agent alerts the deployer and the on-call SRE with a pre-built correlation report.</li>
+        <li><strong>Dependency Health Sweep (Every hour)</strong> --- Checks health endpoints and key metrics for all critical-path services. Surfaces degradation trends before they trigger customer-facing alerts.</li>
+        <li><strong>Certificate and Secret Expiry (Daily 6:00 AM)</strong> --- Scans for TLS certificates and API keys approaching expiration within 30 days and creates tickets in the backlog.</li>
+      </ul>
+
+      <h3>Guardrails</h3>
+
+      <p>Safety controls prevent destructive actions during high-stress incidents:</p>
+
+      <ul>
+        <li><strong>Read-Only by Default</strong> --- The agent can query any metric, log, or alert but cannot execute remediation actions (restart services, scale infrastructure, modify configurations) without explicit human approval. Every proposed action is presented as a recommendation, not an execution.</li>
+        <li><strong>Destructive Action Blocklist</strong> --- Certain actions are permanently blocked regardless of approval: scaling down database clusters, modifying network security groups, deleting persistent volumes, and rotating production credentials. These actions must be performed through the standard change management process.</li>
+        <li><strong>Blast Radius Assessment</strong> --- Before recommending any remediation action, the agent queries the service dependency graph and reports the blast radius. "Restarting inventory-api will affect 3 downstream services (order-processor, fulfillment-engine, analytics-pipeline) serving approximately 800 requests/minute. Proceed?"</li>
+        <li><strong>Incident Escalation Rules</strong> --- If the agent detects a Severity 1 incident (multiple services affected, SLA impact), it automatically pages the incident commander and creates a structured incident channel --- but cannot acknowledge the page on Jordan's behalf.</li>
+      </ul>
+
+      <h3>Entity Management</h3>
+
+      <p>The service catalog is maintained as managed entities:</p>
+
+      <ul>
+        <li>Each service has a registered entry: name, team owner, tier (critical/standard/best-effort), SLA target, deployment pipeline, runbook link, and dependency list.</li>
+        <li>The agent uses this catalog to contextualize every interaction. When Jordan asks about "the inventory service," the agent resolves it to <code>inventory-api</code> (Tier 1, owned by the Platform team, 99.99% SLA target) and pulls the relevant runbook.</li>
+        <li>When runbook steps reference outdated service names or deprecated metrics, the agent flags the discrepancy and suggests an update.</li>
+      </ul>
+
+      <h2>A Day in the Life</h2>
+
+      <p><strong>2:14 AM</strong> --- Jordan's phone buzzes. PagerDuty alert: "High error rate on order-processor (&gt;5% 5xx responses, 8-minute duration)." Jordan opens the copilot from their phone and asks: "What's happening with order-processor?"</p>
+
+      <p><strong>2:15 AM</strong> --- The agent correlates in real time. It pulls the PagerDuty alert, the Datadog error rate metric (currently 7.2%, baseline 0.3%), recent logs (connection timeout errors to inventory-database), the dependency graph (order-processor depends on inventory-database), and inventory-database metrics (connection pool saturation at 98%). The agent presents: "Root cause appears to be connection pool exhaustion on inventory-database. Order-processor is failing because it cannot acquire database connections. Three other services (fulfillment-engine, analytics-pipeline, pricing-service) also depend on inventory-database but are not yet showing errors."</p>
+
+      <p><strong>2:17 AM</strong> --- Jordan asks: "Was anything deployed recently?" The agent reports: "inventory-database connection pool configuration was updated 47 minutes ago by deploy pipeline. The max_connections parameter was changed from 200 to 100. This correlates with the onset of connection pool saturation."</p>
+
+      <p><strong>2:19 AM</strong> --- Jordan asks: "Can we roll back that configuration change?" The agent responds: "I can recommend the rollback but cannot execute it directly. The rollback would restore max_connections to 200. Blast radius assessment: this change affects inventory-database only. No downstream services would be disrupted by the rollback --- in fact, it should resolve the current incident. Recommended: execute rollback through the deployment pipeline."</p>
+
+      <p><strong>2:22 AM</strong> --- Jordan triggers the rollback through the standard pipeline. The agent monitors the recovery: connection pool utilization drops to 45% within 3 minutes, order-processor error rate returns to baseline within 5 minutes. The agent confirms: "Incident resolved. Error rate normalized. No SLA impact --- total elevated error window was 19 minutes against a 43-minute monthly budget remaining."</p>
+
+      <p><strong>2:30 AM</strong> --- The agent drafts a preliminary postmortem with timeline, root cause, remediation steps, and a suggested action item: "Add a guardrail to the deployment pipeline that prevents connection pool reductions greater than 25% without SRE approval."</p>
+
+      <p><strong>9:00 AM</strong> --- Jordan reviews the overnight health check results. The certificate expiry scan flagged two API keys expiring in 12 days. The dependency health sweep shows a gradual increase in p99 latency on the pricing-service over the last week --- not yet alerting, but trending toward the threshold. Jordan opens an investigation ticket.</p>
+
+      <h2>Key Configuration</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Configuration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Agents</strong></td>
+            <td>IncidentResponseAgent with <code>CanHandle</code> matching alert, incident, deployment, and service queries</td>
+          </tr>
+          <tr>
+            <td><strong>MCP Connections</strong></td>
+            <td>MCP.Observability (query_metrics, get_alerts, get_deployment_history, query_logs, get_service_dependencies)</td>
+          </tr>
+          <tr>
+            <td><strong>Scheduled Tasks</strong></td>
+            <td>SLA Budget Check (every 15 min), Deployment Correlation Scan (every 30 min), Dependency Health Sweep (hourly), Certificate/Secret Expiry (daily 6:00 AM)</td>
+          </tr>
+          <tr>
+            <td><strong>Guardrails</strong></td>
+            <td>ReadOnlyDefault (no auto-remediation), DestructiveActionBlocklist (permanent blocks on dangerous operations), BlastRadiusAssessment (dependency impact before any action), IncidentEscalationRules (auto-page for Sev1)</td>
+          </tr>
+          <tr>
+            <td><strong>Entity Management</strong></td>
+            <td>Service catalog with tier, owner, SLA target, dependencies, and runbook links</td>
+          </tr>
+          <tr>
+            <td><strong>User Profiles</strong></td>
+            <td>SRE team (full observability access + remediation recommendations), application developers (service-scoped metrics and logs), management (SLA dashboards and incident summaries)</td>
+          </tr>
+          <tr>
+            <td><strong>Personas</strong></td>
+            <td>Incident Mode (terse, action-oriented, correlates signals), Analysis Mode (detailed, trend-focused, for post-incident review)</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

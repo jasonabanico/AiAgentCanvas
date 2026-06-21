@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Structure - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Project Structure</h1>
+
+      <p>This page describes every project in the AI Agent Canvas solution, its purpose, key files, and dependencies.</p>
+
+      <h2>Solution Layout</h2>
+
+      <p>The solution is organized into two solution folders:</p>
+
+      <ul>
+        <li><strong>AiAgentCanvas</strong> -- framework projects that ship as-is</li>
+        <li><strong>Custom</strong> -- business-specific projects you create and modify</li>
+      </ul>
+
+      <div class="diagram">
+AiAgentCanvas.sln
+src/
+  AiAgentCanvas.Abstractions/   Shared types (zero dependencies)
+  AiAgentCanvas.Core/           Orchestration engine
+  AiAgentCanvas.AgentData/      Markdown-persisted agent data
+  AiAgentCanvas.Skills/         Skill store + MCP connections
+  AiAgentCanvas.Security/       Governance + rate limiting
+  AiAgentCanvas.Scheduler/      Hangfire scheduled tasks
+  AiAgentCanvas.Notifications/  In-memory notification sink + SSE
+  AiAgentCanvas.SystemTools/    Optional file I/O and script tools
+  AiAgentCanvas.Web/            Composition root
+  Custom/
+    HelloWorldAgent/            Sample agent prompts
+    MCP.MarketData/             SEC EDGAR + Alpha Vantage tools
+    VectorStore.Sqlite/         SQLite vector store for RAG
+      </div>
+
+      <h2>Framework Projects</h2>
+
+      <h3>AiAgentCanvas.Abstractions</h3>
+
+      <p>Shared interfaces and utility types with zero project references. Every other project may reference this.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>MarkdownFile.cs</code></td>
+            <td>YAML frontmatter + body parsing, serialization, and file loading</td>
+          </tr>
+          <tr>
+            <td><code>DocumentRecord.cs</code></td>
+            <td>Shared document record type</td>
+          </tr>
+          <tr>
+            <td><code>INotificationSink.cs</code></td>
+            <td>Interface for notification delivery</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><code>MarkdownFile</code> is the foundation of agent data persistence. It parses files with YAML frontmatter delimited by <code>---</code> and provides <code>Parse()</code>, <code>Write()</code>, <code>LoadAll()</code>, and <code>SanitizeFileName()</code> methods.</p>
+
+      <h3>AiAgentCanvas.Core</h3>
+
+      <p>The orchestration engine. Registers the LLM client, tool registry, context providers, and the AG-UI SSE endpoint.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ServiceCollectionExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvas()</code> and <code>UseAiAgentCanvas()</code></td>
+          </tr>
+          <tr>
+            <td><code>Endpoints/AgUiEndpoint.cs</code></td>
+            <td>POST <code>/api/copilotkit</code> -- AG-UI SSE streaming</td>
+          </tr>
+          <tr>
+            <td><code>Services/AIFoundryClientFactory.cs</code></td>
+            <td>Creates <code>ChatCompletionsClient</code> from config</td>
+          </tr>
+          <tr>
+            <td><code>Skills/DynamicToolRegistry.cs</code></td>
+            <td>Runtime tool registration by source key</td>
+          </tr>
+          <tr>
+            <td><code>Skills/DynamicToolContextProvider.cs</code></td>
+            <td>Injects dynamic tools into <code>ChatOptions</code></td>
+          </tr>
+          <tr>
+            <td><code>Providers/RagContextProvider.cs</code></td>
+            <td>RAG context injection from vector store</td>
+          </tr>
+          <tr>
+            <td><code>Configuration/AIFoundryOptions.cs</code></td>
+            <td>Options: Endpoint, Key, DeploymentName, etc.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Azure.AI.Inference</p>
+
+      <h3>AiAgentCanvas.AgentData</h3>
+
+      <p>Six markdown-persisted data domains. Each domain follows an identical pattern: Store + ToolProvider + AIContextProvider.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Subdirectory</th>
+            <th>Domain</th>
+            <th>Storage Path</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Personas/</code></td>
+            <td>Agent personas with custom instructions</td>
+            <td><code>agent-data/personas/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>Context/</code></td>
+            <td>Persistent context entries</td>
+            <td><code>agent-data/context/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>Workflows/</code></td>
+            <td>Multi-step workflows</td>
+            <td><code>agent-data/workflows/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>Guardrails/</code></td>
+            <td>Behavioral guardrails</td>
+            <td><code>agent-data/guardrails/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>Entities/</code></td>
+            <td>Domain entities and schemas</td>
+            <td><code>agent-data/entities/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>Profiles/</code></td>
+            <td>User profiles</td>
+            <td><code>agent-data/profiles/*.md</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>AgentDataServiceExtensions.cs</code></td>
+            <td>Six <code>Add*()</code> methods, one per domain</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Core, Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI</p>
+
+      <h3>AiAgentCanvas.Skills</h3>
+
+      <p>Skill persistence, MCP connection management, and skill authoring tools.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SkillsServiceExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvasSkills()</code>, <code>AddAiAgentCanvasMcp()</code>, <code>AddAiAgentCanvasSkillRegistry()</code>, <code>AddAiAgentCanvasSkillAuthoring()</code></td>
+          </tr>
+          <tr>
+            <td><code>SkillStore.cs</code></td>
+            <td>SQLite-backed skill persistence</td>
+          </tr>
+          <tr>
+            <td><code>McpConnectionManager.cs</code></td>
+            <td>Connects to external MCP servers, registers tools</td>
+          </tr>
+          <tr>
+            <td><code>LocalSkillRegistry.cs</code></td>
+            <td>Resolves skills from local files at runtime</td>
+          </tr>
+          <tr>
+            <td><code>SkillAuthoringToolProvider.cs</code></td>
+            <td>Tools for creating/editing skills via chat</td>
+          </tr>
+          <tr>
+            <td><code>SkillToolProvider.cs</code></td>
+            <td>Tools for managing stored skills</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Core, ModelContextProtocol, Microsoft.Extensions.AI</p>
+
+      <h3>AiAgentCanvas.Security</h3>
+
+      <p>Microsoft.AgentGovernance integration, prompt injection detection, MCP gateway, and ASP.NET rate limiting.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SecurityServiceExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvasSecurity()</code> and <code>UseAiAgentCanvasSecurity()</code></td>
+          </tr>
+          <tr>
+            <td><code>GovernanceContextProvider.cs</code></td>
+            <td>Scans instructions for prompt injection before LLM calls</td>
+          </tr>
+          <tr>
+            <td><code>GovernedMcpGateway.cs</code></td>
+            <td>Wraps McpGateway for tool allow/deny decisions</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> AgentGovernance, Microsoft.Agents.AI, ASP.NET rate limiting</p>
+
+      <h3>AiAgentCanvas.Scheduler</h3>
+
+      <p>Hangfire-based scheduled task management with SQLite storage.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SchedulerServiceExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvasScheduler()</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Hangfire, Hangfire.Storage.SQLite</p>
+
+      <h3>AiAgentCanvas.Notifications</h3>
+
+      <p>In-memory notification channel using <code>System.Threading.Channels</code> with an SSE delivery endpoint.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>NotificationServiceExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvasNotifications()</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Abstractions</p>
+
+      <h3>AiAgentCanvas.SystemTools</h3>
+
+      <p>Optional file I/O and script execution tools. These are governed by the security layer.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SystemToolsServiceExtensions.cs</code></td>
+            <td><code>AddAiAgentCanvasSystemTools()</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Core, Microsoft.Extensions.AI</p>
+
+      <h3>AiAgentCanvas.Web</h3>
+
+      <p>The composition root. Contains only <code>Program.cs</code> and configuration files. This is the only project that references all other projects.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Program.cs</code></td>
+            <td>Wires all services and middleware</td>
+          </tr>
+          <tr>
+            <td><code>appsettings.json</code></td>
+            <td>AIFoundry config, security settings</td>
+          </tr>
+          <tr>
+            <td><code>governance-policy.yaml</code></td>
+            <td>Default governance rules</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Custom Projects</h2>
+
+      <p>The <code>src/Custom/</code> folder is where you add all business-specific code. Each custom project is a standalone class library that gets wired into the composition root.</p>
+
+      <h3>Custom/HelloWorldAgent</h3>
+
+      <p>A minimal sample agent containing only a prompts class. Demonstrates that an agent can be pure reasoning logic with zero framework dependencies.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>HelloWorldAgent.csproj</code></td>
+            <td>net9.0, no package references</td>
+          </tr>
+          <tr>
+            <td><code>HelloWorldAgentPrompts.cs</code></td>
+            <td><code>GetSystemPrompt()</code> returns the agent's system prompt</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Custom/MCP.MarketData</h3>
+
+      <p>A data connection providing SEC EDGAR and Alpha Vantage tools. Demonstrates the ToolProvider + ServiceExtensions pattern.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>MarketDataToolProvider.cs</code></td>
+            <td>Three AITools: <code>edgar_company_facts</code>, <code>stock_quote</code>, <code>stock_technicals</code></td>
+          </tr>
+          <tr>
+            <td><code>MarketDataServiceExtensions.cs</code></td>
+            <td><code>AddMarketDataTools()</code> registers HttpClients and tools</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Dependencies:</strong> Microsoft.Extensions.AI, Microsoft.Extensions.Http.Resilience</p>
+
+      <h3>Custom/VectorStore.Sqlite</h3>
+
+      <p>A SQLite-based vector store used for RAG (Retrieval-Augmented Generation).</p>
+
+      <h2>Adding Your Own Custom Projects</h2>
+
+      <ol>
+        <li>Create a new folder under <code>src/Custom/</code></li>
+        <li>Add a <code>.csproj</code> targeting <code>net9.0</code></li>
+        <li>Implement your agent prompts or tool providers</li>
+        <li>Add a <code>ProjectReference</code> in <code>AiAgentCanvas.Web.csproj</code></li>
+        <li>Add the project to <code>AiAgentCanvas.sln</code> under the Custom solution folder</li>
+        <li>Wire up in <code>Program.cs</code></li>
+      </ol>
+
+      <p>See <a href="custom-agents.html">Adding Custom Agents</a> and <a href="custom-mcp-connections.html">Adding Custom MCP Connections</a> for detailed walkthroughs.</p>
+    </main>
+  </div>
+</body>
+</html>

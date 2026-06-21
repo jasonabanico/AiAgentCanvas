@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Security</h1>
+
+      <p>The <code>AiAgentCanvas.Security</code> project integrates Microsoft.AgentGovernance 4.0.0 for policy-based tool governance, prompt injection detection, and MCP gateway control. It also configures ASP.NET rate limiting and security headers.</p>
+
+      <h2>Overview</h2>
+
+      <p>Security is registered first in <code>Program.cs</code>, before any other service, so that governance is in place before tools are registered:</p>
+
+      <pre><code>builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
+// ... all other registrations ...
+app.UseAiAgentCanvasSecurity();</code></pre>
+
+      <h3>What Gets Registered</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>GovernanceKernel</code></td>
+            <td>Central governance object with policy engine and audit</td>
+          </tr>
+          <tr>
+            <td><code>PolicyEngine</code></td>
+            <td>Evaluates YAML rules against tool calls</td>
+          </tr>
+          <tr>
+            <td><code>AuditEmitter</code></td>
+            <td>Logs all governance events</td>
+          </tr>
+          <tr>
+            <td><code>GovernanceContextProvider</code></td>
+            <td>Scans for prompt injection before each LLM call</td>
+          </tr>
+          <tr>
+            <td><code>GovernedMcpGateway</code></td>
+            <td>Wraps MCP tool calls for allow/deny decisions</td>
+          </tr>
+          <tr>
+            <td>Rate limiter</td>
+            <td>Fixed-window rate limiting on the <code>/api/copilotkit</code> endpoint</td>
+          </tr>
+          <tr>
+            <td>Security headers</td>
+            <td>X-Content-Type-Options, X-Frame-Options, Referrer-Policy</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>AddAiAgentCanvasSecurity()</h2>
+
+      <p>The registration method accepts optional configuration callbacks for governance options and MCP gateway config:</p>
+
+      <pre><code>public static IServiceCollection AddAiAgentCanvasSecurity(
+    this IServiceCollection services,
+    IConfiguration configuration,
+    Action&lt;GovernanceOptions&gt;? configureGovernance = null,
+    Action&lt;McpGatewayConfig&gt;? configureMcp = null)
+{
+    var governanceOptions = new GovernanceOptions
+    {
+        EnableAudit = true,
+        EnableMetrics = true,
+        EnablePromptInjectionDetection = true,
+        ConflictStrategy = ConflictResolutionStrategy.DenyOverrides,
+        PolicyPaths = policyPaths,
+    };
+
+    configureGovernance?.Invoke(governanceOptions);
+
+    var kernel = new GovernanceKernel(governanceOptions);
+    services.AddSingleton(kernel);
+    services.AddSingleton(kernel.PolicyEngine);
+    services.AddSingleton(kernel.AuditEmitter);
+    // ...
+}</code></pre>
+
+      <h3>GovernanceOptions Defaults</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>EnableAudit</code></td>
+            <td><code>true</code></td>
+            <td>Log all governance decisions</td>
+          </tr>
+          <tr>
+            <td><code>EnableMetrics</code></td>
+            <td><code>true</code></td>
+            <td>Collect governance metrics</td>
+          </tr>
+          <tr>
+            <td><code>EnablePromptInjectionDetection</code></td>
+            <td><code>true</code></td>
+            <td>Scan system instructions for injection</td>
+          </tr>
+          <tr>
+            <td><code>ConflictStrategy</code></td>
+            <td><code>DenyOverrides</code></td>
+            <td>When rules conflict, deny wins</td>
+          </tr>
+          <tr>
+            <td><code>PolicyPaths</code></td>
+            <td>From config</td>
+            <td>Path to <code>governance-policy.yaml</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>GovernanceKernel</h2>
+
+      <p>The <code>GovernanceKernel</code> is the central governance object. It is constructed from <code>GovernanceOptions</code> and provides access to the <code>PolicyEngine</code>, <code>AuditEmitter</code>, and <code>InjectionDetector</code>.</p>
+
+      <p>During startup, <code>UseAiAgentCanvasSecurity()</code> subscribes to all governance events for logging:</p>
+
+      <pre><code>kernel.OnAllEvents(e =&gt;
+{
+    logger.LogInformation("[GOVERNANCE:AUDIT] Type={Type} Agent={Agent} Policy={Policy}",
+        e.Type, e.AgentId, e.PolicyName ?? "none");
+});</code></pre>
+
+      <h2>GovernanceContextProvider</h2>
+
+      <p>An <code>AIContextProvider</code> that runs before each LLM call to scan system instructions for prompt injection attempts.</p>
+
+      <pre><code>public sealed class GovernanceContextProvider : AIContextProvider
+{
+    private readonly GovernanceKernel _kernel;
+
+    protected override ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
+        InvokingContext context, CancellationToken cancellationToken)
+    {
+        if (_kernel.InjectionDetector is null ||
+            string.IsNullOrEmpty(context.AIContext.Instructions))
+            return new ValueTask&lt;AIContext&gt;(context.AIContext);
+
+        var result = _kernel.InjectionDetector.Detect(context.AIContext.Instructions);
+        if (result.IsInjection)
+        {
+            _logger.LogWarning("[GOVERNANCE] Prompt injection detected: {Type}",
+                result.InjectionType);
+
+            _kernel.AuditEmitter.Emit(
+                GovernanceEventType.PolicyViolation,
+                "system", "instructions",
+                new Dictionary&lt;string, object&gt;
+                {
+                    ["injectionType"] = result.InjectionType.ToString(),
+                    ["source"] = "system_instructions",
+                });
+        }
+
+        return new ValueTask&lt;AIContext&gt;(context.AIContext);
+    }
+}</code></pre>
+
+      <p>This catches injection attempts that may have been introduced through user-managed data (personas, context entries, etc.) before they reach the LLM.</p>
+
+      <h2>GovernedMcpGateway</h2>
+
+      <p>Wraps the AgentGovernance <code>McpGateway</code> to evaluate tool calls against governance policies. It checks whether a tool call should be allowed, denied, or requires approval.</p>
+
+      <pre><code>public sealed class GovernedMcpGateway
+{
+    private readonly McpGateway _gateway;
+
+    public GovernedMcpGateway(McpGatewayConfig config, ILogger&lt;GovernedMcpGateway&gt; logger)
+    {
+        _gateway = new McpGateway(config);
+    }
+
+    public McpGatewayDecision Evaluate(string agentId, string toolName, string? payload = null)
+    {
+        var request = new McpGatewayRequest
+        {
+            AgentId = agentId,
+            ToolName = toolName,
+            Payload = payload ?? "",
+        };
+
+        var decision = _gateway.ProcessRequest(request);
+
+        if (!decision.Allowed)
+            _logger.LogWarning("[GOVERNANCE:MCP] Blocked tool={Tool} agent={Agent}",
+                toolName, agentId);
+
+        return decision;
+    }
+}</code></pre>
+
+      <h3>McpGatewayConfig</h3>
+
+      <pre><code>var mcpConfig = new McpGatewayConfig
+{
+    BlockOnSuspiciousPayload = true,
+    ApprovalRequiredTools = ["run_script", "write_file"],
+};</code></pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>BlockOnSuspiciousPayload</code></td>
+            <td><code>true</code></td>
+            <td>Block tools with suspicious payloads</td>
+          </tr>
+          <tr>
+            <td><code>ApprovalRequiredTools</code></td>
+            <td><code>["run_script", "write_file"]</code></td>
+            <td>Tools that require explicit approval</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Governance Policy (YAML)</h2>
+
+      <p>Policies are defined in <code>governance-policy.yaml</code> and evaluated by the <code>PolicyEngine</code>. Each rule has a name, scope, action, conditions, and reason.</p>
+
+      <pre><code>name: AiAgentCanvas-default
+description: Default governance policy for AiAgentCanvas
+
+rules:
+  - name: block-dangerous-tools
+    scope: tool_call
+    action: deny
+    conditions:
+      tool_name:
+        in: [run_script]
+    reason: "Shell execution requires explicit approval"
+
+  - name: restrict-file-write-paths
+    scope: tool_call
+    action: deny
+    conditions:
+      tool_name:
+        equals: write_file
+      path:
+        matches: "^(/etc|/var|C:\\\\Windows|C:\\\\Program Files)"
+    reason: "Writing to system directories is blocked"
+
+  - name: block-private-mcp-endpoints
+    scope: tool_call
+    action: deny
+    conditions:
+      tool_name:
+        equals: connect_mcp_server
+      endpoint:
+        matches: "(localhost|127\\.0\\.0\\.1|169\\.254\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)"
+    reason: "MCP connections to private addresses are blocked (SSRF protection)"
+
+  - name: allow-all-other
+    scope: tool_call
+    action: allow
+    conditions: {}</code></pre>
+
+      <h3>Rule Structure</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>name</code></td>
+            <td>Unique rule identifier</td>
+          </tr>
+          <tr>
+            <td><code>scope</code></td>
+            <td>What the rule applies to (<code>tool_call</code>)</td>
+          </tr>
+          <tr>
+            <td><code>action</code></td>
+            <td><code>allow</code> or <code>deny</code></td>
+          </tr>
+          <tr>
+            <td><code>conditions</code></td>
+            <td>Matching criteria: <code>equals</code>, <code>in</code>, <code>matches</code> (regex)</td>
+          </tr>
+          <tr>
+            <td><code>reason</code></td>
+            <td>Human-readable explanation logged on match</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Rules are evaluated in order. The <code>ConflictStrategy</code> of <code>DenyOverrides</code> means if any rule denies, the action is blocked regardless of subsequent allow rules.</p>
+
+      <h3>Configuration</h3>
+
+      <p>The policy file path is configured in <code>appsettings.json</code>:</p>
+
+      <pre><code>{
+  "Security": {
+    "PolicyPath": "governance-policy.yaml",
+    "RateLimitPerMinute": 30
+  }
+}</code></pre>
+
+      <h2>ASP.NET Rate Limiting</h2>
+
+      <p>A fixed-window rate limiter protects the agent endpoint:</p>
+
+      <pre><code>var rateLimitWindow = configuration.GetValue("Security:RateLimitPerMinute", 30);
+services.AddRateLimiter(options =&gt;
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("agent", limiter =&gt;
+    {
+        limiter.PermitLimit = rateLimitWindow;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+});</code></pre>
+
+      <p>When the limit is exceeded, the response is:</p>
+
+      <pre><code>{"error": "Rate limit exceeded. Try again later."}</code></pre>
+
+      <h2>Security Headers</h2>
+
+      <p><code>UseAiAgentCanvasSecurity()</code> adds the following headers to every response:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Header</th>
+            <th>Value</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>X-Content-Type-Options</code></td>
+            <td><code>nosniff</code></td>
+            <td>Prevents MIME-type sniffing</td>
+          </tr>
+          <tr>
+            <td><code>X-Frame-Options</code></td>
+            <td><code>DENY</code></td>
+            <td>Prevents clickjacking</td>
+          </tr>
+          <tr>
+            <td><code>Referrer-Policy</code></td>
+            <td><code>strict-origin-when-cross-origin</code></td>
+            <td>Controls referrer information</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Customizing Security</h2>
+
+      <p>Override defaults by passing configuration callbacks:</p>
+
+      <pre><code>builder.Services.AddAiAgentCanvasSecurity(builder.Configuration,
+    configureGovernance: options =&gt;
+    {
+        options.EnablePromptInjectionDetection = true;
+        options.ConflictStrategy = ConflictResolutionStrategy.AllowOverrides;
+    },
+    configureMcp: config =&gt;
+    {
+        config.ApprovalRequiredTools = ["run_script", "write_file", "delete_file"];
+        config.BlockOnSuspiciousPayload = true;
+    });</code></pre>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Data - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Agent Data</h1>
+
+      <p>The <code>AiAgentCanvas.AgentData</code> project provides six markdown-persisted data domains. Each domain follows an identical three-class pattern and gives the LLM tools to manage its own configuration at runtime.</p>
+
+      <h2>The Six Domains</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Storage Path</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Personas</td>
+            <td><code>agent-data/personas/*.md</code></td>
+            <td>Custom agent identities with instructions</td>
+          </tr>
+          <tr>
+            <td>Context</td>
+            <td><code>agent-data/context/*.md</code></td>
+            <td>Persistent context entries</td>
+          </tr>
+          <tr>
+            <td>Workflows</td>
+            <td><code>agent-data/workflows/*.md</code></td>
+            <td>Multi-step workflow definitions</td>
+          </tr>
+          <tr>
+            <td>Guardrails</td>
+            <td><code>agent-data/guardrails/*.md</code></td>
+            <td>Behavioral constraints</td>
+          </tr>
+          <tr>
+            <td>Entities</td>
+            <td><code>agent-data/entities/*.md</code></td>
+            <td>Domain entity schemas</td>
+          </tr>
+          <tr>
+            <td>UserProfiles</td>
+            <td><code>agent-data/profiles/*.md</code></td>
+            <td>User preference profiles</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>The Store / ToolProvider / ContextProvider Pattern</h2>
+
+      <p>Every domain implements exactly three classes:</p>
+
+      <ol>
+        <li><strong>Store</strong> -- CRUD operations on markdown files in a directory</li>
+        <li><strong>ToolProvider</strong> -- Exposes store operations as <code>AITool</code> instances the LLM can call</li>
+        <li><strong>AIContextProvider</strong> (optional) -- Injects domain data into the system prompt before each LLM call</li>
+      </ol>
+
+      <p>This pattern means the LLM can create, read, update, and delete domain data through tool calls, and that data automatically influences the LLM's behavior through context injection.</p>
+
+      <h2>MarkdownFile: The Persistence Foundation</h2>
+
+      <p>All agent data is stored as markdown files with YAML frontmatter. The <code>MarkdownFile</code> utility class in <code>AiAgentCanvas.Abstractions</code> handles parsing and serialization.</p>
+
+      <h3>File Format</h3>
+
+      <pre><code>---
+name: code-reviewer
+description: Reviews code for quality and correctness
+---
+
+You are an expert code reviewer. When reviewing code:
+- Check for bugs, security issues, and performance problems
+- Suggest improvements with specific code examples
+- Be constructive and explain your reasoning</code></pre>
+
+      <h3>Key Methods</h3>
+
+      <pre><code>// Parse a single file
+MarkdownFile? file = MarkdownFile.Parse("agent-data/personas/code-reviewer.md");
+string name = file.Get("name");           // "code-reviewer"
+string desc = file.Get("description");    // "Reviews code for quality..."
+string body = file.Body;                  // The instruction text
+
+// Write a file (creates directory if needed)
+MarkdownFile.Write(
+    "agent-data/personas/code-reviewer.md",
+    new Dictionary&lt;string, string&gt;
+    {
+        ["name"] = "code-reviewer",
+        ["description"] = "Reviews code for quality and correctness",
+    },
+    "You are an expert code reviewer...");
+
+// Load all files from a directory
+List&lt;MarkdownFile&gt; all = MarkdownFile.LoadAll("agent-data/personas/");
+
+// Sanitize a name for use as a filename
+string safe = MarkdownFile.SanitizeFileName("Code Reviewer"); // "code-reviewer"</code></pre>
+
+      <h2>Detailed Walkthrough: Personas</h2>
+
+      <p>Personas are the most illustrative domain. Here is how all three classes work together.</p>
+
+      <h3>PersonaStore</h3>
+
+      <p>The store manages CRUD operations on persona markdown files and tracks which persona is active via a <code>.active</code> marker file.</p>
+
+      <pre><code>public sealed class PersonaStore
+{
+    private readonly string _directory;
+
+    public PersonaStore(string directory) { /* creates directory if missing */ }
+
+    public void SavePersona(string name, string description, string instructions)
+    {
+        MarkdownFile.Write(
+            Path.Combine(_directory, MarkdownFile.SanitizeFileName(name) + ".md"),
+            new Dictionary&lt;string, string&gt;
+            {
+                ["name"] = name,
+                ["description"] = description,
+            },
+            instructions);
+    }
+
+    public List&lt;PersonaInfo&gt; ListPersonas()
+    {
+        return MarkdownFile.LoadAll(_directory)
+            .Select(ToPersona)
+            .Where(p =&gt; p is not null)
+            .Cast&lt;PersonaInfo&gt;()
+            .ToList();
+    }
+
+    public PersonaInfo? GetPersona(string name) { ... }
+    public bool DeletePersona(string name) { ... }
+    public string? GetActivePersonaName() { ... }
+    public void SetActivePersona(string? name) { ... }
+    public string? GetActiveInstructions() { ... }
+}</code></pre>
+
+      <h3>PersonaToolProvider</h3>
+
+      <p>The tool provider creates <code>AITool</code> instances using <code>AIFunctionFactory.Create()</code>. Each tool delegates to the store.</p>
+
+      <pre><code>public sealed class PersonaToolProvider
+{
+    private readonly PersonaStore _store;
+
+    public IReadOnlyList&lt;AITool&gt; GetTools()
+    {
+        return
+        [
+            AIFunctionFactory.Create(CreatePersona, "create_persona",
+                "Create a new persona with custom instructions"),
+            AIFunctionFactory.Create(ListPersonas, "list_personas",
+                "List all available personas"),
+            AIFunctionFactory.Create(SwitchPersona, "switch_persona",
+                "Switch to a different persona"),
+            AIFunctionFactory.Create(ReadPersona, "read_persona",
+                "Read the full details of a persona"),
+            AIFunctionFactory.Create(UpdatePersona, "update_persona",
+                "Update an existing persona"),
+            AIFunctionFactory.Create(DeletePersona, "delete_persona",
+                "Delete a persona"),
+        ];
+    }
+
+    private string CreatePersona(string name, string description, string instructions)
+    {
+        var existing = _store.GetPersona(name);
+        if (existing is not null)
+            return JsonSerializer.Serialize(new { error = "Persona already exists..." });
+
+        _store.SavePersona(name, description, instructions);
+        return JsonSerializer.Serialize(new { status = "created", name });
+    }
+
+    // ... similar implementations for other tools
+}</code></pre>
+
+      <h3>PersonaContextProvider</h3>
+
+      <p>The context provider reads the active persona and appends its instructions to the system prompt before each LLM call.</p>
+
+      <pre><code>internal sealed class PersonaContextProvider : AIContextProvider
+{
+    private readonly PersonaStore _store;
+    private readonly string _defaultPrompt;
+
+    protected override ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
+        InvokingContext context, CancellationToken cancellationToken)
+    {
+        var activeInstructions = _store.GetActiveInstructions();
+        if (!string.IsNullOrEmpty(activeInstructions))
+        {
+            context.AIContext.Instructions =
+                (context.AIContext.Instructions ?? "") + "\n" + activeInstructions;
+        }
+        else if (string.IsNullOrEmpty(context.AIContext.Instructions))
+        {
+            context.AIContext.Instructions = _defaultPrompt;
+        }
+        return new ValueTask&lt;AIContext&gt;(context.AIContext);
+    }
+}</code></pre>
+
+      <h2>Registration</h2>
+
+      <p>The <code>AgentDataServiceExtensions</code> class provides one <code>Add*()</code> method per domain. Each method registers the Store, ToolProvider, tools, and (where applicable) the AIContextProvider.</p>
+
+      <pre><code>public static IServiceCollection AddAiAgentCanvasPersonas(
+    this IServiceCollection services,
+    string directory = "./agent-data/personas")
+{
+    services.AddSingleton(new PersonaStore(directory));
+    services.AddSingleton&lt;PersonaToolProvider&gt;();
+    services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+        sp.GetRequiredService&lt;PersonaToolProvider&gt;().GetTools());
+    services.AddSingleton&lt;AIContextProvider&gt;(sp =&gt;
+    {
+        var store = sp.GetRequiredService&lt;PersonaStore&gt;();
+        var defaultPrompt = sp.GetRequiredService&lt;DefaultSystemPrompt&gt;().Value;
+        return new PersonaContextProvider(store, defaultPrompt);
+    });
+    return services;
+}</code></pre>
+
+      <p>All six domains are registered individually in <code>Program.cs</code>:</p>
+
+      <pre><code>builder.Services.AddAiAgentCanvasPersonas();
+builder.Services.AddAiAgentCanvasContext();
+builder.Services.AddAiAgentCanvasWorkflows();
+builder.Services.AddAiAgentCanvasGuardrails();
+builder.Services.AddAiAgentCanvasEntities();
+builder.Services.AddAiAgentCanvasUserProfiles();</code></pre>
+
+      <h2>Other Domains</h2>
+
+      <p>Each domain follows the same pattern as Personas but with domain-specific data:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Context Provider</th>
+            <th>What it injects</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Personas</td>
+            <td><code>PersonaContextProvider</code></td>
+            <td>Active persona instructions</td>
+          </tr>
+          <tr>
+            <td>Context</td>
+            <td><code>PersistentContextProvider</code></td>
+            <td>All persistent context entries</td>
+          </tr>
+          <tr>
+            <td>Guardrails</td>
+            <td><code>GuardrailContextProvider</code></td>
+            <td>Active guardrail constraints</td>
+          </tr>
+          <tr>
+            <td>Entities</td>
+            <td><code>EntityContextProvider</code></td>
+            <td>Entity schemas and definitions</td>
+          </tr>
+          <tr>
+            <td>UserProfiles</td>
+            <td><code>UserProfileContextProvider</code></td>
+            <td>Active user preferences</td>
+          </tr>
+          <tr>
+            <td>Workflows</td>
+            <td><em>(none)</em></td>
+            <td>Executed on demand via <code>WorkflowExecutor</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Creating a New Domain</h2>
+
+      <p>To add a seventh agent data domain, follow the same pattern:</p>
+
+      <ol>
+        <li>Create a subdirectory under <code>AiAgentCanvas.AgentData/</code> (e.g., <code>Templates/</code>)</li>
+        <li>Create a <code>TemplateStore</code> class with CRUD methods using <code>MarkdownFile</code></li>
+        <li>Create a <code>TemplateToolProvider</code> class exposing tools via <code>AIFunctionFactory.Create()</code></li>
+        <li>Optionally create a <code>TemplateContextProvider</code> extending <code>AIContextProvider</code></li>
+        <li>Add an <code>AddAiAgentCanvasTemplates()</code> method to <code>AgentDataServiceExtensions</code></li>
+        <li>Call the new method in <code>Program.cs</code></li>
+      </ol>
+    </main>
+  </div>
+</body>
+</html>

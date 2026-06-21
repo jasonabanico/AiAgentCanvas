@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflows - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Workflows</h1>
+
+      <p>Workflows let you define multi-step agent sequences that run as a single operation. Instead of typing each step manually, you create a workflow once and run it whenever you need it.</p>
+
+      <h2>What Is a Workflow?</h2>
+
+      <p>A workflow is a named sequence of steps stored as a markdown file. Each workflow has:</p>
+
+      <ul>
+        <li><strong>Name</strong> -- A short identifier (e.g., "Morning Briefing").</li>
+        <li><strong>Description</strong> -- What the workflow accomplishes.</li>
+        <li><strong>Tags</strong> -- Optional labels for organization.</li>
+        <li><strong>Content</strong> -- The full workflow definition, including steps.</li>
+      </ul>
+
+      <p>When you run a workflow, the agent reads its definition, builds a prompt from the steps, and executes it through the LLM. The agent has access to all its tools during execution, so workflow steps can fetch data, create entities, and perform any action the agent normally can.</p>
+
+      <h2>Creating a Workflow</h2>
+
+      <p>Ask the agent to create a workflow in natural language:</p>
+
+      <pre><code>Create a workflow called "Morning Briefing" with description "Daily market
+overview" that does the following:
+1. Get stock quotes for AAPL, MSFT, GOOGL, and AMZN
+2. Get technical indicators for each stock
+3. Summarize the overall market sentiment
+4. List any stocks with significant price changes</code></pre>
+
+      <p>The agent calls <code>create_workflow</code> and saves the workflow as a markdown file in <code>agent-data/workflows/</code>.</p>
+
+      <h2>Listing Workflows</h2>
+
+      <p>To see all available workflows:</p>
+
+      <pre><code>List my workflows</code></pre>
+
+      <p>The agent calls <code>list_workflows</code> and returns the name, description, and tags of each workflow.</p>
+
+      <h2>Reading a Workflow</h2>
+
+      <p>To view the full definition of a workflow:</p>
+
+      <pre><code>Show me the Morning Briefing workflow</code></pre>
+
+      <p>The agent calls <code>read_workflow</code> and displays the complete workflow content, including all steps.</p>
+
+      <h2>Running a Workflow</h2>
+
+      <p>To execute a workflow:</p>
+
+      <pre><code>Run the Morning Briefing workflow</code></pre>
+
+      <p>The agent calls <code>run_workflow</code>, which:</p>
+
+      <ol>
+        <li>Loads the workflow definition from its markdown file.</li>
+        <li>Builds a prompt from the workflow content.</li>
+        <li>Executes the prompt through the LLM with full tool access.</li>
+        <li>Returns the combined results.</li>
+      </ol>
+
+      <p>The agent executes the steps sequentially, using tool calls as needed. You see the results stream in as the workflow progresses.</p>
+
+      <h2>Deleting a Workflow</h2>
+
+      <pre><code>Delete the Morning Briefing workflow</code></pre>
+
+      <p>The agent calls <code>delete_workflow</code> and removes the markdown file.</p>
+
+      <h2>Workflow File Format</h2>
+
+      <p>Workflows are stored as markdown files in <code>agent-data/workflows/</code>. Each file contains YAML frontmatter followed by the workflow content:</p>
+
+      <pre><code>---
+name: Morning Briefing
+description: Daily market overview
+tags:
+  - market
+  - daily
+---
+
+## Steps
+
+1. Get current stock quotes for AAPL, MSFT, GOOGL, and AMZN
+2. Retrieve technical indicators for each stock
+3. Summarize the overall market sentiment based on the data
+4. Highlight any stocks with price changes greater than 2%</code></pre>
+
+      <p>You can also edit these files directly if you prefer working with files over chat commands.</p>
+
+      <h2>Example Workflows</h2>
+
+      <h3>Portfolio Review</h3>
+
+      <pre><code>Create a workflow called "Portfolio Review" that:
+1. Gets stock quotes for my portfolio: AAPL, MSFT, GOOGL, AMZN, TSLA
+2. Gets EDGAR company facts for any stock that moved more than 3%
+3. Produces a summary table with ticker, price, change, and recommendation</code></pre>
+
+      <h3>Competitor Analysis</h3>
+
+      <pre><code>Create a workflow called "Competitor Analysis" that:
+1. Gets stock quotes for CRM, NOW, WDAY, and HUBS
+2. Gets technical indicators for each
+3. Compares their relative strength
+4. Produces a competitive landscape summary</code></pre>
+
+      <h3>End of Day Report</h3>
+
+      <pre><code>Create a workflow called "End of Day Report" that:
+1. Gets stock quotes for the top 5 holdings
+2. Summarizes the day's market movements
+3. Lists any significant news or filings from EDGAR
+4. Recommends actions for the next trading day</code></pre>
+
+      <h2>Combining Workflows with Scheduling</h2>
+
+      <p>Workflows become more powerful when combined with scheduled tasks. For example:</p>
+
+      <pre><code>Schedule a recurring task every weekday at 9 AM to run the Morning Briefing workflow</code></pre>
+
+      <p>This creates a Hangfire job that executes your workflow automatically. See <a href="scheduling.html">Scheduling</a> for details.</p>
+
+      <h2>Tips</h2>
+
+      <ul>
+        <li><strong>Workflows are LLM-driven</strong> -- Steps are instructions, not code. The LLM interprets and executes them using available tools.</li>
+        <li><strong>Tool access is automatic</strong> -- The agent can call any registered tool during workflow execution, including MCP connections.</li>
+        <li><strong>Results depend on available data</strong> -- If a tool call fails (e.g., API rate limit), the workflow continues with what it has and notes the failure.</li>
+        <li><strong>Keep steps clear and specific</strong> -- Vague steps produce inconsistent results. "Get the stock quote for AAPL" works better than "check the market."</li>
+        <li><strong>Edit files directly</strong> -- Workflow markdown files in <code>agent-data/workflows/</code> can be edited with any text editor for fine-tuning.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

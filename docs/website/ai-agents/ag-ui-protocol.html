@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AG-UI Protocol - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>AG-UI Protocol</h1>
+
+      <p>AG-UI (Agent Graphical UI) is a protocol for streaming AI agent responses to frontend applications in real time. AI Agent Canvas uses AG-UI to connect the .NET backend (powered by Microsoft Agent Framework) to the CopilotKit frontend over Server-Sent Events (SSE).</p>
+
+      <h2>What Is AG-UI</h2>
+
+      <p>Traditional REST APIs return a complete response in a single payload. For AI agents that may take seconds to generate a response, this creates a poor user experience -- the user stares at a loading spinner until the entire response is ready.</p>
+
+      <p>AG-UI solves this by streaming <strong>events</strong> as the agent processes. The user sees text appear token by token, knows when the agent starts and finishes, and gets a responsive conversational experience.</p>
+
+      <p>The protocol defines a set of event types that represent the lifecycle of an agent response:</p>
+
+      <div class="diagram"><pre>Client POST /api/copilotkit
+     |
+     v
+Server opens SSE stream
+     |
+     +-- event: run.started
+     +-- event: text.message.start
+     +-- event: text.message.content  (repeated, one per token chunk)
+     +-- event: text.message.content
+     +-- event: text.message.content
+     +-- event: text.message.end
+     +-- event: run.finished
+     |
+     v
+SSE stream closes</pre></div>
+
+      <h2>The /api/copilotkit Endpoint</h2>
+
+      <p>AI Agent Canvas exposes a single SSE endpoint that CopilotKit connects to:</p>
+
+      <pre><code>public static class AgUiEndpoint
+{
+    public static void MapAgUiEndpoints(this WebApplication app)
+    {
+        app.MapPost("/api/copilotkit", HandleCopilotKitRequest);
+    }
+}</code></pre>
+
+      <p>This endpoint is mapped in the application startup via <code>app.UseAiAgentCanvas()</code>, which internally calls <code>app.MapAgUiEndpoints()</code>.</p>
+
+      <h2>Request Format</h2>
+
+      <p>The frontend sends a POST request with a JSON body containing the conversation messages and an optional thread ID:</p>
+
+      <pre><code>{
+  "threadId": "conv-abc-123",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is the current market summary?"
+    }
+  ]
+}</code></pre>
+
+      <p>The endpoint extracts messages and initializes the agent session:</p>
+
+      <pre><code>var body = await JsonSerializer.DeserializeAsync&lt;JsonElement&gt;(context.Request.Body);
+var messages = body.GetProperty("messages");
+var threadId = body.TryGetProperty("threadId", out var tid)
+    ? tid.GetString() ?? Guid.NewGuid().ToString()
+    : Guid.NewGuid().ToString();
+var runId = Guid.NewGuid().ToString();</code></pre>
+
+      <p>Each request gets a unique <code>runId</code>. The <code>threadId</code> persists across messages in the same conversation, enabling continuity.</p>
+
+      <h2>SSE Response Format</h2>
+
+      <p>The response uses the <code>text/event-stream</code> content type with standard SSE formatting:</p>
+
+      <pre><code>context.Response.ContentType = "text/event-stream";
+context.Response.Headers.CacheControl = "no-cache";
+context.Response.Headers.Connection = "keep-alive";</code></pre>
+
+      <p>Each event is written as:</p>
+
+      <pre><code>event: &lt;event-type&gt;
+data: &lt;json-payload&gt;
+</code></pre>
+
+      <p>Note the double newline after the data line -- this is the SSE event delimiter.</p>
+
+      <h2>Event Types</h2>
+
+      <h3>run.started</h3>
+
+      <p>Signals that the agent has begun processing the request:</p>
+
+      <pre><code>event: run.started
+data: {"threadId":"conv-abc-123","runId":"run-xyz-789"}</code></pre>
+
+      <p>The frontend uses this to show a processing indicator and track the run.</p>
+
+      <h3>text.message.start</h3>
+
+      <p>Marks the beginning of a new assistant message:</p>
+
+      <pre><code>event: text.message.start
+data: {"messageId":"msg-001","role":"assistant","agentName":"AiAgentCanvas"}</code></pre>
+
+      <p>CopilotKit creates a new message bubble in the UI when it receives this event.</p>
+
+      <h3>text.message.content</h3>
+
+      <p>Delivers a chunk of the response text. This event is sent repeatedly as tokens stream from the LLM:</p>
+
+      <pre><code>event: text.message.content
+data: {"messageId":"msg-001","delta":"The current"}
+
+event: text.message.content
+data: {"messageId":"msg-001","delta":" market shows"}
+
+event: text.message.content
+data: {"messageId":"msg-001","delta":" strong momentum..."}</code></pre>
+
+      <p>The <code>delta</code> field contains the incremental text. The frontend appends each delta to build the complete message progressively.</p>
+
+      <h3>text.message.end</h3>
+
+      <p>Signals that the message is complete:</p>
+
+      <pre><code>event: text.message.end
+data: {"messageId":"msg-001"}</code></pre>
+
+      <h3>run.finished</h3>
+
+      <p>Signals that the entire agent run is complete:</p>
+
+      <pre><code>event: run.finished
+data: {"threadId":"conv-abc-123","runId":"run-xyz-789"}</code></pre>
+
+      <p>The frontend uses this to stop the processing indicator and re-enable the input field.</p>
+
+      <h2>Streaming Implementation</h2>
+
+      <p>The backend iterates over the agent's streaming output and emits SSE events for each chunk:</p>
+
+      <pre><code>await foreach (var update in agent.RunStreamingAsync(
+    chatMessages, session, cancellationToken: context.RequestAborted))
+{
+    if (update.Text is { Length: &gt; 0 } text)
+    {
+        await WriteEvent(context, "text.message.content",
+            new { messageId, delta = text });
+    }
+}</code></pre>
+
+      <p>The <code>WriteEvent</code> helper formats and flushes each event:</p>
+
+      <pre><code>private static async Task WriteEvent(
+    HttpContext context, string eventType, object data)
+{
+    var json = JsonSerializer.Serialize(data, JsonOptions);
+    await context.Response.WriteAsync(
+        $"event: {eventType}\ndata: {json}\n\n",
+        context.RequestAborted);
+    await context.Response.Body.FlushAsync(context.RequestAborted);
+}</code></pre>
+
+      <p>The <code>FlushAsync</code> call is critical -- without it, the response may be buffered and the client would not receive events in real time.</p>
+
+      <h2>How CopilotKit Consumes the Stream</h2>
+
+      <p>On the frontend, CopilotKit handles the SSE stream automatically. The Next.js application configures CopilotKit with the backend URL:</p>
+
+      <pre><code>&lt;CopilotKit runtimeUrl="/api/copilotkit"&gt;
+  &lt;CopilotChat /&gt;
+&lt;/CopilotKit&gt;</code></pre>
+
+      <p>CopilotKit:</p>
+
+      <ol>
+        <li>Sends POST requests to <code>/api/copilotkit</code> when the user submits a message</li>
+        <li>Opens an SSE connection on the response</li>
+        <li>Parses incoming events by type</li>
+        <li>Updates the chat UI progressively as <code>text.message.content</code> events arrive</li>
+        <li>Manages conversation state across multiple request/response cycles</li>
+      </ol>
+
+      <h2>Why SSE Over WebSockets</h2>
+
+      <p>AI Agent Canvas uses SSE rather than WebSockets for several reasons:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Consideration</th>
+            <th>SSE</th>
+            <th>WebSockets</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Direction</td>
+            <td>Server-to-client (unidirectional)</td>
+            <td>Bidirectional</td>
+          </tr>
+          <tr>
+            <td>HTTP compatibility</td>
+            <td>Standard HTTP, works with all proxies/CDNs</td>
+            <td>Requires protocol upgrade</td>
+          </tr>
+          <tr>
+            <td>Reconnection</td>
+            <td>Built-in automatic reconnect</td>
+            <td>Must implement manually</td>
+          </tr>
+          <tr>
+            <td>Complexity</td>
+            <td>Simple text protocol</td>
+            <td>Binary framing, connection management</td>
+          </tr>
+          <tr>
+            <td>Load balancers</td>
+            <td>Works with standard HTTP load balancers</td>
+            <td>Requires sticky sessions or special config</td>
+          </tr>
+          <tr>
+            <td>Firewall friendliness</td>
+            <td>Standard HTTPS port, no special rules</td>
+            <td>May be blocked by corporate firewalls</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>For the agent use case, communication is fundamentally <strong>request-response with streaming</strong>: the client sends a message (POST), and the server streams back the response. There is no need for the server to push unsolicited messages or for the client to send data mid-stream.</p>
+
+      <p>SSE fits this pattern naturally:</p>
+
+      <ul>
+        <li>The POST request carries the user message</li>
+        <li>The SSE response carries the streaming agent response</li>
+        <li>HTTP infrastructure (proxies, CDNs, load balancers) works without modification</li>
+        <li>Automatic reconnection handles network interruptions</li>
+      </ul>
+
+      <p>WebSockets would add complexity (connection management, heartbeats, reconnection logic) without providing benefits for this use case.</p>
+
+      <h2>Cancellation</h2>
+
+      <p>The endpoint respects the HTTP request's cancellation token:</p>
+
+      <pre><code>cancellationToken: context.RequestAborted</code></pre>
+
+      <p>If the client closes the connection (user navigates away, network drops), the <code>RequestAborted</code> token fires, canceling the agent's LLM call and stopping the stream. This prevents wasted compute on responses nobody will read.</p>
+
+      <h2>Summary</h2>
+
+      <p>The AG-UI protocol provides a clean boundary between the .NET agent backend and the CopilotKit frontend:</p>
+
+      <ul>
+        <li><strong>POST /api/copilotkit</strong> -- Single endpoint for all agent interactions</li>
+        <li><strong>SSE events</strong> -- <code>run.started</code>, <code>text.message.start</code>, <code>text.message.content</code>, <code>text.message.end</code>, <code>run.finished</code></li>
+        <li><strong>Progressive rendering</strong> -- Users see responses as they are generated, token by token</li>
+        <li><strong>Standard HTTP</strong> -- No special infrastructure required, works with existing proxies and load balancers</li>
+        <li><strong>Cancellation</strong> -- Clean shutdown when clients disconnect</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

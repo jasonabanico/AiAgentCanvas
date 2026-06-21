@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Operations Copilot - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Customer Operations Copilot</h1>
+
+      <h2>Company Profile</h2>
+
+      <p><strong>Bloom &amp; Vine</strong> is a direct-to-consumer home goods brand based in Portland, Oregon. Founded four years ago, the company sells handcrafted ceramics, textiles, and sustainable home decor through their Shopify storefront. Annual revenue hit $18 million last year, driven by a loyal customer base and strong social media presence. The operations team is small --- eight people handling everything from order fulfillment to customer support.</p>
+
+      <h2>The Persona</h2>
+
+      <p><strong>Aisha Thompson, Customer Operations Manager.</strong> Aisha oversees the end-to-end customer experience: order processing, shipping logistics, returns, and support ticket resolution. She manages a team of three support agents and personally handles escalated issues. Her tools include Shopify for orders, Zendesk for support tickets, ShipStation for fulfillment tracking, and a spreadsheet she maintains for tracking recurring issues. She is the connective tissue between the warehouse, the support team, and the founders.</p>
+
+      <h2>The Problem</h2>
+
+      <p>Bloom &amp; Vine's growth has outpaced their operational tooling. Aisha's team handles 200+ support tickets per week across email, chat, and social channels. The most common issues --- order status inquiries, return requests, and shipping delays --- are straightforward but time-consuming because each requires switching between Shopify, Zendesk, and ShipStation to gather context.</p>
+
+      <p>Returns processing is particularly painful. The company's return policy varies by product category (ceramics have a different breakage policy than textiles), and the support agents frequently need to check the policy, verify the order, assess the reason, and determine whether to issue a refund, replacement, or store credit. Each return takes 12-15 minutes to process manually.</p>
+
+      <p>Peak seasons are worse. During the holiday rush, the ticket backlog grows to 500+ and response times stretch beyond 48 hours. Aisha spends her evenings triaging tickets instead of improving processes.</p>
+
+      <h2>How AI Agent Canvas Solves It</h2>
+
+      <p>Bloom &amp; Vine deploys AI Agent Canvas as an internal operations copilot that Aisha and her support agents use alongside their existing tools.</p>
+
+      <h3>MCP Data Connections</h3>
+
+      <p>Two custom MCP connectors bridge the key operational systems:</p>
+
+      <p><strong>MCP.Shopify</strong> exposes order and product data:</p>
+
+      <ul>
+        <li><strong>lookup_order</strong> --- Retrieves complete order details by order number, email, or customer name. Includes line items, payment status, fulfillment status, shipping tracking, and order history. "Pull up order #BV-28491" returns everything Aisha needs in one response.</li>
+        <li><strong>lookup_customer</strong> --- Returns customer profile with order history, lifetime value, return history, and any internal notes. "Show me the customer profile for sarah.chen@email.com" reveals that Sarah is a repeat buyer with $2,400 in lifetime purchases and zero prior returns.</li>
+        <li><strong>process_return</strong> --- Initiates a return in Shopify: creates the return record, generates a shipping label, and triggers the appropriate refund type (original payment, store credit, or replacement). Requires explicit confirmation before executing.</li>
+      </ul>
+
+      <p><strong>MCP.Zendesk</strong> connects the support ticket system:</p>
+
+      <ul>
+        <li><strong>get_ticket</strong> --- Retrieves a Zendesk ticket with full conversation history, tags, and internal notes. "What's the status of ticket #41872?" returns the complete thread.</li>
+        <li><strong>update_ticket</strong> --- Adds internal notes, changes priority, assigns to a team member, or updates tags. Used by the agent to enrich tickets with order context automatically.</li>
+        <li><strong>search_tickets</strong> --- Finds tickets matching criteria: status, assignee, creation date, tags, or keyword. "Show me all open tickets tagged 'shipping-delay' from the last 7 days" returns a filtered list.</li>
+      </ul>
+
+      <h3>Scheduled Tasks</h3>
+
+      <p>Automated monitoring runs continuously in the background:</p>
+
+      <ul>
+        <li><strong>Order Anomaly Scan (Every 2 hours)</strong> --- Checks all orders placed in the last 48 hours for anomalies: payment failures, fulfillment delays beyond SLA, duplicate orders, and address validation warnings. Flagged orders appear in a daily digest or trigger immediate notifications for high-severity issues.</li>
+        <li><strong>Shipping Delay Monitor (Every 4 hours)</strong> --- Cross-references ShipStation tracking data against expected delivery dates. Orders that are delayed beyond the carrier's estimate by more than 2 days are flagged, and the agent pre-drafts a proactive customer communication.</li>
+        <li><strong>Weekly Ticket Trends (Monday 7:00 AM)</strong> --- Analyzes the prior week's ticket volume, resolution time, and category distribution. Identifies emerging patterns --- for example, a spike in "item arrived damaged" tickets from a specific carrier.</li>
+      </ul>
+
+      <h3>Workflows</h3>
+
+      <p>Multi-step workflows handle common operations end to end:</p>
+
+      <p><strong>Returns Processing Workflow:</strong></p>
+
+      <ol>
+        <li>Support agent receives a return request and asks the copilot: "Process a return for order #BV-28491, reason: item damaged in shipping."</li>
+        <li>The agent looks up the order, identifies the product category (ceramics), retrieves the applicable return policy (full refund or replacement for damaged ceramics within 30 days), and verifies the order date is within the return window.</li>
+        <li>The agent presents the recommended action: "Order is eligible for full refund or free replacement under the ceramics breakage policy. Customer has zero prior returns. Recommended: offer both options to the customer."</li>
+        <li>Upon confirmation, the agent creates the return in Shopify, generates the prepaid return label, and drafts a response for the support agent to send through Zendesk.</li>
+      </ol>
+
+      <h3>Notifications and Escalations</h3>
+
+      <p>The agent monitors for conditions that require immediate human attention:</p>
+
+      <ul>
+        <li><strong>VIP Customer Issues</strong> --- Tickets from customers with lifetime value above $1,000 are automatically escalated to Aisha with full order context attached.</li>
+        <li><strong>Repeat Complaints</strong> --- If the same customer opens a third ticket within 30 days, the agent flags the pattern and recommends a personal outreach from Aisha.</li>
+        <li><strong>Inventory-Impacting Returns</strong> --- If returns for a specific product exceed 5% of units sold in a rolling 30-day window, the agent alerts the product team with a summary of return reasons.</li>
+      </ul>
+
+      <h2>A Day in the Life</h2>
+
+      <p><strong>7:30 AM</strong> --- Aisha opens the copilot to find the overnight anomaly scan results. Two orders flagged: one payment retry failed after three attempts, and one order shipped to an undeliverable address (carrier returned the package). The agent has already pre-drafted a customer email for the address issue.</p>
+
+      <p><strong>8:15 AM</strong> --- A support agent asks the copilot: "Customer says her ceramic vase arrived broken. Order #BV-31205." The agent pulls the order (placed 8 days ago, ceramics category, first-time buyer), confirms it falls within the 30-day breakage policy, and recommends a full replacement with expedited shipping to recover the customer experience. The agent drafts the Zendesk response and waits for the support agent to approve before sending.</p>
+
+      <p><strong>10:00 AM</strong> --- The shipping delay monitor flags 12 orders stuck at a regional carrier hub in Dallas for 3+ days. The agent groups them by carrier route, identifies the likely cause (weather-related delays affecting the Southwest corridor), and drafts a batch notification for affected customers offering a 15% discount on their next order.</p>
+
+      <p><strong>1:00 PM</strong> --- Aisha asks: "Show me the ticket trends from last week." The agent presents the weekly analysis: ticket volume was up 22% from the prior week, driven by a 40% increase in "where is my order" inquiries. The root cause correlates with the Dallas carrier delays. Average resolution time held steady at 4.2 hours because the agent automated initial order lookups for the support team.</p>
+
+      <p><strong>3:30 PM</strong> --- A VIP escalation arrives. A customer with $3,200 in lifetime purchases received the wrong item. The agent surfaces the full context: order details, what was ordered vs. what shipped, warehouse batch information, and the customer's previous positive interactions. Aisha handles the call personally, armed with everything she needs.</p>
+
+      <h2>Key Configuration</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Configuration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Agents</strong></td>
+            <td>CustomerOpsAgent with <code>CanHandle</code> matching order, return, shipping, and ticket queries</td>
+          </tr>
+          <tr>
+            <td><strong>MCP Connections</strong></td>
+            <td>MCP.Shopify (lookup_order, lookup_customer, process_return), MCP.Zendesk (get_ticket, update_ticket, search_tickets)</td>
+          </tr>
+          <tr>
+            <td><strong>Scheduled Tasks</strong></td>
+            <td>Order Anomaly Scan (every 2 hours), Shipping Delay Monitor (every 4 hours), Weekly Ticket Trends (Monday 7:00 AM)</td>
+          </tr>
+          <tr>
+            <td><strong>Workflows</strong></td>
+            <td>ReturnsProcessing (policy check, return creation, label generation, response drafting)</td>
+          </tr>
+          <tr>
+            <td><strong>Guardrails</strong></td>
+            <td>RequireConfirmation (all refunds and replacements require human approval), SpendLimit (refunds above $200 escalate to Aisha)</td>
+          </tr>
+          <tr>
+            <td><strong>User Profiles</strong></td>
+            <td>Support agents (ticket and order access), Aisha (full access + escalation management), warehouse team (fulfillment data only)</td>
+          </tr>
+          <tr>
+            <td><strong>Entity Management</strong></td>
+            <td>Product catalog with category-specific return policies, carrier routing rules</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

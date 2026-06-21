@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adding Custom Agents - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Adding Custom Agents</h1>
+
+      <p>Custom agents in AI Agent Canvas are lightweight projects that provide specialized system prompts. An agent does not need to implement any interface or reference any framework project -- it can be a pure class library containing only a prompts class. Tools are provided automatically by the <code>DynamicToolRegistry</code> and startup-registered tool providers.</p>
+
+      <h2>How Agents Get Tools</h2>
+
+      <p>A common question is: how does a custom agent access tools? The answer is that it does not manage tools at all. The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services and passes them to the <code>ChatClientAgent</code>. Your agent's system prompt simply instructs the LLM which tools to use and how to use them. The tools themselves are registered separately (see <a href="custom-mcp-connections.html">Adding Custom MCP Connections</a>).</p>
+
+      <h2>Step-by-Step Guide</h2>
+
+      <h3>Step 1: Create a Project Folder</h3>
+
+      <p>Create a new folder under <code>src/Custom/</code>:</p>
+
+      <pre><code>src/Custom/MyAgent/</code></pre>
+
+      <h3>Step 2: Create the .csproj</h3>
+
+      <p>Create a minimal project file. For a pure prompts agent, no package references are needed:</p>
+
+      <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net9.0&lt;/TargetFramework&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+  &lt;/PropertyGroup&gt;
+
+&lt;/Project&gt;</code></pre>
+
+      <h3>Step 3: Create the Agent Prompts Class</h3>
+
+      <p>Create a static class with a <code>GetSystemPrompt()</code> method that returns the system prompt for your agent:</p>
+
+      <pre><code>namespace MyAgent;
+
+public static class MyAgentPrompts
+{
+    public static string GetSystemPrompt() =&gt; """
+        You are a customer support assistant for Contoso Electronics.
+
+        You have access to the following tools:
+        - search_knowledge_base: Search the product knowledge base
+        - lookup_order: Look up an order by order number
+        - create_ticket: Create a support ticket
+
+        Guidelines:
+        - Always greet the customer warmly
+        - Look up order details before making claims about order status
+        - If you cannot resolve an issue, create a support ticket
+        - Never share internal pricing or margin information
+        - Escalate billing disputes to a human agent
+        """;
+}</code></pre>
+
+      <p>The system prompt should:</p>
+
+      <ul>
+        <li>Describe the agent's role and personality</li>
+        <li>List the tools it should use (these are registered separately)</li>
+        <li>Provide behavioral guidelines and constraints</li>
+        <li>Specify what the agent should and should not do</li>
+      </ul>
+
+      <h3>Step 4: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
+
+      <p>Open <code>src/AiAgentCanvas.Web/AiAgentCanvas.Web.csproj</code> and add a reference to your project:</p>
+
+      <pre><code>&lt;ItemGroup&gt;
+  &lt;ProjectReference Include="..\Custom\MyAgent\MyAgent.csproj" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+
+      <h3>Step 5: Add to AiAgentCanvas.sln</h3>
+
+      <p>Add the project to the solution under the Custom solution folder:</p>
+
+      <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MyAgent/MyAgent.csproj --solution-folder Custom</code></pre>
+
+      <h3>Step 6: Wire Up in Program.cs</h3>
+
+      <p>Use your agent's system prompt when configuring <code>AddAiAgentCanvas()</code>:</p>
+
+      <pre><code>using MyAgent;
+
+builder.Services.AddAiAgentCanvas(builder.Configuration, options =&gt;
+{
+    options.AgentName = "CustomerSupport";
+    options.AgentDescription = "A customer support assistant for Contoso Electronics.";
+    options.SystemPrompt = MyAgentPrompts.GetSystemPrompt();
+});</code></pre>
+
+      <h2>Full Reference: HelloWorldAgent</h2>
+
+      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in sample. It has exactly two files.</p>
+
+      <h3>HelloWorldAgent.csproj</h3>
+
+      <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net9.0&lt;/TargetFramework&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+  &lt;/PropertyGroup&gt;
+
+&lt;/Project&gt;</code></pre>
+
+      <p>No package references. No project references. Just a net9.0 class library.</p>
+
+      <h3>HelloWorldAgentPrompts.cs</h3>
+
+      <pre><code>namespace HelloWorldAgent;
+
+public static class HelloWorldAgentPrompts
+{
+    public static string GetSystemPrompt() =&gt; """
+        You are a helpful stock market assistant.
+
+        You have access to the following tools:
+        - stock_quote: Get the current price and daily change for a ticker
+        - stock_technicals: Get technical indicators (RSI, SMA, EMA, MACD)
+        - edgar_company_facts: Fetch SEC EDGAR financial data for a company
+
+        When a user asks about a stock, use the appropriate tools to fetch live data,
+        then summarize the results in a clear, concise response. Use specific numbers.
+        If the user doesn't specify a ticker, ask them which stock they're interested in.
+        """;
+}</code></pre>
+
+      <p>The tools referenced in the prompt (<code>stock_quote</code>, <code>stock_technicals</code>, <code>edgar_company_facts</code>) are provided by the <code>MCP.MarketData</code> custom project. They are registered separately via <code>builder.Services.AddMarketDataTools()</code> in <code>Program.cs</code>.</p>
+
+      <h2>Switching Between Agents</h2>
+
+      <p>To switch between agents, change the <code>SystemPrompt</code> in the <code>AddAiAgentCanvas()</code> call in <code>Program.cs</code>. You can also use the Personas agent data domain to switch prompts at runtime without restarting the server -- see <a href="agent-data.html">Agent Data</a>.</p>
+
+      <h2>Agents with Custom Tools</h2>
+
+      <p>If your agent needs custom tools (data connections, API integrations), create them as a separate Custom project following the <a href="custom-mcp-connections.html">Adding Custom MCP Connections</a> guide. The separation is intentional: agent prompts define behavior, while tool providers define capabilities.</p>
+
+      <p>However, if you prefer to keep tools and prompts in the same project, you can. Just add the <code>Microsoft.Extensions.AI</code> package reference and follow the tool provider pattern:</p>
+
+      <pre><code>// MyAgent/MyAgentToolProvider.cs
+using Microsoft.Extensions.AI;
+
+namespace MyAgent;
+
+public sealed class MyAgentToolProvider
+{
+    public IReadOnlyList&lt;AITool&gt; GetTools()
+    {
+        return
+        [
+            AIFunctionFactory.Create(SearchKnowledgeBase, "search_knowledge_base",
+                "Search the product knowledge base"),
+        ];
+    }
+
+    private string SearchKnowledgeBase(string query)
+    {
+        // Your implementation here
+        return "...";
+    }
+}</code></pre>
+
+      <pre><code>// MyAgent/MyAgentServiceExtensions.cs
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace MyAgent;
+
+public static class MyAgentServiceExtensions
+{
+    public static IServiceCollection AddMyAgent(this IServiceCollection services)
+    {
+        services.AddSingleton&lt;MyAgentToolProvider&gt;();
+        services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+            sp.GetRequiredService&lt;MyAgentToolProvider&gt;().GetTools());
+        return services;
+    }
+}</code></pre>
+
+      <p>Then in <code>Program.cs</code>:</p>
+
+      <pre><code>builder.Services.AddMyAgent();</code></pre>
+
+      <h2>Testing Your Agent</h2>
+
+      <ol>
+        <li>Build the solution: <code>dotnet build AiAgentCanvas.sln</code></li>
+        <li>Run the backend: <code>cd src/AiAgentCanvas.Web &amp;&amp; dotnet run</code></li>
+        <li>Run the frontend: <code>cd frontend &amp;&amp; npm run dev</code></li>
+        <li>Open the CopilotKit UI and interact with your agent</li>
+        <li>Check the console logs for tool calls and governance events</li>
+      </ol>
+    </main>
+  </div>
+</body>
+</html>

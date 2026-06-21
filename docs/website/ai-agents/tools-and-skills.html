@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tools and Skills - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Tools and Skills</h1>
+
+      <p>Tools are how AI agents interact with the world. Without tools, an agent can only generate text. With tools, it can query databases, call APIs, search documents, manage schedules, and perform calculations. Skills extend this concept by allowing agents to create and manage reusable prompt-based tools at runtime.</p>
+
+      <h2>What Are AI Tools</h2>
+
+      <p>In the Microsoft.Extensions.AI ecosystem, a tool is represented by the <code>AITool</code> base class. The most common concrete type is <code>AIFunction</code>, which wraps a .NET method so the LLM can call it.</p>
+
+      <p>The LLM never executes tools directly. Instead, it receives tool <strong>schemas</strong> (name, description, parameter definitions) and decides when to call them. The framework handles execution and feeds results back.</p>
+
+      <h3>AIFunction and AIFunctionFactory</h3>
+
+      <p><code>AIFunctionFactory.Create</code> is the primary way to define tools in AI Agent Canvas. It takes a delegate and metadata, producing an <code>AITool</code> the framework can register:</p>
+
+      <pre><code>public IReadOnlyList&lt;AITool&gt; GetTools()
+{
+    return
+    [
+        AIFunctionFactory.Create(ConnectMcpServer, "connect_mcp_server",
+            "Connect to an MCP server and register its tools"),
+        AIFunctionFactory.Create(DisconnectMcpServer, "disconnect_mcp_server",
+            "Disconnect from an MCP server and remove its tools"),
+        AIFunctionFactory.Create(ListMcpConnections, "list_mcp_connections",
+            "List all active MCP server connections"),
+    ];
+}</code></pre>
+
+      <p>The <code>[Description]</code> attribute on parameters generates the JSON schema that the LLM uses to understand what arguments to provide:</p>
+
+      <pre><code>[Description("Connect to an MCP server and register its tools")]
+private async Task&lt;string&gt; ConnectMcpServer(
+    [Description("A unique name for this connection")] string name,
+    [Description("The server endpoint URL")] string endpoint,
+    [Description("Transport type: 'http' or 'sse'")] string transport,
+    CancellationToken ct)
+{
+    // Implementation
+}</code></pre>
+
+      <p>Good tool descriptions are critical. The LLM relies on them to decide <strong>when</strong> and <strong>how</strong> to call a tool. Vague descriptions lead to incorrect tool selection.</p>
+
+      <h2>The Tool Call Loop</h2>
+
+      <p>When the LLM decides to use a tool, the following sequence executes:</p>
+
+      <div class="diagram"><pre>User: "What MCP servers are connected?"
+                    |
+                    v
+           +----------------+
+           |   LLM Reasons  |
+           | "I should call |
+           | list_mcp_      |
+           | connections"   |
+           +-------+--------+
+                   |
+                   v
+           +----------------+
+           | Framework      |
+           | executes       |
+           | ListMcp...()   |
+           +-------+--------+
+                   |
+                   v
+           +----------------+
+           | Result:        |
+           | {"count": 2,   |
+           |  "connections":.|
+           |  [...]}        |
+           +-------+--------+
+                   |
+                   v
+           +----------------+
+           | LLM receives   |
+           | result, formats|
+           | human-readable |
+           | response       |
+           +----------------+</pre></div>
+
+      <p>Key points about tool execution:</p>
+
+      <ol>
+        <li><strong>The LLM chooses</strong> -- The framework never forces a tool call. The LLM infers from context and tool descriptions.</li>
+        <li><strong>The framework executes</strong> -- Tool methods run in the server process, not in the LLM. This is important for security and data access.</li>
+        <li><strong>Results feed back</strong> -- Tool output becomes a new message in the conversation, and the LLM generates its response with that information.</li>
+        <li><strong>Multiple rounds</strong> -- The LLM can call multiple tools in sequence, using each result to inform the next step.</li>
+      </ol>
+
+      <h2>DynamicToolRegistry</h2>
+
+      <p>Not all tools are known at startup. AI Agent Canvas uses <code>DynamicToolRegistry</code> to compose tools from multiple sources at runtime:</p>
+
+      <pre><code>public sealed class DynamicToolRegistry
+{
+    private readonly ConcurrentDictionary&lt;string, List&lt;AITool&gt;&gt; _toolsBySource = new();
+
+    public void Register(string source, IEnumerable&lt;AITool&gt; tools)
+    {
+        _toolsBySource[source] = tools.ToList();
+    }
+
+    public void Unregister(string source)
+    {
+        _toolsBySource.TryRemove(source, out _);
+    }
+
+    public IReadOnlyList&lt;AITool&gt; GetAllTools()
+    {
+        return _toolsBySource.Values.SelectMany(t =&gt; t).ToList();
+    }
+}</code></pre>
+
+      <p>Tools are grouped by <strong>source</strong> -- a string key that identifies where they came from. For example:</p>
+
+      <ul>
+        <li><code>"mcp:market-data"</code> -- Tools from a connected MCP server</li>
+        <li><code>"skills"</code> -- Tools loaded from skill definitions</li>
+        <li><code>"system"</code> -- Built-in system tools</li>
+      </ul>
+
+      <p>The <code>DynamicToolContextProvider</code> injects these dynamic tools into every LLM call:</p>
+
+      <pre><code>internal sealed class DynamicToolContextProvider : AIContextProvider
+{
+    private readonly DynamicToolRegistry _registry;
+
+    protected override ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
+        InvokingContext context, CancellationToken cancellationToken)
+    {
+        var dynamicTools = _registry.GetAllTools();
+        if (dynamicTools.Count &gt; 0)
+        {
+            var existing = context.AIContext.Tools?.ToList() ?? [];
+            existing.AddRange(dynamicTools);
+            context.AIContext.Tools = existing;
+        }
+        return new ValueTask&lt;AIContext&gt;(context.AIContext);
+    }
+}</code></pre>
+
+      <p>This means when an MCP server is connected at runtime, its tools immediately become available to the agent without a restart.</p>
+
+      <h2>Tool Providers</h2>
+
+      <p>AI Agent Canvas organizes tools into <strong>tool provider</strong> classes. Each provider owns a specific domain of tools:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Tools</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>McpConnectionManager</code></td>
+            <td><code>connect_mcp_server</code>, <code>disconnect_mcp_server</code>, <code>list_mcp_connections</code></td>
+            <td>Manage MCP data connections</td>
+          </tr>
+          <tr>
+            <td><code>SkillToolProvider</code></td>
+            <td><code>create_skill</code>, <code>list_skills</code>, <code>run_skill</code>, <code>remove_skill</code></td>
+            <td>Manage reusable prompt skills</td>
+          </tr>
+          <tr>
+            <td><code>SkillAuthoringToolProvider</code></td>
+            <td><code>author_skill</code>, <code>edit_skill</code>, <code>read_skill</code>, <code>delete_authored_skill</code></td>
+            <td>Author skill markdown files</td>
+          </tr>
+          <tr>
+            <td><code>SchedulerToolProvider</code></td>
+            <td>Schedule-related tools</td>
+            <td>Manage scheduled agent tasks</td>
+          </tr>
+          <tr>
+            <td><code>WorkflowToolProvider</code></td>
+            <td>Workflow tools</td>
+            <td>Execute multi-step workflows</td>
+          </tr>
+          <tr>
+            <td><code>SystemToolProvider</code></td>
+            <td>System-level utilities</td>
+            <td>Core system operations</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Tool providers implement a <code>GetTools()</code> method that returns their tools as <code>IReadOnlyList&lt;AITool&gt;</code>. These are registered in DI and collected during agent construction.</p>
+
+      <h2>Skills: Agent-Managed Tools</h2>
+
+      <p>Skills are a higher-level abstraction on top of tools. A skill is a <strong>persisted prompt template</strong> that the agent can create, manage, and execute at runtime.</p>
+
+      <h3>Creating a Skill</h3>
+
+      <p>When a user asks the agent to "create a skill that summarizes text," the agent calls <code>create_skill</code>:</p>
+
+      <pre><code>private string CreateSkill(string name, string description, string promptTemplate)
+{
+    var record = new SkillRecord
+    {
+        Id = id,
+        Name = normalizedName,
+        Description = description,
+        PromptTemplate = promptTemplate,  // e.g., "Summarize: {input}"
+    };
+    _store.SaveSkill(record);
+}</code></pre>
+
+      <h3>Running a Skill</h3>
+
+      <p>When the skill is invoked via <code>run_skill</code>, the framework substitutes the <code>{input}</code> placeholder and sends the expanded prompt to the agent:</p>
+
+      <pre><code>private async Task&lt;string&gt; RunSkill(string name, string input, CancellationToken ct)
+{
+    var skill = _store.GetSkill(name);
+    var prompt = skill.PromptTemplate.Replace("{input}", input);
+
+    var messages = new List&lt;ChatMessage&gt;
+    {
+        new(ChatRole.User, prompt),
+    };
+
+    var response = await _agent.RunAsync(messages, cancellationToken: ct);
+    return JsonSerializer.Serialize(new { skill = name, result = response.Text });
+}</code></pre>
+
+      <h3>Skill Authoring</h3>
+
+      <p>Beyond runtime skill creation, <code>SkillAuthoringToolProvider</code> allows the agent to write skill definitions as <strong>markdown files</strong> with YAML frontmatter:</p>
+
+      <pre><code>---
+name: summarize
+description: Summarize text into key points
+tags: text, summary
+---
+
+Summarize the following text into 3-5 key bullet points:
+
+{input}</code></pre>
+
+      <p>This persistence format makes skills portable, version-controllable, and human-readable.</p>
+
+      <h2>Tool Design Guidelines</h2>
+
+      <p>When building tools for AI Agent Canvas:</p>
+
+      <ol>
+        <li><strong>Descriptive names</strong> -- Use verb-noun format: <code>connect_mcp_server</code>, not <code>mcp</code> or <code>connect</code>.</li>
+        <li><strong>Clear descriptions</strong> -- Both the tool and each parameter need descriptions the LLM can reason about.</li>
+        <li><strong>Return structured data</strong> -- Return JSON strings so the LLM can parse and present results cleanly.</li>
+        <li><strong>Handle errors gracefully</strong> -- Return error information as data rather than throwing exceptions.</li>
+        <li><strong>Keep tools focused</strong> -- One tool per action. Avoid multi-purpose tools with mode parameters.</li>
+        <li><strong>Use CancellationToken</strong> -- Long-running tools should accept and respect cancellation tokens.</li>
+      </ol>
+
+      <h2>Summary</h2>
+
+      <p>The tools and skills system in AI Agent Canvas provides a layered approach:</p>
+
+      <ul>
+        <li><strong>AITool / AIFunction</strong> -- The foundation: .NET methods the LLM can call</li>
+        <li><strong>Tool Providers</strong> -- Organized groups of related tools</li>
+        <li><strong>DynamicToolRegistry</strong> -- Runtime composition of tools from multiple sources</li>
+        <li><strong>Skills</strong> -- Persisted prompt templates the agent manages as reusable capabilities</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

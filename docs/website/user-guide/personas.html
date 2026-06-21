@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personas - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Personas</h1>
+
+      <p>Personas let you switch the agent's personality, tone, and focus area without changing any code. Each persona is a set of custom instructions that shape how the agent responds.</p>
+
+      <h2>What Is a Persona?</h2>
+
+      <p>A persona is a named configuration with:</p>
+
+      <ul>
+        <li><strong>Name</strong> -- A short identifier (e.g., "Analyst", "Advisor").</li>
+        <li><strong>Description</strong> -- What the persona is for.</li>
+        <li><strong>Instructions</strong> -- Detailed instructions injected into the agent's system prompt.</li>
+      </ul>
+
+      <p>When a persona is active, its instructions are prepended to every agent response, guiding the agent's behavior, tone, and areas of focus. When no persona is active, the agent uses its default system prompt.</p>
+
+      <h2>Creating a Persona</h2>
+
+      <p>Ask the agent to create one in natural language:</p>
+
+      <pre><code>Create a persona called "Financial Analyst" with instructions to focus on
+quantitative analysis, cite data sources, use precise financial terminology,
+and present findings in a structured format with bullet points.</code></pre>
+
+      <p>The agent calls the <code>create_persona</code> tool and saves the persona as a markdown file in <code>agent-data/personas/</code>.</p>
+
+      <h2>Listing Personas</h2>
+
+      <p>To see all available personas:</p>
+
+      <pre><code>List my personas</code></pre>
+
+      <p>The agent calls <code>list_personas</code> and returns the name and description of each persona.</p>
+
+      <h2>Switching Personas</h2>
+
+      <p>To activate a different persona:</p>
+
+      <pre><code>Switch to the Financial Analyst persona</code></pre>
+
+      <p>The agent calls <code>switch_persona</code>, and all subsequent responses in the session use that persona's instructions. The active persona is tracked in an <code>.active</code> file, so it persists across backend restarts.</p>
+
+      <h2>Reading a Persona</h2>
+
+      <p>To view the full details of a persona:</p>
+
+      <pre><code>Show me the Financial Analyst persona</code></pre>
+
+      <p>The agent calls <code>read_persona</code> and displays the persona's name, description, and instructions.</p>
+
+      <h2>Updating a Persona</h2>
+
+      <p>To change a persona's instructions:</p>
+
+      <pre><code>Update the Financial Analyst persona to also include risk assessment in every analysis</code></pre>
+
+      <p>The agent calls <code>update_persona</code> and saves the changes.</p>
+
+      <h2>Deleting a Persona</h2>
+
+      <p>To remove a persona:</p>
+
+      <pre><code>Delete the Financial Analyst persona</code></pre>
+
+      <p>The agent calls <code>delete_persona</code> and removes the markdown file.</p>
+
+      <h2>How Personas Work Internally</h2>
+
+      <p>Personas are managed by three components:</p>
+
+      <ol>
+        <li><strong>PersonaStore</strong> -- Reads and writes persona markdown files in <code>agent-data/personas/</code>. Each persona is a separate <code>.md</code> file.</li>
+        <li><strong>PersonaToolProvider</strong> -- Exposes the six persona tools (<code>create_persona</code>, <code>update_persona</code>, <code>list_personas</code>, <code>switch_persona</code>, <code>read_persona</code>, <code>delete_persona</code>) to the agent.</li>
+        <li><strong>PersonaContextProvider</strong> -- An AI context provider that reads the active persona's instructions and injects them into the agent's system prompt before every interaction.</li>
+      </ol>
+
+      <h2>Example Personas</h2>
+
+      <p>Here are some useful persona configurations to get started:</p>
+
+      <h3>Data Analyst</h3>
+
+      <pre><code>Create a persona called "Data Analyst" with instructions:
+- Focus on quantitative analysis and data interpretation
+- Always ask for data sources and sample sizes
+- Present findings with tables and bullet points
+- Flag statistical anomalies and outliers</code></pre>
+
+      <h3>Executive Advisor</h3>
+
+      <pre><code>Create a persona called "Executive Advisor" with instructions:
+- Provide concise, strategic recommendations
+- Lead with the bottom line, then support with details
+- Frame insights in terms of business impact and ROI
+- Use professional but accessible language</code></pre>
+
+      <h3>Research Assistant</h3>
+
+      <pre><code>Create a persona called "Research Assistant" with instructions:
+- Be thorough and cite sources whenever possible
+- Present multiple perspectives on complex topics
+- Organize findings with clear headings and sections
+- Flag areas where information is uncertain or incomplete</code></pre>
+
+      <h2>Tips</h2>
+
+      <ul>
+        <li><strong>Only one persona is active at a time.</strong> Switching personas replaces the previous one.</li>
+        <li><strong>Persona instructions stack with other context.</strong> Guardrails, user profiles, entities, and persistent context are still active alongside the persona.</li>
+        <li><strong>Clear the persona</strong> by asking "Switch to the default persona" or "Deactivate the current persona."</li>
+        <li><strong>Keep instructions focused.</strong> Shorter, clearer instructions produce more consistent behavior than long, complex ones.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

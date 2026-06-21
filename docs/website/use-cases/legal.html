@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contract Review Agent - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Contract Review Agent</h1>
+
+      <h2>Company Profile</h2>
+
+      <p><strong>Sterling &amp; Associates</strong> is a 120-attorney law firm headquartered in Chicago with offices in New York and San Francisco. The firm specializes in corporate transactions, intellectual property, and commercial litigation. Their clients range from mid-market companies to Fortune 500 enterprises, and the volume of contracts flowing through the firm at any given time exceeds 400 active matters.</p>
+
+      <h2>The Persona</h2>
+
+      <p><strong>Elena Vasquez, Associate Attorney.</strong> Five years into her practice, Elena works in the corporate transactions group. She reviews 15-20 contracts per week --- supplier agreements, licensing deals, NDAs, and merger-related ancillary documents. She is sharp, efficient, and frustrated. The firm's document management system holds thousands of precedent agreements, but finding the right clause from a prior deal requires searching through dozens of files manually.</p>
+
+      <h2>The Problem</h2>
+
+      <p>Contract review at Sterling follows a predictable but time-consuming pattern. Elena receives a draft agreement from opposing counsel, reads it cover to cover, identifies problematic clauses, cross-references the firm's standard positions, checks for client-specific requirements, and redlines the document. A routine supplier agreement takes 3-4 hours. A complex licensing deal can take two full days.</p>
+
+      <p>Three specific bottlenecks slow her down. First, locating precedent language: "How did we handle the limitation of liability in the Acme Industries deal last year?" requires emailing colleagues or manually searching the DMS. Second, client-specific requirements are tracked in internal memos that are not linked to the DMS, so Elena must remember or re-discover each client's preferences. Third, confidentiality walls between practice groups mean she must be careful not to access or reference documents from matters she is not staffed on.</p>
+
+      <h2>How AI Agent Canvas Solves It</h2>
+
+      <p>Sterling deploys AI Agent Canvas as a contract review assistant integrated into their attorney workspace.</p>
+
+      <h3>MCP Data Connections</h3>
+
+      <p>A custom <strong>MCP.DocumentManagement</strong> connector interfaces with the firm's iManage DMS:</p>
+
+      <ul>
+        <li><strong>search_precedents</strong> --- Searches the DMS for contracts matching specified criteria: clause type, client, industry, deal type, and date range. Elena asks "Find indemnification clauses from technology licensing agreements closed in the last 18 months" and receives a ranked list of matching clauses with document references.</li>
+        <li><strong>retrieve_clause</strong> --- Extracts a specific clause from a document by section heading or clause type. "Pull the limitation of liability from the Acme Industries MSA (matter 2025-1847)" returns the exact language with its document citation.</li>
+        <li><strong>check_client_standards</strong> --- Queries the client standards database to retrieve the firm's approved positions for a specific client. "What is our standard position on consequential damages for TechCorp?" returns the approved language and any client-specific notes.</li>
+      </ul>
+
+      <h3>Skill Authoring</h3>
+
+      <p>The firm creates custom skills that encode their contract review methodology:</p>
+
+      <ul>
+        <li><strong>Clause Extraction</strong> --- Given a contract document, identifies and categorizes every material clause: indemnification, limitation of liability, termination, assignment, change of control, IP ownership, confidentiality, and governing law. Each extracted clause is tagged with a risk assessment (standard, requires review, non-standard).</li>
+        <li><strong>Redline Comparison</strong> --- Compares a received draft against the firm's standard template for that contract type and highlights deviations. The output is a structured list of differences with the firm's preferred alternative language.</li>
+        <li><strong>Position Reconciliation</strong> --- Cross-references extracted clauses against client-specific standards and flags any clause where the draft deviates from the client's approved position.</li>
+      </ul>
+
+      <h3>Guardrails</h3>
+
+      <ul>
+        <li><strong>Matter-Based Access Control</strong> --- The agent enforces confidentiality walls by restricting DMS searches to matters where the requesting attorney is listed as a team member. If Elena searches for precedents, she only sees results from her own matters and from the firm's general precedent library. Documents from walled-off matters are excluded from results.</li>
+        <li><strong>No Legal Advice Framing</strong> --- The agent presents its analysis as draft work product for attorney review. Every output includes a disclaimer that the analysis has not been reviewed by a supervising attorney and does not constitute the firm's legal opinion.</li>
+        <li><strong>Privilege Protection</strong> --- The agent will not include attorney-client privileged content in any output that could be shared externally. If Elena asks the agent to draft a clause summary for opposing counsel, it strips internal notes and work product references.</li>
+      </ul>
+
+      <h3>User Profiles</h3>
+
+      <p>User profiles map each attorney to their practice area, seniority level, and matter assignments:</p>
+
+      <ul>
+        <li><strong>Practice Area</strong> determines which standard templates and clause libraries are loaded by default. Elena's corporate transactions profile loads commercial contract templates. An IP attorney's profile loads licensing and patent agreement templates.</li>
+        <li><strong>Seniority Level</strong> controls the depth of analysis. Associates receive detailed explanations and citations to precedent. Partners receive concise summaries with only flagged deviations.</li>
+        <li><strong>Matter Assignments</strong> define the DMS access perimeter for confidentiality wall enforcement.</li>
+      </ul>
+
+      <h2>A Day in the Life</h2>
+
+      <p><strong>8:00 AM</strong> --- Elena receives a draft Master Services Agreement from opposing counsel for a new TechCorp engagement. She uploads the document to the copilot and asks: "Extract all material clauses and assess against our standard MSA template."</p>
+
+      <p><strong>8:15 AM</strong> --- The agent returns a structured analysis. Fourteen clauses extracted. Three flagged as non-standard: the indemnification cap is set at contract value (the firm's standard is 2x), the termination for convenience requires 90-day notice (standard is 30), and the IP ownership clause contains a broad license-back provision not present in the template.</p>
+
+      <p><strong>8:30 AM</strong> --- Elena asks: "Check these three flagged clauses against TechCorp's client standards." The agent queries the client standards database and reports: TechCorp has previously accepted a 1.5x indemnification cap, requires no more than 60-day termination notice, and has no documented position on license-back provisions. Elena now knows exactly where she has room to negotiate and where she needs partner guidance.</p>
+
+      <p><strong>10:00 AM</strong> --- For the license-back provision, Elena needs precedent. She asks: "Find license-back clauses from technology MSAs where we successfully negotiated narrower scope, last two years." The agent returns four examples from her accessible matters, each with the original draft language and the final negotiated version.</p>
+
+      <p><strong>11:30 AM</strong> --- Elena drafts her redline and asks the agent to verify consistency: "Check my redlined indemnification clause against the TechCorp standard and flag any conflicts." The agent confirms alignment and notes that her proposed cap of 1.5x matches the client's documented threshold.</p>
+
+      <p><strong>3:00 PM</strong> --- A partner asks Elena to prepare a summary of open issues for the client call tomorrow. Elena asks the agent: "Summarize the three non-standard clauses, our proposed positions, and the precedent supporting each." The agent produces a one-page brief with citations to the precedent agreements --- all from matters Elena is authorized to access.</p>
+
+      <h2>Key Configuration</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Configuration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Agents</strong></td>
+            <td>ContractReviewAgent with <code>CanHandle</code> matching contract, clause, and agreement queries</td>
+          </tr>
+          <tr>
+            <td><strong>MCP Connections</strong></td>
+            <td>MCP.DocumentManagement (search_precedents, retrieve_clause, check_client_standards)</td>
+          </tr>
+          <tr>
+            <td><strong>Skills</strong></td>
+            <td>ClauseExtraction, RedlineComparison, PositionReconciliation</td>
+          </tr>
+          <tr>
+            <td><strong>Guardrails</strong></td>
+            <td>MatterBasedAccessControl, NoLegalAdviceFraming, PrivilegeProtection</td>
+          </tr>
+          <tr>
+            <td><strong>User Profiles</strong></td>
+            <td>Per-attorney: practice area, seniority level, matter assignments</td>
+          </tr>
+          <tr>
+            <td><strong>Personas</strong></td>
+            <td>Associate Mode (detailed analysis with citations), Partner Mode (concise flagged deviations)</td>
+          </tr>
+          <tr>
+            <td><strong>Entity Management</strong></td>
+            <td>Client registry, matter database, standard clause library</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>
