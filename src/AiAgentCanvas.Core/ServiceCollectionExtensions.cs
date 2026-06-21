@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Configuration;
 using AiAgentCanvas.Core.Endpoints;
 using AiAgentCanvas.Core.Providers;
@@ -47,10 +48,14 @@ public static class ServiceCollectionExtensions
             var chatHistoryProvider = sp.GetService<ChatHistoryProvider>();
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
-            var tools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+            var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+            var governanceWrapper = sp.GetService<IToolGovernanceWrapper>();
+            var tools = governanceWrapper is not null
+                ? rawTools.Select(t => t is AIFunction fn ? (AITool)governanceWrapper.Wrap(fn) : t).ToList()
+                : rawTools;
             var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
-            toolLogger.LogInformation("Registered {ToolCount} tools: {ToolNames}",
-                tools.Count, string.Join(", ", tools.Select(t => t.Name)));
+            toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
+                tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));
 
             var agentOptions = new ChatClientAgentOptions
             {

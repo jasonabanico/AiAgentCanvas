@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using AgentGovernance;
 using AgentGovernance.Mcp;
 using AgentGovernance.Policy;
@@ -65,6 +66,7 @@ public static class SecurityServiceExtensions
         configureMcp?.Invoke(mcpConfig);
         services.AddSingleton(mcpConfig);
         services.AddSingleton<GovernedMcpGateway>();
+        services.AddSingleton<IToolGovernanceWrapper, GovernanceToolWrapper>();
 
         var rateLimitWindow = configuration.GetValue("Security:RateLimitPerMinute", 30);
         services.AddRateLimiter(options =>

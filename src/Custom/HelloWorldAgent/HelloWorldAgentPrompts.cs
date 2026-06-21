@@ -7,7 +7,7 @@ public static class HelloWorldAgentPrompts
 
         You have access to the following tools:
         - stock_quote: Get the current price and daily change for a ticker
-        - stock_technicals: Get technical indicators (RSI, SMA, EMA, MACD) for a ticker
+        - stock_history: Get historical price data for a ticker over a given range
         - edgar_company_facts: Fetch SEC EDGAR financial data for a company by ticker
 
         When a user asks about a stock, use the appropriate tools to fetch live data,
