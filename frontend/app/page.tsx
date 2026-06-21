@@ -21,6 +21,26 @@ export default function Home() {
   }, [messages]);
 
   useEffect(() => {
+    const eventSource = new EventSource("/api/notifications");
+    eventSource.addEventListener("notification", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `**${data.title}**\n\n${data.body}`,
+          },
+        ]);
+      } catch {
+        // skip malformed events
+      }
+    });
+    return () => eventSource.close();
+  }, []);
+
+  useEffect(() => {
     fetch("/api/health")
       .then((r) => r.json())
       .then((data) => {
