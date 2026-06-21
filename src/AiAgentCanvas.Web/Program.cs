@@ -4,9 +4,12 @@ using AiAgentCanvas.Notifications;
 using AiAgentCanvas.Scheduler;
 using AiAgentCanvas.Security;
 using AiAgentCanvas.Skills;
+using AiAgentCanvas.SystemTools;
 using Hangfire;
 using Hangfire.Storage.SQLite;
+using HelloWorldAgent;
 using MCP.MarketData;
+using VectorStore.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +22,11 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 });
 
 builder.Services.AddMarketDataTools();
+builder.Services.AddAiAgentCanvasSystemTools(options =>
+{
+    options.AllowedCommands = ["dotnet", "git", "npm", "node"];
+    options.ScriptTimeoutSeconds = 30;
+});
 builder.Services.AddAiAgentCanvasNotifications();
 builder.Services.AddAiAgentCanvasScheduler();
 builder.Services.AddAiAgentCanvasSkills();
@@ -31,6 +39,14 @@ builder.Services.AddAiAgentCanvasWorkflows();
 builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasEntities();
 builder.Services.AddAiAgentCanvasUserProfiles();
+
+builder.Services.AddSqliteChatHistory();
+
+if (!string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentName"]))
+{
+    builder.Services.AddSqliteVectorStore(builder.Configuration);
+    builder.Services.AddAiAgentCanvasRag();
+}
 
 builder.Services.AddHangfire(config => config
     .UseSimpleAssemblyNameTypeSerializer()

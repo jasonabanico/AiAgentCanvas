@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -15,6 +15,9 @@
     <ProjectReference Include="..\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj" />
     <ProjectReference Include="..\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
     <ProjectReference Include="..\Custom\MCP.MarketData\MCP.MarketData.csproj" />
+    <ProjectReference Include="..\Custom\VectorStore.Sqlite\VectorStore.Sqlite.csproj" />
+    <ProjectReference Include="..\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj" />
+    <ProjectReference Include="..\Custom\HelloWorldAgent\HelloWorldAgent.csproj" />
   </ItemGroup>
 
   <ItemGroup>
