@@ -50,7 +50,15 @@ app.UseAiAgentCanvasSecurity();</code></pre>
           </tr>
           <tr>
             <td><code>GovernedMcpGateway</code></td>
-            <td>Wraps MCP tool calls for allow/deny decisions</td>
+            <td>Evaluates tool calls against policy for allow/deny decisions</td>
+          </tr>
+          <tr>
+            <td><code>GovernedAIFunction</code></td>
+            <td>DelegatingAIFunction wrapper that runs governance checks before each tool call</td>
+          </tr>
+          <tr>
+            <td><code>GovernanceToolWrapper</code></td>
+            <td>Implements <code>IToolGovernanceWrapper</code> (from Abstractions) to wrap all tools at startup</td>
           </tr>
           <tr>
             <td>Rate limiter</td>
@@ -240,6 +248,44 @@ app.UseAiAgentCanvasSecurity();</code></pre>
           </tr>
         </tbody>
       </table>
+
+      <h2>Tool-Call Governance</h2>
+
+      <p>Every tool registered at startup is wrapped with governance checks via the <code>IToolGovernanceWrapper</code> abstraction. This ensures that <strong>every</strong> tool call goes through policy evaluation, not just MCP calls.</p>
+
+      <h3>How It Works</h3>
+
+      <ol>
+        <li>The Security project registers <code>GovernanceToolWrapper</code> as <code>IToolGovernanceWrapper</code></li>
+        <li>Core's <code>AddAiAgentCanvas()</code> optionally resolves <code>IToolGovernanceWrapper</code> from DI</li>
+        <li>If present, each <code>AIFunction</code> is wrapped in a <code>GovernedAIFunction</code> (a <code>DelegatingAIFunction</code>)</li>
+        <li>Before every tool call, <code>GovernedAIFunction.InvokeCoreAsync()</code> runs <code>GovernedMcpGateway.Evaluate()</code></li>
+        <li>Audit events are emitted for both allowed and blocked calls</li>
+        <li>Blocked calls return an error JSON to the LLM instead of executing</li>
+      </ol>
+
+      <p>This is opt-in: if Security is not registered, tools pass through unwrapped. The <code>IToolGovernanceWrapper</code> interface lives in Abstractions so Core never references Security directly.</p>
+
+      <h3>GovernedAIFunction</h3>
+
+      <pre><code>public sealed class GovernedAIFunction : DelegatingAIFunction
+{
+    protected override async ValueTask&lt;object?&gt; InvokeCoreAsync(
+        AIFunctionArguments arguments, CancellationToken cancellationToken)
+    {
+        var decision = _gateway.Evaluate("agent", toolName, payload);
+
+        _auditEmitter.Emit(
+            decision.Allowed ? GovernanceEventType.PolicyCheck
+                             : GovernanceEventType.ToolCallBlocked,
+            "agent", toolName, ...);
+
+        if (!decision.Allowed)
+            return /* error JSON */;
+
+        return await base.InvokeCoreAsync(arguments, cancellationToken);
+    }
+}</code></pre>
 
       <h2>Governance Policy (YAML)</h2>
 

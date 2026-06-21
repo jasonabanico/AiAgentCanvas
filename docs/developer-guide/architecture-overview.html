@@ -64,7 +64,7 @@ src/
   AiAgentCanvas.SystemTools/     &lt;-- Optional file I/O + script tools
   AiAgentCanvas.Web/             &lt;-- Composition root (Program.cs)
   Custom/
-    HelloWorldAgent/             &lt;-- Sample agent (prompts only)
+    HelloWorldAgent/             &lt;-- Starter example: tools + persona seed
     MCP.MarketData/              &lt;-- SEC EDGAR + Yahoo Finance tools
     VectorStore.Sqlite/          &lt;-- SQLite vector store for RAG
       </div>
@@ -83,16 +83,16 @@ src/
                  Abstractions (shared types)
 
             Custom/MCP.MarketData  ----&gt; Microsoft.Extensions.AI
-            Custom/HelloWorldAgent ----&gt; (no dependencies)
+            Custom/HelloWorldAgent ----&gt; AgentData, Microsoft.Extensions.AI
       </div>
 
       <p>Key dependency rules:</p>
 
       <ul>
-        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, and <code>AgentNotification</code>.</li>
-        <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, and the AG-UI endpoint.</li>
+        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, and <code>IToolGovernanceWrapper</code>.</li>
+        <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, and the AG-UI endpoint.</li>
         <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions.</li>
-        <li><strong>Custom projects</strong> reference only <code>Microsoft.Extensions.AI</code> (for <code>AIFunctionFactory</code>) -- they do not reference Core or any framework project.</li>
+        <li><strong>Custom projects</strong> reference <code>Microsoft.Extensions.AI</code> (for <code>AIFunctionFactory</code>) and optionally <code>AgentData</code> (for <code>IPersonaSeed</code> to seed personas).</li>
         <li><strong>Web</strong> references everything and wires it together in <code>Program.cs</code>.</li>
       </ul>
 

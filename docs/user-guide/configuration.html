@@ -22,7 +22,8 @@
   "Logging": { ... },
   "AllowedHosts": "*",
   "AIFoundry": { ... },
-  "Security": { ... }
+  "Security": { ... },
+  "VectorStore": { ... }
 }</code></pre>
 
       <h2>AIFoundry Section</h2>
@@ -34,6 +35,7 @@
     "Endpoint": "https://your-resource.openai.azure.com/",
     "Key": "your-api-key-here",
     "DeploymentName": "gpt-4o",
+    "EmbeddingDeploymentName": "",
     "UseAzureCredential": false
   }
 }</code></pre>
@@ -61,6 +63,11 @@
             <td><code>DeploymentName</code></td>
             <td>Yes</td>
             <td>The model deployment name (e.g., <code>gpt-4o</code>, <code>gpt-4o-mini</code>).</td>
+          </tr>
+          <tr>
+            <td><code>EmbeddingDeploymentName</code></td>
+            <td>No</td>
+            <td>Embedding model for RAG (e.g., <code>text-embedding-3-small</code>). When set, enables the SQLite vector store and <code>RagContextProvider</code>. Leave empty to disable RAG.</td>
           </tr>
           <tr>
             <td><code>UseAzureCredential</code></td>
@@ -123,6 +130,33 @@
             <td><code>RateLimitPerMinute</code></td>
             <td><code>30</code></td>
             <td>Maximum API requests per minute per client. Returns HTTP 429 when exceeded.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>VectorStore Section</h2>
+
+      <p>Configures the SQLite vector store used for RAG. Only active when <code>EmbeddingDeploymentName</code> is set.</p>
+
+      <pre><code>{
+  "VectorStore": {
+    "ConnectionString": "Data Source=vectorstore.db"
+  }
+}</code></pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ConnectionString</code></td>
+            <td><code>Data Source=vectorstore.db</code></td>
+            <td>SQLite connection string for the vector store database.</td>
           </tr>
         </tbody>
       </table>
@@ -230,6 +264,14 @@ export Security__RateLimitPerMinute=60</code></pre>
           <tr>
             <td><code>hangfire.db</code></td>
             <td>SQLite database for scheduled task state</td>
+          </tr>
+          <tr>
+            <td><code>chathistory.db</code></td>
+            <td>SQLite database for conversation history persistence</td>
+          </tr>
+          <tr>
+            <td><code>vectorstore.db</code></td>
+            <td>SQLite database for RAG document embeddings (only when <code>EmbeddingDeploymentName</code> is set)</td>
           </tr>
         </tbody>
       </table>

@@ -36,7 +36,7 @@ src/
   AiAgentCanvas.SystemTools/    Optional file I/O and script tools
   AiAgentCanvas.Web/            Composition root
   Custom/
-    HelloWorldAgent/            Sample agent prompts
+    HelloWorldAgent/            Starter example: tools + persona seed
     MCP.MarketData/             SEC EDGAR + Yahoo Finance tools
     VectorStore.Sqlite/         SQLite vector store for RAG
       </div>
@@ -67,10 +67,16 @@ src/
             <td><code>INotificationSink.cs</code></td>
             <td>Interface for notification delivery</td>
           </tr>
+          <tr>
+            <td><code>IToolGovernanceWrapper.cs</code></td>
+            <td>Interface for wrapping tools with governance checks</td>
+          </tr>
         </tbody>
       </table>
 
       <p><code>MarkdownFile</code> is the foundation of agent data persistence. It parses files with YAML frontmatter delimited by <code>---</code> and provides <code>Parse()</code>, <code>Write()</code>, <code>LoadAll()</code>, and <code>SanitizeFileName()</code> methods.</p>
+
+      <p><code>IToolGovernanceWrapper</code> is the bridge between Core and Security. Core optionally resolves it to wrap each tool with governance checks at startup, without referencing the Security project directly.</p>
 
       <h3>AiAgentCanvas.Core</h3>
 
@@ -245,10 +251,18 @@ src/
             <td><code>GovernedMcpGateway.cs</code></td>
             <td>Wraps McpGateway for tool allow/deny decisions</td>
           </tr>
+          <tr>
+            <td><code>GovernedAIFunction.cs</code></td>
+            <td>DelegatingAIFunction that runs governance checks before each tool call</td>
+          </tr>
+          <tr>
+            <td><code>GovernanceToolWrapper.cs</code></td>
+            <td>Implements <code>IToolGovernanceWrapper</code> to wrap tools with <code>GovernedAIFunction</code></td>
+          </tr>
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> AgentGovernance, Microsoft.Agents.AI, ASP.NET rate limiting</p>
+      <p><strong>Dependencies:</strong> Abstractions, AgentGovernance, Microsoft.Agents.AI, ASP.NET rate limiting</p>
 
       <h3>AiAgentCanvas.Scheduler</h3>
 
@@ -311,7 +325,7 @@ src/
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Core, Microsoft.Extensions.AI</p>
+      <p><strong>Dependencies:</strong> Microsoft.Extensions.AI</p>
 
       <h3>AiAgentCanvas.Web</h3>
 
@@ -331,7 +345,7 @@ src/
           </tr>
           <tr>
             <td><code>appsettings.json</code></td>
-            <td>AIFoundry config, security settings</td>
+            <td>AIFoundry, security, and vector store config</td>
           </tr>
           <tr>
             <td><code>governance-policy.yaml</code></td>
@@ -346,7 +360,7 @@ src/
 
       <h3>Custom/HelloWorldAgent</h3>
 
-      <p>A minimal sample agent containing only a prompts class. Demonstrates that an agent can be pure reasoning logic with zero framework dependencies.</p>
+      <p>A complete starter example demonstrating the custom agent pattern: domain tools paired with a seeded persona. Copy this project as a template for your own agents.</p>
 
       <table>
         <thead>
@@ -357,15 +371,17 @@ src/
         </thead>
         <tbody>
           <tr>
-            <td><code>HelloWorldAgent.csproj</code></td>
-            <td>net9.0, no package references</td>
+            <td><code>HelloWorldToolProvider.cs</code></td>
+            <td>Three tools: <code>hello_greet</code>, <code>hello_roll_dice</code>, <code>hello_coin_flip</code></td>
           </tr>
           <tr>
-            <td><code>HelloWorldAgentPrompts.cs</code></td>
-            <td><code>GetSystemPrompt()</code> returns the agent's system prompt</td>
+            <td><code>HelloWorldServiceExtensions.cs</code></td>
+            <td><code>AddHelloWorldAgent()</code> registers tools and seeds the <code>hello-world</code> persona</td>
           </tr>
         </tbody>
       </table>
+
+      <p><strong>Dependencies:</strong> AgentData, Microsoft.Extensions.AI</p>
 
       <h3>Custom/MCP.MarketData</h3>
 

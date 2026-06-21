@@ -12,11 +12,11 @@
     <main class="main-content">
       <h1>Adding Custom Agents</h1>
 
-      <p>Custom agents in AI Agent Canvas are lightweight projects that provide specialized system prompts. An agent does not need to implement any interface or reference any framework project -- it can be a pure class library containing only a prompts class. Tools are provided automatically by the <code>DynamicToolRegistry</code> and startup-registered tool providers.</p>
+      <p>A custom agent in AI Agent Canvas is a project under <code>src/Custom/</code> that pairs <strong>domain-specific tools</strong> with a <strong>persona</strong> that tells the LLM how to use them. This is the primary extension point -- you add tools for your domain and seed a persona that gives the agent its role and personality.</p>
 
-      <h2>How Agents Get Tools</h2>
+      <h2>How It Works</h2>
 
-      <p>A common question is: how does a custom agent access tools? The answer is that it does not manage tools at all. The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services and passes them to the <code>ChatClientAgent</code>. Your agent's system prompt simply instructs the LLM which tools to use and how to use them. The tools themselves are registered separately (see <a href="custom-mcp-connections.html">Adding Custom MCP Connections</a>).</p>
+      <p>The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services and passes them to the <code>ChatClientAgent</code>. Custom agents register their tools and optionally seed a persona via <code>IPersonaSeed</code>. At startup, seeded personas are saved to <code>agent-data/personas/</code> if they don't already exist. Users can activate them at runtime by saying <em>"switch to the [persona-name] persona"</em>.</p>
 
       <h2>Step-by-Step Guide</h2>
 
@@ -28,7 +28,7 @@
 
       <h3>Step 2: Create the .csproj</h3>
 
-      <p>Create a minimal project file. For a pure prompts agent, no package references are needed:</p>
+      <p>Add package references for <code>Microsoft.Extensions.AI</code> (for tool creation) and a project reference to <code>AgentData</code> (for persona seeding):</p>
 
       <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
 
@@ -38,143 +38,58 @@
     &lt;Nullable&gt;enable&lt;/Nullable&gt;
   &lt;/PropertyGroup&gt;
 
-&lt;/Project&gt;</code></pre>
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" /&gt;
+    &lt;PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" /&gt;
+  &lt;/ItemGroup&gt;
 
-      <h3>Step 3: Create the Agent Prompts Class</h3>
-
-      <p>Create a static class with a <code>GetSystemPrompt()</code> method that returns the system prompt for your agent:</p>
-
-      <pre><code>namespace MyAgent;
-
-public static class MyAgentPrompts
-{
-    public static string GetSystemPrompt() =&gt; """
-        You are a customer support assistant for Contoso Electronics.
-
-        You have access to the following tools:
-        - search_knowledge_base: Search the product knowledge base
-        - lookup_order: Look up an order by order number
-        - create_ticket: Create a support ticket
-
-        Guidelines:
-        - Always greet the customer warmly
-        - Look up order details before making claims about order status
-        - If you cannot resolve an issue, create a support ticket
-        - Never share internal pricing or margin information
-        - Escalate billing disputes to a human agent
-        """;
-}</code></pre>
-
-      <p>The system prompt should:</p>
-
-      <ul>
-        <li>Describe the agent's role and personality</li>
-        <li>List the tools it should use (these are registered separately)</li>
-        <li>Provide behavioral guidelines and constraints</li>
-        <li>Specify what the agent should and should not do</li>
-      </ul>
-
-      <h3>Step 4: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
-
-      <p>Open <code>src/AiAgentCanvas.Web/AiAgentCanvas.Web.csproj</code> and add a reference to your project:</p>
-
-      <pre><code>&lt;ItemGroup&gt;
-  &lt;ProjectReference Include="..\Custom\MyAgent\MyAgent.csproj" /&gt;
-&lt;/ItemGroup&gt;</code></pre>
-
-      <h3>Step 5: Add to AiAgentCanvas.sln</h3>
-
-      <p>Add the project to the solution under the Custom solution folder:</p>
-
-      <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MyAgent/MyAgent.csproj --solution-folder Custom</code></pre>
-
-      <h3>Step 6: Wire Up in Program.cs</h3>
-
-      <p>Use your agent's system prompt when configuring <code>AddAiAgentCanvas()</code>:</p>
-
-      <pre><code>using MyAgent;
-
-builder.Services.AddAiAgentCanvas(builder.Configuration, options =&gt;
-{
-    options.AgentName = "CustomerSupport";
-    options.AgentDescription = "A customer support assistant for Contoso Electronics.";
-    options.SystemPrompt = MyAgentPrompts.GetSystemPrompt();
-});</code></pre>
-
-      <h2>Full Reference: HelloWorldAgent</h2>
-
-      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in sample. It has exactly two files.</p>
-
-      <h3>HelloWorldAgent.csproj</h3>
-
-      <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
-
-  &lt;PropertyGroup&gt;
-    &lt;TargetFramework&gt;net9.0&lt;/TargetFramework&gt;
-    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
-    &lt;Nullable&gt;enable&lt;/Nullable&gt;
-  &lt;/PropertyGroup&gt;
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\..\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" /&gt;
+  &lt;/ItemGroup&gt;
 
 &lt;/Project&gt;</code></pre>
 
-      <p>No package references. No project references. Just a net9.0 class library.</p>
+      <h3>Step 3: Create a Tool Provider</h3>
 
-      <h3>HelloWorldAgentPrompts.cs</h3>
+      <p>Create a class that returns the tools the LLM can call. Use <code>[Description]</code> attributes so the model understands each parameter:</p>
 
-      <pre><code>namespace HelloWorldAgent;
-
-public static class HelloWorldAgentPrompts
-{
-    public static string GetSystemPrompt() =&gt; """
-        You are a helpful stock market assistant.
-
-        You have access to the following tools:
-        - stock_quote: Get the current price for a ticker from Yahoo Finance
-        - stock_history: Get historical stock data from Yahoo Finance with configurable range
-        - edgar_company_facts: Fetch SEC EDGAR financial data for a company
-
-        When a user asks about a stock, use the appropriate tools to fetch live data,
-        then summarize the results in a clear, concise response. Use specific numbers.
-        If the user doesn't specify a ticker, ask them which stock they're interested in.
-        """;
-}</code></pre>
-
-      <p>The tools referenced in the prompt (<code>stock_quote</code>, <code>stock_history</code>, <code>edgar_company_facts</code>) are provided by the <code>MCP.MarketData</code> custom project. They are registered separately via <code>builder.Services.AddMarketDataTools()</code> in <code>Program.cs</code>.</p>
-
-      <h2>Switching Between Agents</h2>
-
-      <p>To switch between agents, change the <code>SystemPrompt</code> in the <code>AddAiAgentCanvas()</code> call in <code>Program.cs</code>. You can also use the Personas agent data domain to switch prompts at runtime without restarting the server -- see <a href="agent-data.html">Agent Data</a>.</p>
-
-      <h2>Agents with Custom Tools</h2>
-
-      <p>If your agent needs custom tools (data connections, API integrations), create them as a separate Custom project following the <a href="custom-mcp-connections.html">Adding Custom MCP Connections</a> guide. The separation is intentional: agent prompts define behavior, while tool providers define capabilities.</p>
-
-      <p>However, if you prefer to keep tools and prompts in the same project, you can. Just add the <code>Microsoft.Extensions.AI</code> package reference and follow the tool provider pattern:</p>
-
-      <pre><code>// MyAgent/MyAgentToolProvider.cs
+      <pre><code>using System.ComponentModel;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 
 namespace MyAgent;
 
 public sealed class MyAgentToolProvider
 {
-    public IReadOnlyList&lt;AITool&gt; GetTools()
-    {
-        return
-        [
-            AIFunctionFactory.Create(SearchKnowledgeBase, "search_knowledge_base",
-                "Search the product knowledge base"),
-        ];
-    }
+    public IReadOnlyList&lt;AITool&gt; GetTools() =&gt;
+    [
+        AIFunctionFactory.Create(SearchKnowledgeBase, "search_kb",
+            "Search the product knowledge base"),
+        AIFunctionFactory.Create(LookupOrder, "lookup_order",
+            "Look up an order by order number"),
+    ];
 
-    private string SearchKnowledgeBase(string query)
+    [Description("Search the product knowledge base")]
+    private static string SearchKnowledgeBase(
+        [Description("Search query")] string query)
     {
         // Your implementation here
-        return "...";
+        return JsonSerializer.Serialize(new { results = new[] { "..." } });
+    }
+
+    [Description("Look up an order by order number")]
+    private static string LookupOrder(
+        [Description("The order number to look up")] string orderNumber)
+    {
+        return JsonSerializer.Serialize(new { order = orderNumber, status = "shipped" });
     }
 }</code></pre>
 
-      <pre><code>// MyAgent/MyAgentServiceExtensions.cs
+      <h3>Step 4: Create a Service Extension</h3>
+
+      <p>Register your tools and seed a persona that tells the LLM its role and which tools to use:</p>
+
+      <pre><code>using AiAgentCanvas.AgentData.Personas;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -184,16 +99,128 @@ public static class MyAgentServiceExtensions
 {
     public static IServiceCollection AddMyAgent(this IServiceCollection services)
     {
+        // Register tools
         services.AddSingleton&lt;MyAgentToolProvider&gt;();
         services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
             sp.GetRequiredService&lt;MyAgentToolProvider&gt;().GetTools());
+
+        // Seed a persona
+        services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+            name: "customer-support",
+            description: "Customer support assistant for Contoso Electronics",
+            instructions: """
+                You are a customer support assistant for Contoso Electronics.
+
+                Use these tools:
+                - search_kb: Search the product knowledge base
+                - lookup_order: Look up an order by order number
+
+                Guidelines:
+                - Always greet the customer warmly
+                - Look up order details before making claims about order status
+                - Never share internal pricing or margin information
+                """));
+
         return services;
     }
 }</code></pre>
 
-      <p>Then in <code>Program.cs</code>:</p>
+      <h3>Step 5: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
 
-      <pre><code>builder.Services.AddMyAgent();</code></pre>
+      <p>Open <code>src/AiAgentCanvas.Web/AiAgentCanvas.Web.csproj</code> and add a reference to your project:</p>
+
+      <pre><code>&lt;ProjectReference Include="..\Custom\MyAgent\MyAgent.csproj" /&gt;</code></pre>
+
+      <h3>Step 6: Add to AiAgentCanvas.sln</h3>
+
+      <p>Add the project to the solution under the Custom solution folder:</p>
+
+      <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MyAgent/MyAgent.csproj --solution-folder Custom</code></pre>
+
+      <h3>Step 7: Wire Up in Program.cs</h3>
+
+      <pre><code>using MyAgent;
+
+builder.Services.AddMyAgent();</code></pre>
+
+      <p>Tools are immediately available to the agent. The persona is saved to <code>agent-data/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
+
+      <h2>Full Reference: HelloWorldAgent</h2>
+
+      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in sample. It demonstrates the complete pattern with three files:</p>
+
+      <h3>HelloWorldToolProvider.cs</h3>
+
+      <p>Registers three tools: <code>hello_greet</code>, <code>hello_roll_dice</code>, and <code>hello_coin_flip</code>.</p>
+
+      <pre><code>public sealed class HelloWorldToolProvider
+{
+    public IReadOnlyList&lt;AITool&gt; GetTools() =&gt;
+    [
+        AIFunctionFactory.Create(Greet, "hello_greet",
+            "Greet a user by name with a personalized welcome message"),
+        AIFunctionFactory.Create(RollDice, "hello_roll_dice",
+            "Roll one or more dice and return the results"),
+        AIFunctionFactory.Create(CoinFlip, "hello_coin_flip",
+            "Flip a coin and return heads or tails"),
+    ];
+
+    private static string Greet(string name) =&gt; /* ... */;
+    private static string RollDice(int count = 1, int sides = 6) =&gt; /* ... */;
+    private static string CoinFlip() =&gt; /* ... */;
+}</code></pre>
+
+      <h3>HelloWorldServiceExtensions.cs</h3>
+
+      <p>Registers the tools and seeds a persona that gives the agent its personality:</p>
+
+      <pre><code>public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
+{
+    // Register tools
+    services.AddSingleton&lt;HelloWorldToolProvider&gt;();
+    services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+        sp.GetRequiredService&lt;HelloWorldToolProvider&gt;().GetTools());
+
+    // Seed a persona
+    services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+        name: "hello-world",
+        description: "A friendly demo agent that greets users, rolls dice, and flips coins",
+        instructions: """
+            You are a friendly, enthusiastic demo assistant for AI Agent Canvas.
+
+            You have these tools -- use them whenever relevant:
+            - hello_greet: Greet users by name with a warm welcome
+            - hello_roll_dice: Roll dice for games, decisions, or fun
+            - hello_coin_flip: Flip a coin for quick yes/no decisions
+
+            Keep responses short, upbeat, and show off what tools can do.
+            When someone first talks to you, greet them and offer to roll dice or flip a coin.
+            """));
+
+    return services;
+}</code></pre>
+
+      <p>Wired in <code>Program.cs</code> with a single line: <code>builder.Services.AddHelloWorldAgent();</code></p>
+
+      <h2>Persona Seeding</h2>
+
+      <p>The <code>IPersonaSeed</code> interface lets custom agents ship their own personas. At startup, <code>AddAiAgentCanvasPersonas()</code> resolves all registered <code>IPersonaSeed</code> services and saves any that don't already exist on disk. This means:</p>
+
+      <ul>
+        <li>Personas are created automatically on first run</li>
+        <li>Manual edits to the persona file are preserved (seeds don't overwrite)</li>
+        <li>Users activate seeded personas the same way as manually created ones</li>
+      </ul>
+
+      <pre><code>// Register a persona seed in your service extension
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: "my-persona",
+    description: "Short description for listing",
+    instructions: "Full system prompt instructions..."));</code></pre>
+
+      <h2>Switching Between Agents</h2>
+
+      <p>Users switch agents at runtime via personas -- no restart needed. Say <em>"switch to the hello-world persona"</em> or <em>"switch to the customer-support persona"</em>. Say <em>"switch to default"</em> to return to the base system prompt. See <a href="agent-data.html">Agent Data</a> for details.</p>
 
       <h2>Testing Your Agent</h2>
 

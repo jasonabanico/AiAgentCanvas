@@ -52,6 +52,7 @@ cd AgentOpsHub</code></pre>
     "Endpoint": "https://your-resource.openai.azure.com/",
     "Key": "your-api-key-here",
     "DeploymentName": "gpt-4o",
+    "EmbeddingDeploymentName": "",
     "UseAzureCredential": false
   }
 }</code></pre>
@@ -75,6 +76,10 @@ cd AgentOpsHub</code></pre>
           <tr>
             <td><code>DeploymentName</code></td>
             <td>The model deployment to use (e.g., <code>gpt-4o</code>).</td>
+          </tr>
+          <tr>
+            <td><code>EmbeddingDeploymentName</code></td>
+            <td>Optional. Embedding model for RAG (e.g., <code>text-embedding-3-small</code>). Leave empty to disable RAG.</td>
           </tr>
           <tr>
             <td><code>UseAzureCredential</code></td>
@@ -133,16 +138,24 @@ npm run dev</code></pre>
         </thead>
         <tbody>
           <tr>
-            <td><code>src/AiAgentCanvas/</code></td>
-            <td>Core framework (agent orchestration, AG-UI protocol, tool registry)</td>
+            <td><code>src/AiAgentCanvas.Core/</code></td>
+            <td>Orchestration engine (MAF ChatClientAgent, AG-UI endpoint, tool registry)</td>
           </tr>
           <tr>
-            <td><code>src/MyAgents/</code></td>
-            <td>Custom agent logic</td>
+            <td><code>src/AiAgentCanvas.AgentData/</code></td>
+            <td>Personas, workflows, guardrails, entities, context, profiles</td>
           </tr>
           <tr>
-            <td><code>src/MCP/</code></td>
-            <td>Data connections (MCP clients)</td>
+            <td><code>src/AiAgentCanvas.Security/</code></td>
+            <td>Governance, prompt injection detection, tool-call filtering</td>
+          </tr>
+          <tr>
+            <td><code>src/Custom/HelloWorldAgent/</code></td>
+            <td>Starter example: tools + persona seed</td>
+          </tr>
+          <tr>
+            <td><code>src/Custom/MCP.MarketData/</code></td>
+            <td>SEC EDGAR + Yahoo Finance data tools</td>
           </tr>
           <tr>
             <td><code>src/AiAgentCanvas.Web/</code></td>

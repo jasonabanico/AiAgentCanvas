@@ -30,7 +30,7 @@
       <ol>
         <li><strong>AIFoundryOptions</strong> -- binds the <code>AIFoundry</code> configuration section</li>
         <li><strong>AIFoundryClientFactory</strong> -- singleton that creates <code>AzureOpenAIClient</code></li>
-        <li><strong>IChatClient</strong> -- via <code>AddChatClient()</code>, resolved from the factory</li>
+        <li><strong>IChatClient</strong> -- wrapped in <code>ToolDeduplicatingChatClient</code>, resolved from the factory</li>
         <li><strong>DynamicToolRegistry</strong> -- singleton for runtime tool registration</li>
         <li><strong>DefaultSystemPrompt</strong> -- wraps the configured or default system prompt</li>
         <li><strong>SystemPromptProvider</strong> -- <code>AIContextProvider</code> that sets initial instructions</li>
@@ -39,9 +39,15 @@
         <li><strong>CORS</strong> -- allows any origin (intended for local CopilotKit development)</li>
       </ol>
 
-      <p>The agent is constructed with all <code>IReadOnlyList&lt;AITool&gt;</code> services flattened into <code>ChatOptions.Tools</code>, and all <code>AIContextProvider</code> services passed as the context pipeline:</p>
+      <p>The agent is constructed with all <code>IReadOnlyList&lt;AITool&gt;</code> services flattened into <code>ChatOptions.Tools</code>, optionally wrapped with governance, and all <code>AIContextProvider</code> services passed as the context pipeline:</p>
 
-      <pre><code>var tools = sp.GetServices&lt;IReadOnlyList&lt;AITool&gt;&gt;().SelectMany(t =&gt; t).ToList();
+      <pre><code>var rawTools = sp.GetServices&lt;IReadOnlyList&lt;AITool&gt;&gt;().SelectMany(t =&gt; t).ToList();
+
+// If Security is registered, wrap each tool with governance checks
+var governanceWrapper = sp.GetService&lt;IToolGovernanceWrapper&gt;();
+var tools = governanceWrapper is not null
+    ? rawTools.Select(t =&gt; t is AIFunction fn ? (AITool)governanceWrapper.Wrap(fn) : t).ToList()
+    : rawTools;
 
 var agentOptions = new ChatClientAgentOptions
 {
@@ -243,11 +249,11 @@ data: {"threadId":"abc-123","runId":"def-456"}</code></pre>
       <p>Tools reach the agent through two mechanisms:</p>
 
       <ol>
-        <li><strong>Startup registration</strong> -- Tool providers register <code>IReadOnlyList&lt;AITool&gt;</code> as singleton services. These are collected once at startup and passed to <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>.</li>
+        <li><strong>Startup registration</strong> -- Tool providers register <code>IReadOnlyList&lt;AITool&gt;</code> as singleton services. These are collected once at startup, optionally wrapped with governance via <code>IToolGovernanceWrapper</code>, and passed to <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>.</li>
         <li><strong>Runtime registration</strong> -- Tools registered into <code>DynamicToolRegistry</code> are injected by <code>DynamicToolContextProvider</code> before each LLM call. This is used for MCP connections that can come and go.</li>
       </ol>
 
-      <p>Both paths result in the LLM seeing all available tools in its context window.</p>
+      <p>Both paths result in the LLM seeing all available tools in its context window. When the Security project is registered, every startup tool is wrapped in a <code>GovernedAIFunction</code> that runs <code>GovernedMcpGateway.Evaluate()</code> before execution and emits audit events for both allowed and blocked calls.</p>
 
       <h2>Context Provider Pipeline</h2>
 
