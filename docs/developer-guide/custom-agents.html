@@ -12,11 +12,11 @@
     <main class="main-content">
       <h1>Adding Custom Agents</h1>
 
-      <p>A custom agent in AI Agent Canvas is a project under <code>src/Custom/</code> that pairs <strong>domain-specific tools</strong> with a <strong>persona</strong> that tells the LLM how to use them. This is the primary extension point -- you add tools for your domain and seed a persona that gives the agent its role and personality.</p>
+      <p>A custom agent in AI Agent Canvas is a self-contained project under <code>src/Custom/</code> that seeds all the components the agent needs to function: <strong>persona</strong>, <strong>guardrails</strong>, <strong>workflows</strong>, <strong>context</strong>, <strong>entities</strong>, <strong>skills</strong>, and <strong>MCP connections</strong>. Agents and data connections are separate projects: agents define <em>how</em> the LLM behaves, data connections define <em>what</em> it can do.</p>
 
       <h2>How It Works</h2>
 
-      <p>The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services and passes them to the <code>ChatClientAgent</code>. Custom agents register their tools and optionally seed a persona via <code>IPersonaSeed</code>. At startup, seeded personas are saved to <code>agent-data/personas/</code> if they don't already exist. Users can activate them at runtime by saying <em>"switch to the [persona-name] persona"</em>.</p>
+      <p>Data connections (like <code>MCP.MarketData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
 
       <h2>Step-by-Step Guide</h2>
 
@@ -28,7 +28,7 @@
 
       <h3>Step 2: Create the .csproj</h3>
 
-      <p>Add package references for <code>Microsoft.Extensions.AI</code> (for tool creation) and a project reference to <code>Abstractions</code> (for persona seeding):</p>
+      <p>A custom agent only needs two dependencies: <code>Abstractions</code> (for the seed interfaces) and <code>Microsoft.Extensions.DependencyInjection.Abstractions</code> (for the service extension). No <code>Microsoft.Extensions.AI</code> — agents don't own tools.</p>
 
       <pre><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
 
@@ -39,7 +39,6 @@
   &lt;/PropertyGroup&gt;
 
   &lt;ItemGroup&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" /&gt;
     &lt;PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" /&gt;
   &lt;/ItemGroup&gt;
 
@@ -49,48 +48,11 @@
 
 &lt;/Project&gt;</code></pre>
 
-      <h3>Step 3: Create a Tool Provider</h3>
+      <h3>Step 3: Create a Service Extension</h3>
 
-      <p>Create a class that returns the tools the LLM can call. Use <code>[Description]</code> attributes so the model understands each parameter:</p>
-
-      <pre><code>using System.ComponentModel;
-using System.Text.Json;
-using Microsoft.Extensions.AI;
-
-namespace MyAgent;
-
-public sealed class MyAgentToolProvider
-{
-    public IReadOnlyList&lt;AITool&gt; GetTools() =&gt;
-    [
-        AIFunctionFactory.Create(SearchKnowledgeBase, "search_kb",
-            "Search the product knowledge base"),
-        AIFunctionFactory.Create(LookupOrder, "lookup_order",
-            "Look up an order by order number"),
-    ];
-
-    [Description("Search the product knowledge base")]
-    private static string SearchKnowledgeBase(
-        [Description("Search query")] string query)
-    {
-        // Your implementation here
-        return JsonSerializer.Serialize(new { results = new[] { "..." } });
-    }
-
-    [Description("Look up an order by order number")]
-    private static string LookupOrder(
-        [Description("The order number to look up")] string orderNumber)
-    {
-        return JsonSerializer.Serialize(new { order = orderNumber, status = "shipped" });
-    }
-}</code></pre>
-
-      <h3>Step 4: Create a Service Extension</h3>
-
-      <p>Register your tools and seed a persona that tells the LLM its role and which tools to use:</p>
+      <p>Register seeds for the components your agent needs. At minimum, seed a persona. Optionally seed guardrails, workflows, context, entities, skills, and MCP connections:</p>
 
       <pre><code>using AiAgentCanvas.Abstractions;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MyAgent;
@@ -99,124 +61,198 @@ public static class MyAgentServiceExtensions
 {
     public static IServiceCollection AddMyAgent(this IServiceCollection services)
     {
-        // Register tools
-        services.AddSingleton&lt;MyAgentToolProvider&gt;();
-        services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
-            sp.GetRequiredService&lt;MyAgentToolProvider&gt;().GetTools());
-
-        // Seed a persona
+        // Persona: how the LLM behaves
         services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
             name: "customer-support",
             description: "Customer support assistant for Contoso Electronics",
             instructions: """
                 You are a customer support assistant for Contoso Electronics.
-
-                Use these tools:
-                - search_kb: Search the product knowledge base
-                - lookup_order: Look up an order by order number
-
-                Guidelines:
-                - Always greet the customer warmly
-                - Look up order details before making claims about order status
-                - Never share internal pricing or margin information
+                Use search_kb and lookup_order to help customers.
+                Always greet warmly and never share internal pricing.
                 """));
+
+        // Guardrail: policy constraint
+        services.AddSingleton&lt;IGuardrailSeed&gt;(new GuardrailSeed(
+            name: "no-internal-pricing",
+            severity: "high",
+            enabled: true,
+            rule: "Never reveal wholesale costs, margins, or internal pricing to customers."));
+
+        // Workflow: reusable multi-step task
+        services.AddSingleton&lt;IWorkflowSeed&gt;(new WorkflowSeed(
+            name: "order-investigation",
+            description: "Investigate a customer order issue end-to-end",
+            tags: "support,orders",
+            content: """
+                ## Order Investigation
+                1. Look up the order with `lookup_order`
+                2. Check product details with `search_kb`
+                3. Summarize findings and recommend next steps
+                """));
+
+        // Context: background knowledge
+        services.AddSingleton&lt;IContextSeed&gt;(new ContextSeed(
+            topic: "contoso-return-policy",
+            tags: "support,policy",
+            content: "Contoso offers 30-day returns on all electronics..."));
+
+        // Entity: domain schema
+        services.AddSingleton&lt;IEntitySeed&gt;(new EntitySeed(
+            name: "support-ticket",
+            type: "ticket",
+            tags: "support",
+            content: "Schema: customer name, order number, issue description, resolution..."));
+
+        // Skill: reusable prompt template
+        services.AddSingleton&lt;ISkillSeed&gt;(new SkillSeed(
+            name: "escalation-summary",
+            description: "Generate an escalation summary for a support case",
+            promptTemplate: "Summarize the support case for {{customer}} regarding order {{order}}..."));
 
         return services;
     }
 }</code></pre>
 
-      <h3>Step 5: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
+      <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. Agents define <em>how</em> the LLM behaves; data connections define <em>what</em> it can do.</p>
+
+      <h3>Step 4: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
 
       <p>Open <code>src/AiAgentCanvas.Web/AiAgentCanvas.Web.csproj</code> and add a reference to your project:</p>
 
       <pre><code>&lt;ProjectReference Include="..\Custom\MyAgent\MyAgent.csproj" /&gt;</code></pre>
 
-      <h3>Step 6: Add to AiAgentCanvas.sln</h3>
+      <h3>Step 5: Add to AiAgentCanvas.sln</h3>
 
       <p>Add the project to the solution under the Custom solution folder:</p>
 
       <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MyAgent/MyAgent.csproj --solution-folder Custom</code></pre>
 
-      <h3>Step 7: Wire Up in Program.cs</h3>
+      <h3>Step 6: Wire Up in Program.cs</h3>
 
       <pre><code>using MyAgent;
 
 builder.Services.AddMyAgent();</code></pre>
 
-      <p>Tools are immediately available to the agent. The persona is saved to <code>agent-data/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
+      <p>The persona is saved to <code>agent-data/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
 
       <h2>Full Reference: HelloWorldAgent</h2>
 
-      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in sample. It demonstrates the complete pattern with three files:</p>
-
-      <h3>HelloWorldToolProvider.cs</h3>
-
-      <p>Registers three tools: <code>hello_greet</code>, <code>hello_roll_dice</code>, and <code>hello_coin_flip</code>.</p>
-
-      <pre><code>public sealed class HelloWorldToolProvider
-{
-    public IReadOnlyList&lt;AITool&gt; GetTools() =&gt;
-    [
-        AIFunctionFactory.Create(Greet, "hello_greet",
-            "Greet a user by name with a personalized welcome message"),
-        AIFunctionFactory.Create(RollDice, "hello_roll_dice",
-            "Roll one or more dice and return the results"),
-        AIFunctionFactory.Create(CoinFlip, "hello_coin_flip",
-            "Flip a coin and return heads or tails"),
-    ];
-
-    private static string Greet(string name) =&gt; /* ... */;
-    private static string RollDice(int count = 1, int sides = 6) =&gt; /* ... */;
-    private static string CoinFlip() =&gt; /* ... */;
-}</code></pre>
+      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in starter example. It demonstrates the complete custom agent pattern — a financial analyst that seeds all component types and references tools from the <code>MCP.MarketData</code> data connection.</p>
 
       <h3>HelloWorldServiceExtensions.cs</h3>
 
-      <p>Registers the tools and seeds a persona that gives the agent its personality:</p>
+      <p>The entire agent is a single file that seeds every component type:</p>
 
-      <pre><code>public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
-{
-    // Register tools
-    services.AddSingleton&lt;HelloWorldToolProvider&gt;();
-    services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
-        sp.GetRequiredService&lt;HelloWorldToolProvider&gt;().GetTools());
+      <table>
+        <thead>
+          <tr>
+            <th>Seed</th>
+            <th>Name</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>IPersonaSeed</code></td>
+            <td><code>financial-analyst</code></td>
+            <td>Role instructions referencing market data tools</td>
+          </tr>
+          <tr>
+            <td><code>IGuardrailSeed</code></td>
+            <td><code>investment-disclaimer</code></td>
+            <td>Never provide buy/sell recommendations</td>
+          </tr>
+          <tr>
+            <td><code>IWorkflowSeed</code></td>
+            <td><code>full-stock-analysis</code></td>
+            <td>Quote &rarr; history &rarr; fundamentals &rarr; summary</td>
+          </tr>
+          <tr>
+            <td><code>IContextSeed</code></td>
+            <td><code>financial-analysis-methodology</code></td>
+            <td>Reference material for P/E, revenue growth, EPS, etc.</td>
+          </tr>
+          <tr>
+            <td><code>IEntitySeed</code></td>
+            <td><code>stock-analysis-report</code></td>
+            <td>Schema for structured analysis output</td>
+          </tr>
+          <tr>
+            <td><code>ISkillSeed</code></td>
+            <td><code>compare-stocks</code></td>
+            <td>Prompt template for side-by-side stock comparison</td>
+          </tr>
+        </tbody>
+      </table>
 
-    // Seed a persona
-    services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
-        name: "hello-world",
-        description: "A friendly demo agent that greets users, rolls dice, and flips coins",
-        instructions: """
-            You are a friendly, enthusiastic demo assistant for AI Agent Canvas.
-
-            You have these tools -- use them whenever relevant:
-            - hello_greet: Greet users by name with a warm welcome
-            - hello_roll_dice: Roll dice for games, decisions, or fun
-            - hello_coin_flip: Flip a coin for quick yes/no decisions
-
-            Keep responses short, upbeat, and show off what tools can do.
-            When someone first talks to you, greet them and offer to roll dice or flip a coin.
-            """));
-
-    return services;
-}</code></pre>
+      <p>The tools (<code>stock_quote</code>, <code>stock_history</code>, <code>edgar_company_facts</code>) are registered by the <code>MCP.MarketData</code> data connection in a separate project. The agent doesn't own or define any tools — it only tells the LLM how to use them.</p>
 
       <p>Wired in <code>Program.cs</code> with a single line: <code>builder.Services.AddHelloWorldAgent();</code></p>
 
-      <h2>Persona Seeding</h2>
+      <h2>Component Seeding</h2>
 
-      <p>The <code>IPersonaSeed</code> interface lets custom agents ship their own personas. At startup, <code>AddAiAgentCanvasPersonas()</code> resolves all registered <code>IPersonaSeed</code> services and saves any that don't already exist on disk. This means:</p>
+      <p>Seed interfaces let custom agents ship their own data. At startup, the framework resolves all registered seed services and saves any that don't already exist on disk (or in the database for skills). This means:</p>
 
       <ul>
-        <li>Personas are created automatically on first run</li>
-        <li>Manual edits to the persona file are preserved (seeds don't overwrite)</li>
-        <li>Users activate seeded personas the same way as manually created ones</li>
+        <li>Components are created automatically on first run</li>
+        <li>Manual edits to persisted files are preserved (seeds never overwrite)</li>
+        <li>Users interact with seeded components the same way as manually created ones</li>
       </ul>
 
-      <pre><code>// Register a persona seed in your service extension
-services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
-    name: "my-persona",
-    description: "Short description for listing",
-    instructions: "Full system prompt instructions..."));</code></pre>
+      <table>
+        <thead>
+          <tr>
+            <th>Interface</th>
+            <th>Concrete Class</th>
+            <th>Fields</th>
+            <th>Persisted To</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>IPersonaSeed</code></td>
+            <td><code>PersonaSeed</code></td>
+            <td>name, description, instructions</td>
+            <td><code>agent-data/personas/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>IGuardrailSeed</code></td>
+            <td><code>GuardrailSeed</code></td>
+            <td>name, severity, enabled, rule</td>
+            <td><code>agent-data/guardrails/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>IWorkflowSeed</code></td>
+            <td><code>WorkflowSeed</code></td>
+            <td>name, description, tags, content</td>
+            <td><code>agent-data/workflows/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>IContextSeed</code></td>
+            <td><code>ContextSeed</code></td>
+            <td>topic, tags, content</td>
+            <td><code>agent-data/context/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>IEntitySeed</code></td>
+            <td><code>EntitySeed</code></td>
+            <td>name, type, tags, content</td>
+            <td><code>agent-data/entities/*.md</code></td>
+          </tr>
+          <tr>
+            <td><code>ISkillSeed</code></td>
+            <td><code>SkillSeed</code></td>
+            <td>name, description, promptTemplate</td>
+            <td><code>skills.db</code> (SQLite)</td>
+          </tr>
+          <tr>
+            <td><code>IMcpConnectionSeed</code></td>
+            <td><code>McpConnectionSeed</code></td>
+            <td>name, endpoint, transport</td>
+            <td>In-memory (connected at startup)</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2>Switching Between Agents</h2>
 

@@ -43,6 +43,37 @@ public sealed class McpConnectionManager : IAsyncDisposable
             .ToList();
     }
 
+    public async Task ConnectAsync(string name, string endpoint, string transport, CancellationToken ct)
+    {
+        if (_connections.ContainsKey(name))
+            return;
+
+        IClientTransport clientTransport = transport.ToLowerInvariant() switch
+        {
+            "http" or "sse" => new HttpClientTransport(new HttpClientTransportOptions { Endpoint = new Uri(endpoint) }),
+            _ => throw new ArgumentException($"Unsupported transport type: {transport}"),
+        };
+
+        var client = await McpClient.CreateAsync(clientTransport, cancellationToken: ct);
+        var mcpTools = await client.ListToolsAsync(cancellationToken: ct);
+        var aiTools = mcpTools.Cast<AITool>().ToList();
+
+        var connection = new McpConnection
+        {
+            Name = name,
+            Endpoint = endpoint,
+            Transport = transport,
+            Client = client,
+            Tools = aiTools,
+        };
+
+        _connections[name] = connection;
+        _registry.Register($"mcp:{name}", aiTools);
+
+        _logger.LogInformation("Connected to MCP server {Name} at {Endpoint}, {ToolCount} tools registered",
+            name, endpoint, aiTools.Count);
+    }
+
     [Description("Connect to an MCP server and register its tools")]
     private async Task<string> ConnectMcpServer(
         [Description("A unique name for this connection")] string name,
@@ -55,33 +86,9 @@ public sealed class McpConnectionManager : IAsyncDisposable
 
         try
         {
-            IClientTransport clientTransport = transport.ToLowerInvariant() switch
-            {
-                "http" or "sse" => new HttpClientTransport(new HttpClientTransportOptions { Endpoint = new Uri(endpoint) }),
-                _ => throw new ArgumentException($"Unsupported transport type: {transport}"),
-            };
-
-            var client = await McpClient.CreateAsync(clientTransport, cancellationToken: ct);
-            var mcpTools = await client.ListToolsAsync(cancellationToken: ct);
-            var aiTools = mcpTools.Cast<AITool>().ToList();
-
-            var connection = new McpConnection
-            {
-                Name = name,
-                Endpoint = endpoint,
-                Transport = transport,
-                Client = client,
-                Tools = aiTools,
-            };
-
-            _connections[name] = connection;
-            _registry.Register($"mcp:{name}", aiTools);
-
-            _logger.LogInformation("Connected to MCP server {Name} at {Endpoint}, {ToolCount} tools registered",
-                name, endpoint, aiTools.Count);
-
-            var toolNames = aiTools.Select(t => t.Name).ToList();
-            return JsonSerializer.Serialize(new { status = "connected", name, endpoint, toolCount = aiTools.Count, tools = toolNames });
+            await ConnectAsync(name, endpoint, transport, ct);
+            var toolNames = _connections[name].Tools!.Select(t => t.Name).ToList();
+            return JsonSerializer.Serialize(new { status = "connected", name, endpoint, toolCount = toolNames.Count, tools = toolNames });
         }
         catch (Exception ex)
         {

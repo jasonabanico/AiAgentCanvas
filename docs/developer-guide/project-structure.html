@@ -36,7 +36,7 @@ src/
   AiAgentCanvas.SystemTools/    Optional file I/O and script tools
   AiAgentCanvas.Web/            Composition root
   Custom/
-    HelloWorldAgent/            Starter example: tools + persona seed
+    HelloWorldAgent/            Starter agent: persona for market data tools
     MCP.MarketData/             SEC EDGAR + Yahoo Finance tools
     VectorStore.Sqlite/         SQLite vector store for RAG
       </div>
@@ -70,6 +70,34 @@ src/
           <tr>
             <td><code>IToolGovernanceWrapper.cs</code></td>
             <td>Interface for wrapping tools with governance checks</td>
+          </tr>
+          <tr>
+            <td><code>IPersonaSeed.cs</code></td>
+            <td>Seed interface for shipping personas from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>IGuardrailSeed.cs</code></td>
+            <td>Seed interface for shipping guardrails from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>IWorkflowSeed.cs</code></td>
+            <td>Seed interface for shipping workflows from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>IContextSeed.cs</code></td>
+            <td>Seed interface for shipping context entries from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>IEntitySeed.cs</code></td>
+            <td>Seed interface for shipping entities from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>ISkillSeed.cs</code></td>
+            <td>Seed interface for shipping skills from custom agents</td>
+          </tr>
+          <tr>
+            <td><code>IMcpConnectionSeed.cs</code></td>
+            <td>Seed interface for declaring MCP connections from custom agents</td>
           </tr>
         </tbody>
       </table>
@@ -360,7 +388,7 @@ src/
 
       <h3>Custom/HelloWorldAgent</h3>
 
-      <p>A complete starter example demonstrating the custom agent pattern: domain tools paired with a seeded persona. Copy this project as a template for your own agents.</p>
+      <p>A complete starter example demonstrating the custom agent pattern. Seeds all component types (persona, guardrail, workflow, context, entity, skill) for a financial analyst that references tools from the <code>MCP.MarketData</code> data connection. Copy this project as a template for your own agents.</p>
 
       <table>
         <thead>
@@ -371,17 +399,13 @@ src/
         </thead>
         <tbody>
           <tr>
-            <td><code>HelloWorldToolProvider.cs</code></td>
-            <td>Three tools: <code>hello_greet</code>, <code>hello_roll_dice</code>, <code>hello_coin_flip</code></td>
-          </tr>
-          <tr>
             <td><code>HelloWorldServiceExtensions.cs</code></td>
-            <td><code>AddHelloWorldAgent()</code> registers tools and seeds the <code>hello-world</code> persona</td>
+            <td><code>AddHelloWorldAgent()</code> seeds persona, guardrail, workflow, context, entity, and skill</td>
           </tr>
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Extensions.AI</p>
+      <p><strong>Dependencies:</strong> Abstractions</p>
 
       <h3>Custom/MCP.MarketData</h3>
 

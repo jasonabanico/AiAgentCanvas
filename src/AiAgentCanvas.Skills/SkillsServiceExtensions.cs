@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Skills;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,10 +11,24 @@ public static class SkillsServiceExtensions
         this IServiceCollection services,
         string connectionString = "Data Source=skills.db")
     {
-        services.AddSingleton(new SkillStore(connectionString));
+        var store = new SkillStore(connectionString);
+        services.AddSingleton(store);
         services.AddSingleton<SkillToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<SkillToolProvider>().GetTools());
+        {
+            foreach (var seed in sp.GetServices<ISkillSeed>())
+            {
+                if (store.GetSkill(seed.Name) is null)
+                    store.SaveSkill(new SkillRecord
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        Name = seed.Name,
+                        Description = seed.Description,
+                        PromptTemplate = seed.PromptTemplate,
+                    });
+            }
+            return sp.GetRequiredService<SkillToolProvider>().GetTools();
+        });
         return services;
     }
 
@@ -21,7 +36,14 @@ public static class SkillsServiceExtensions
     {
         services.AddSingleton<McpConnectionManager>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<McpConnectionManager>().GetTools());
+        {
+            var manager = sp.GetRequiredService<McpConnectionManager>();
+            foreach (var seed in sp.GetServices<IMcpConnectionSeed>())
+            {
+                _ = manager.ConnectAsync(seed.Name, seed.Endpoint, seed.Transport, CancellationToken.None);
+            }
+            return manager.GetTools();
+        });
         return services;
     }
 

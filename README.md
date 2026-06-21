@@ -35,7 +35,7 @@ src/
 ├── AiAgentCanvas.Notifications/    # Notification sink
 ├── AiAgentCanvas.Web/              # Composition root (Program.cs)
 └── Custom/                         # Your extensions
-    ├── HelloWorldAgent/            # Starter example: tool provider + DI registration
+    ├── HelloWorldAgent/            # Starter agent: persona for market data tools
     ├── MCP.MarketData/             # SEC EDGAR + Yahoo Finance tools
     └── VectorStore.Sqlite/         # SQLite vector store for RAG
 frontend/                           # Next.js + CopilotKit chat UI
@@ -87,58 +87,53 @@ Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and
 
 ## Adding a Custom Agent
 
-See `Custom/HelloWorldAgent/` for a complete working example. A custom agent pairs **domain tools** with a **persona** that tells the LLM how to use them.
+See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, guardrails, workflows, context, entities, and skills — and references tools from separate data connection projects.
 
-### 1. Create a tool provider
+### 1. Create a service extension that seeds components
 
 ```csharp
-public sealed class HelloWorldToolProvider
-{
-    public IReadOnlyList<AITool> GetTools() =>
-    [
-        AIFunctionFactory.Create(Greet, "hello_greet", "Greet a user by name"),
-        AIFunctionFactory.Create(RollDice, "hello_roll_dice", "Roll dice"),
-    ];
+using AiAgentCanvas.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
-    private static string Greet(string name) => /* ... */;
-    private static string RollDice(int count = 1, int sides = 6) => /* ... */;
+public static class HelloWorldServiceExtensions
+{
+    public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
+    {
+        services.AddSingleton<IPersonaSeed>(new PersonaSeed(
+            name: "financial-analyst",
+            description: "A financial analyst that uses market data tools",
+            instructions: "You are a financial analyst assistant..."));
+
+        services.AddSingleton<IGuardrailSeed>(new GuardrailSeed(
+            name: "investment-disclaimer",
+            severity: "high", enabled: true,
+            rule: "Never provide buy/sell recommendations..."));
+
+        services.AddSingleton<IWorkflowSeed>(new WorkflowSeed(
+            name: "full-stock-analysis",
+            description: "Quote, history, fundamentals, summary",
+            tags: "finance", content: "## Steps..."));
+
+        // Also: IContextSeed, IEntitySeed, ISkillSeed, IMcpConnectionSeed
+
+        return services;
+    }
 }
 ```
 
-### 2. Create a service extension that registers tools + persona
-
-```csharp
-public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
-{
-    // Register tools
-    services.AddSingleton<HelloWorldToolProvider>();
-    services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-        sp.GetRequiredService<HelloWorldToolProvider>().GetTools());
-
-    // Seed a persona — saved to agent-data/personas/ on first startup
-    services.AddSingleton<IPersonaSeed>(new PersonaSeed(
-        name: "hello-world",
-        description: "A friendly demo agent that greets users and rolls dice",
-        instructions: """
-            You are a friendly demo assistant.
-            Use hello_greet, hello_roll_dice, and hello_coin_flip to interact.
-            """));
-
-    return services;
-}
-```
-
-### 3. Wire it in Program.cs
+### 2. Wire it in Program.cs
 
 ```csharp
 builder.Services.AddHelloWorldAgent();
 ```
 
-Tools are immediately available to the agent. The persona is saved to `agent-data/personas/hello-world.md` on first startup — users can activate it with *"switch to the hello-world persona"*.
+All seeded components are saved to disk on first startup (seeds never overwrite manual edits). The tools referenced in the persona (`stock_quote`, `stock_history`, `edgar_company_facts`) come from the `MCP.MarketData` data connection registered separately.
+
+**Agents and data connections are separate projects.** Agents define *how* the LLM behaves (via personas, guardrails, workflows, context, entities, skills). Data connections define *what* it can do (via tools). This separation lets multiple agents share the same tools.
 
 ## Key Features
 
-- **62 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
+- **59 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
 - **AG-UI streaming** — real-time SSE responses via CopilotKit
 - **Personas** — switch agent behavior with custom system prompts
 - **Workflows** — define multi-step workflows the agent executes

@@ -42,12 +42,20 @@ public static class AgentDataServiceExtensions
         this IServiceCollection services,
         string directory = "./agent-data/context")
     {
-        services.AddSingleton(new ContextStore(directory));
+        var store = new ContextStore(directory);
+        services.AddSingleton(store);
         services.AddSingleton<ContextToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<ContextToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
-            new PersistentContextProvider(sp.GetRequiredService<ContextStore>()));
+        {
+            foreach (var seed in sp.GetServices<IContextSeed>())
+            {
+                if (store.Get(seed.Topic) is null)
+                    store.Save(seed.Topic, seed.Tags, seed.Content);
+            }
+            return new PersistentContextProvider(store);
+        });
         return services;
     }
 
@@ -55,11 +63,19 @@ public static class AgentDataServiceExtensions
         this IServiceCollection services,
         string directory = "./agent-data/workflows")
     {
-        services.AddSingleton(new WorkflowStore(directory));
+        var store = new WorkflowStore(directory);
+        services.AddSingleton(store);
         services.AddSingleton<WorkflowExecutor>();
         services.AddSingleton<WorkflowToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<WorkflowToolProvider>().GetTools());
+        {
+            foreach (var seed in sp.GetServices<IWorkflowSeed>())
+            {
+                if (store.Get(seed.Name) is null)
+                    store.Save(seed.Name, seed.Description, seed.Tags, seed.Content);
+            }
+            return sp.GetRequiredService<WorkflowToolProvider>().GetTools();
+        });
         return services;
     }
 
@@ -67,12 +83,20 @@ public static class AgentDataServiceExtensions
         this IServiceCollection services,
         string directory = "./agent-data/guardrails")
     {
-        services.AddSingleton(new GuardrailStore(directory));
+        var store = new GuardrailStore(directory);
+        services.AddSingleton(store);
         services.AddSingleton<GuardrailToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<GuardrailToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
-            new GuardrailContextProvider(sp.GetRequiredService<GuardrailStore>()));
+        {
+            foreach (var seed in sp.GetServices<IGuardrailSeed>())
+            {
+                if (store.Get(seed.Name) is null)
+                    store.Save(seed.Name, seed.Severity, seed.Enabled, seed.Rule);
+            }
+            return new GuardrailContextProvider(store);
+        });
         return services;
     }
 
@@ -80,12 +104,20 @@ public static class AgentDataServiceExtensions
         this IServiceCollection services,
         string directory = "./agent-data/entities")
     {
-        services.AddSingleton(new EntityStore(directory));
+        var store = new EntityStore(directory);
+        services.AddSingleton(store);
         services.AddSingleton<EntityToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<EntityToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
-            new EntityContextProvider(sp.GetRequiredService<EntityStore>()));
+        {
+            foreach (var seed in sp.GetServices<IEntitySeed>())
+            {
+                if (store.Get(seed.Name) is null)
+                    store.Save(seed.Name, seed.Type, seed.Tags, seed.Content);
+            }
+            return new EntityContextProvider(store);
+        });
         return services;
     }
 
