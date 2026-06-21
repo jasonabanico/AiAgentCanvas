@@ -85,11 +85,11 @@ npm run dev
 
 Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and how has it performed over the last month?"*
 
-## Adding Custom Tools
+## Adding a Custom Agent
 
-See `Custom/HelloWorldAgent/` for a complete working example. The pattern is:
+See `Custom/HelloWorldAgent/` for a complete working example. A custom agent pairs **domain tools** with a **persona** that tells the LLM how to use them.
 
-1. **Create a tool provider** with methods the LLM can call:
+### 1. Create a tool provider
 
 ```csharp
 public sealed class HelloWorldToolProvider
@@ -100,37 +100,45 @@ public sealed class HelloWorldToolProvider
         AIFunctionFactory.Create(RollDice, "hello_roll_dice", "Roll dice"),
     ];
 
-    private static string Greet(string name) =>
-        JsonSerializer.Serialize(new { greeting = $"Hello, {name}!" });
-
-    private static string RollDice(int count = 1, int sides = 6) =>
-        JsonSerializer.Serialize(new { rolls = Enumerable.Range(0, count)
-            .Select(_ => Random.Shared.Next(1, sides + 1)).ToList() });
+    private static string Greet(string name) => /* ... */;
+    private static string RollDice(int count = 1, int sides = 6) => /* ... */;
 }
 ```
 
-2. **Create a service extension** to register it:
+### 2. Create a service extension that registers tools + persona
 
 ```csharp
-public static class HelloWorldServiceExtensions
+public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
 {
-    public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
-    {
-        services.AddSingleton<HelloWorldToolProvider>();
-        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<HelloWorldToolProvider>().GetTools());
-        return services;
-    }
+    // Register tools
+    services.AddSingleton<HelloWorldToolProvider>();
+    services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+        sp.GetRequiredService<HelloWorldToolProvider>().GetTools());
+
+    // Seed a persona — saved to agent-data/personas/ on first startup
+    services.AddSingleton<IPersonaSeed>(new PersonaSeed(
+        name: "hello-world",
+        description: "A friendly demo agent that greets users and rolls dice",
+        instructions: """
+            You are a friendly demo assistant.
+            Use hello_greet, hello_roll_dice, and hello_coin_flip to interact.
+            """));
+
+    return services;
 }
 ```
 
-3. **Wire it in Program.cs**: `builder.Services.AddHelloWorldAgent();`
+### 3. Wire it in Program.cs
 
-The MAF `ChatClientAgent` automatically picks up all registered `IReadOnlyList<AITool>` services and makes them available for the LLM to call.
+```csharp
+builder.Services.AddHelloWorldAgent();
+```
+
+Tools are immediately available to the agent. The persona is saved to `agent-data/personas/hello-world.md` on first startup — users can activate it with *"switch to the hello-world persona"*.
 
 ## Key Features
 
-- **61 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
+- **62 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
 - **AG-UI streaming** — real-time SSE responses via CopilotKit
 - **Personas** — switch agent behavior with custom system prompts
 - **Workflows** — define multi-step workflows the agent executes

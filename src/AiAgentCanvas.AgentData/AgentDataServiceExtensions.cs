@@ -17,13 +17,20 @@ public static class AgentDataServiceExtensions
         this IServiceCollection services,
         string directory = "./agent-data/personas")
     {
-        services.AddSingleton(new PersonaStore(directory));
+        var store = new PersonaStore(directory);
+        services.AddSingleton(store);
         services.AddSingleton<PersonaToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<PersonaToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
         {
-            var store = sp.GetRequiredService<PersonaStore>();
+            // Apply persona seeds from custom agents
+            foreach (var seed in sp.GetServices<IPersonaSeed>())
+            {
+                if (store.GetPersona(seed.Name) is null)
+                    store.SavePersona(seed.Name, seed.Description, seed.Instructions);
+            }
+
             var defaultPrompt = sp.GetRequiredService<DefaultSystemPrompt>().Value;
             return new PersonaContextProvider(store, defaultPrompt);
         });

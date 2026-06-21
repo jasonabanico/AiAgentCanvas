@@ -11,13 +11,15 @@ public sealed class HelloWorldToolProvider
         return
         [
             AIFunctionFactory.Create(Greet, "hello_greet",
-                "Greet a user by name with a friendly message"),
+                "Greet a user by name with a personalized welcome message"),
             AIFunctionFactory.Create(RollDice, "hello_roll_dice",
                 "Roll one or more dice and return the results"),
+            AIFunctionFactory.Create(CoinFlip, "hello_coin_flip",
+                "Flip a coin and return heads or tails"),
         ];
     }
 
-    [Description("Greet a user by name with a friendly message")]
+    [Description("Greet a user by name with a personalized welcome message")]
     private static string Greet(
         [Description("The name of the person to greet")] string name)
     {
@@ -38,5 +40,12 @@ public sealed class HelloWorldToolProvider
         var rng = Random.Shared;
         var rolls = Enumerable.Range(0, count).Select(_ => rng.Next(1, sides + 1)).ToList();
         return JsonSerializer.Serialize(new { rolls, total = rolls.Sum(), sides, count });
+    }
+
+    [Description("Flip a coin and return heads or tails")]
+    private static string CoinFlip()
+    {
+        var result = Random.Shared.Next(2) == 0 ? "heads" : "tails";
+        return JsonSerializer.Serialize(new { result });
     }
 }
