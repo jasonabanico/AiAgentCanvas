@@ -21,6 +21,7 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
     options.AgentDescription = "A multi-tool AI assistant with market data, scheduling, skills, and MCP integration.";
 });
 
+builder.Services.AddHelloWorldAgent();
 builder.Services.AddMarketDataTools();
 builder.Services.AddAiAgentCanvasSystemTools(options =>
 {

@@ -35,7 +35,7 @@ src/
 ├── AiAgentCanvas.Notifications/    # Notification sink
 ├── AiAgentCanvas.Web/              # Composition root (Program.cs)
 └── Custom/                         # Your extensions
-    ├── HelloWorldAgent/            # Example agent prompts
+    ├── HelloWorldAgent/            # Starter example: tool provider + DI registration
     ├── MCP.MarketData/             # SEC EDGAR + Yahoo Finance tools
     └── VectorStore.Sqlite/         # SQLite vector store for RAG
 frontend/                           # Next.js + CopilotKit chat UI
@@ -87,39 +87,50 @@ Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and
 
 ## Adding Custom Tools
 
-Create a tool provider class and register it in DI. Tools are automatically available to the agent.
+See `Custom/HelloWorldAgent/` for a complete working example. The pattern is:
+
+1. **Create a tool provider** with methods the LLM can call:
 
 ```csharp
-public sealed class MyToolProvider
+public sealed class HelloWorldToolProvider
 {
-    public IReadOnlyList<AITool> GetTools()
-    {
-        return
-        [
-            AIFunctionFactory.Create(MyAction, "my_action", "Does something useful"),
-        ];
-    }
+    public IReadOnlyList<AITool> GetTools() =>
+    [
+        AIFunctionFactory.Create(Greet, "hello_greet", "Greet a user by name"),
+        AIFunctionFactory.Create(RollDice, "hello_roll_dice", "Roll dice"),
+    ];
 
-    private string MyAction(string input)
+    private static string Greet(string name) =>
+        JsonSerializer.Serialize(new { greeting = $"Hello, {name}!" });
+
+    private static string RollDice(int count = 1, int sides = 6) =>
+        JsonSerializer.Serialize(new { rolls = Enumerable.Range(0, count)
+            .Select(_ => Random.Shared.Next(1, sides + 1)).ToList() });
+}
+```
+
+2. **Create a service extension** to register it:
+
+```csharp
+public static class HelloWorldServiceExtensions
+{
+    public static IServiceCollection AddHelloWorldAgent(this IServiceCollection services)
     {
-        return JsonSerializer.Serialize(new { result = "done", input });
+        services.AddSingleton<HelloWorldToolProvider>();
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<HelloWorldToolProvider>().GetTools());
+        return services;
     }
 }
 ```
 
-Register in your service extensions:
-
-```csharp
-services.AddSingleton<MyToolProvider>();
-services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-    sp.GetRequiredService<MyToolProvider>().GetTools());
-```
+3. **Wire it in Program.cs**: `builder.Services.AddHelloWorldAgent();`
 
 The MAF `ChatClientAgent` automatically picks up all registered `IReadOnlyList<AITool>` services and makes them available for the LLM to call.
 
 ## Key Features
 
-- **55 built-in tools** — market data, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
+- **61 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
 - **AG-UI streaming** — real-time SSE responses via CopilotKit
 - **Personas** — switch agent behavior with custom system prompts
 - **Workflows** — define multi-step workflows the agent executes
