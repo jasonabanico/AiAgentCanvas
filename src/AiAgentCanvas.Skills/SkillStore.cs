@@ -1,108 +1,67 @@
-using Microsoft.Data.Sqlite;
+using AiAgentCanvas.Abstractions;
 
 namespace AiAgentCanvas.Skills;
 
 public class SkillRecord
 {
-    public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string PromptTemplate { get; set; } = string.Empty;
-    public string CreatedAt { get; set; } = string.Empty;
+    public string FilePath { get; set; } = string.Empty;
 }
 
-public sealed class SkillStore : IDisposable
+public sealed class SkillStore
 {
-    private readonly SqliteConnection _connection;
+    private readonly string _directory;
 
-    public SkillStore(string connectionString)
+    public SkillStore(string directory)
     {
-        _connection = new SqliteConnection(connectionString);
-        _connection.Open();
-        Initialize();
-    }
-
-    private void Initialize()
-    {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS skills (
-                id TEXT PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT NOT NULL,
-                prompt_template TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            )
-            """;
-        cmd.ExecuteNonQuery();
+        _directory = directory;
+        if (!Directory.Exists(_directory))
+            Directory.CreateDirectory(_directory);
     }
 
     public void SaveSkill(SkillRecord skill)
     {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = """
-            INSERT OR REPLACE INTO skills (id, name, description, prompt_template, created_at)
-            VALUES (@id, @name, @description, @prompt_template, @created_at)
-            """;
-        cmd.Parameters.AddWithValue("@id", skill.Id);
-        cmd.Parameters.AddWithValue("@name", skill.Name);
-        cmd.Parameters.AddWithValue("@description", skill.Description);
-        cmd.Parameters.AddWithValue("@prompt_template", skill.PromptTemplate);
-        cmd.Parameters.AddWithValue("@created_at",
-            string.IsNullOrEmpty(skill.CreatedAt) ? DateTime.UtcNow.ToString("o") : skill.CreatedAt);
-        cmd.ExecuteNonQuery();
+        MarkdownFile.Write(
+            Path.Combine(_directory, MarkdownFile.SanitizeFileName(skill.Name) + ".md"),
+            new Dictionary<string, string>
+            {
+                ["name"] = skill.Name,
+                ["description"] = skill.Description,
+            },
+            skill.PromptTemplate);
     }
 
     public List<SkillRecord> ListSkills()
     {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "SELECT id, name, description, prompt_template, created_at FROM skills ORDER BY name";
-
-        var skills = new List<SkillRecord>();
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            skills.Add(new SkillRecord
-            {
-                Id = reader.GetString(0),
-                Name = reader.GetString(1),
-                Description = reader.GetString(2),
-                PromptTemplate = reader.GetString(3),
-                CreatedAt = reader.GetString(4),
-            });
-        }
-        return skills;
+        return MarkdownFile.LoadAll(_directory)
+            .Select(ToRecord)
+            .OrderBy(s => s.Name)
+            .ToList();
     }
 
     public SkillRecord? GetSkill(string name)
     {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "SELECT id, name, description, prompt_template, created_at FROM skills WHERE name = @name";
-        cmd.Parameters.AddWithValue("@name", name);
-
-        using var reader = cmd.ExecuteReader();
-        if (!reader.Read()) return null;
-
-        return new SkillRecord
-        {
-            Id = reader.GetString(0),
-            Name = reader.GetString(1),
-            Description = reader.GetString(2),
-            PromptTemplate = reader.GetString(3),
-            CreatedAt = reader.GetString(4),
-        };
+        var file = MarkdownFile.LoadAll(_directory)
+            .FirstOrDefault(f => f.Get("name").Equals(name, StringComparison.OrdinalIgnoreCase));
+        return file is null ? null : ToRecord(file);
     }
 
     public bool RemoveSkill(string name)
     {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "DELETE FROM skills WHERE name = @name";
-        cmd.Parameters.AddWithValue("@name", name);
-        return cmd.ExecuteNonQuery() > 0;
+        var file = MarkdownFile.LoadAll(_directory)
+            .FirstOrDefault(f => f.Get("name").Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (file is null) return false;
+        File.Delete(file.FilePath);
+        return true;
     }
 
-    public void Dispose()
+    private static SkillRecord ToRecord(MarkdownFile file) => new()
     {
-        _connection.Dispose();
-    }
+        Name = file.Get("name"),
+        Description = file.Get("description"),
+        PromptTemplate = file.Body,
+        FilePath = file.FilePath,
+    };
 }

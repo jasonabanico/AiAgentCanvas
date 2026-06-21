@@ -96,10 +96,8 @@ public sealed class LocalSkillRegistry
             });
         }
 
-        var id = $"skill-{Guid.NewGuid():N}"[..18];
         var record = new SkillRecord
         {
-            Id = id,
             Name = manifest.Name.ToLowerInvariant().Replace(' ', '_'),
             Description = manifest.Description,
             PromptTemplate = manifest.PromptTemplate ?? string.Empty,
@@ -108,7 +106,7 @@ public sealed class LocalSkillRegistry
         _store.SaveSkill(record);
         _logger.LogInformation("Installed skill {Name} from catalog", name);
 
-        return JsonSerializer.Serialize(new { status = "installed", id, name = record.Name, description = record.Description });
+        return JsonSerializer.Serialize(new { status = "installed", name = record.Name, description = record.Description });
     }
 
     [Description("List all skills in the local catalog with their installed status")]

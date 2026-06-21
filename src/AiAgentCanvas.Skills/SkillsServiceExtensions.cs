@@ -9,9 +9,9 @@ public static class SkillsServiceExtensions
 {
     public static IServiceCollection AddAiAgentCanvasSkills(
         this IServiceCollection services,
-        string connectionString = "Data Source=skills.db")
+        string directory = "./agent-data/skills")
     {
-        var store = new SkillStore(connectionString);
+        var store = new SkillStore(directory);
         services.AddSingleton(store);
         services.AddSingleton<SkillToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
@@ -21,7 +21,6 @@ public static class SkillsServiceExtensions
                 if (store.GetSkill(seed.Name) is null)
                     store.SaveSkill(new SkillRecord
                     {
-                        Id = Guid.NewGuid().ToString("N"),
                         Name = seed.Name,
                         Description = seed.Description,
                         PromptTemplate = seed.PromptTemplate,

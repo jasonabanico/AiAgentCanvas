@@ -41,28 +41,26 @@ public sealed class SkillToolProvider
         [Description("What the skill does")] string description,
         [Description("Prompt template with {input} placeholder")] string promptTemplate)
     {
-        var id = $"skill-{Guid.NewGuid():N}"[..18];
         var normalizedName = name.ToLowerInvariant().Replace(' ', '_');
 
         var record = new SkillRecord
         {
-            Id = id,
             Name = normalizedName,
             Description = description,
             PromptTemplate = promptTemplate,
         };
 
         _store.SaveSkill(record);
-        _logger.LogInformation("Created skill {Name} with id {Id}", normalizedName, id);
+        _logger.LogInformation("Created skill {Name}", normalizedName);
 
-        return JsonSerializer.Serialize(new { status = "created", id, name = normalizedName, description });
+        return JsonSerializer.Serialize(new { status = "created", name = normalizedName, description });
     }
 
     [Description("List all saved prompt skills")]
     private string ListSkills()
     {
         var skills = _store.ListSkills();
-        var result = skills.Select(s => new { s.Id, s.Name, s.Description, s.CreatedAt }).ToList();
+        var result = skills.Select(s => new { s.Name, s.Description }).ToList();
         return JsonSerializer.Serialize(new { count = result.Count, skills = result });
     }
 
