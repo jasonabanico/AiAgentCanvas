@@ -10,8 +10,12 @@ obj/
 publish/
 **/wwwroot/
 
-## Hangfire
+## Runtime databases
 hangfire.db*
+scheduler.db*
+skills.db*
+chathistory.db*
+vectorstore.db*
 
 ## Node / Next.js
 node_modules/
