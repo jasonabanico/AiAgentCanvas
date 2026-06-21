@@ -89,7 +89,7 @@ src/
       <p>Key dependency rules:</p>
 
       <ul>
-        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>).</li>
+        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>, <code>IToolDependencySeed</code>).</li>
         <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, and the AG-UI endpoint.</li>
         <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions.</li>
         <li><strong>Custom projects</strong> reference <code>Abstractions</code> (for seed interfaces) and optionally <code>Microsoft.Extensions.AI</code> (for data connection tools) -- they never reference Core, AgentData, or any other framework project.</li>

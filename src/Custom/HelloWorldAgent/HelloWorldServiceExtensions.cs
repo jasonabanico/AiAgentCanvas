@@ -149,6 +149,10 @@ public static class HelloWorldServiceExtensions
                 End with a brief summary of key differences and the investment disclaimer.
                 """));
 
+        services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
+            agentName: "financial-analyst",
+            requiredTools: ["stock_quote", "stock_history", "edgar_company_facts"]));
+
         return services;
     }
 }

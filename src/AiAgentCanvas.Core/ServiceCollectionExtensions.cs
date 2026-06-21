@@ -57,6 +57,15 @@ public static class ServiceCollectionExtensions
             toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));
 
+            var toolNames = new HashSet<string>(tools.Select(t => t.Name));
+            foreach (var dep in sp.GetServices<IToolDependencySeed>())
+            {
+                var missing = dep.RequiredTools.Where(t => !toolNames.Contains(t)).ToList();
+                if (missing.Count > 0)
+                    toolLogger.LogWarning("Agent '{AgentName}' requires tools not registered: {MissingTools}",
+                        dep.AgentName, string.Join(", ", missing));
+            }
+
             var agentOptions = new ChatClientAgentOptions
             {
                 Name = options.AgentName,

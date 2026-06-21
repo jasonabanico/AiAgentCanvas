@@ -109,11 +109,16 @@ public static class MyAgentServiceExtensions
             description: "Generate an escalation summary for a support case",
             promptTemplate: "Summarize the support case for {{customer}} regarding order {{order}}..."));
 
+        // Tool dependencies: validated at startup, warns if missing
+        services.AddSingleton&lt;IToolDependencySeed&gt;(new ToolDependencySeed(
+            agentName: "customer-support",
+            requiredTools: ["search_kb", "lookup_order"]));
+
         return services;
     }
 }</code></pre>
 
-      <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. Agents define <em>how</em> the LLM behaves; data connections define <em>what</em> it can do.</p>
+      <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. The <code>IToolDependencySeed</code> declares this dependency explicitly — at startup the framework validates that all required tools are registered and logs warnings for any missing ones.</p>
 
       <h3>Step 4: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
 
@@ -181,6 +186,11 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>ISkillSeed</code></td>
             <td><code>compare-stocks</code></td>
             <td>Prompt template for side-by-side stock comparison</td>
+          </tr>
+          <tr>
+            <td><code>IToolDependencySeed</code></td>
+            <td><code>financial-analyst</code></td>
+            <td>Declares dependency on stock_quote, stock_history, edgar_company_facts</td>
           </tr>
         </tbody>
       </table>
@@ -250,6 +260,12 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>McpConnectionSeed</code></td>
             <td>name, endpoint, transport</td>
             <td>In-memory (connected at startup)</td>
+          </tr>
+          <tr>
+            <td><code>IToolDependencySeed</code></td>
+            <td><code>ToolDependencySeed</code></td>
+            <td>agentName, requiredTools</td>
+            <td>Validated at startup (warnings for missing tools)</td>
           </tr>
         </tbody>
       </table>

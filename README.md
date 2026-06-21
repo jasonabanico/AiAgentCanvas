@@ -116,6 +116,11 @@ public static class HelloWorldServiceExtensions
 
         // Also: IContextSeed, IEntitySeed, ISkillSeed, IMcpConnectionSeed
 
+        // Declare tool dependencies (validated at startup)
+        services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
+            agentName: "customer-support",
+            requiredTools: ["search_kb", "lookup_order"]));
+
         return services;
     }
 }
