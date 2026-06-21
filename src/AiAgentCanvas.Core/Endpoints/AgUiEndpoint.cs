@@ -4,6 +4,7 @@ using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Core.Endpoints;
@@ -22,21 +23,48 @@ public static class AgUiEndpoint
 
     private static async Task HandleCopilotKitRequest(
         HttpContext context,
-        AIAgent agent,
+        IServiceProvider sp,
         ILoggerFactory loggerFactory)
     {
-        var body = await JsonSerializer.DeserializeAsync<JsonElement>(context.Request.Body);
+        var logger = loggerFactory.CreateLogger("AiAgentCanvas.Core.Endpoints.AgUiEndpoint");
+
+        AIAgent agent;
+        try
+        {
+            agent = sp.GetRequiredService<AIAgent>();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to resolve AIAgent — check AI configuration in appsettings.json");
+            context.Response.StatusCode = 503;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "AI service is not configured. Update the AIFoundry section in appsettings.json with valid credentials.",
+                details = ex.InnerException?.Message ?? ex.Message
+            });
+            return;
+        }
+
+        JsonElement body;
+        try
+        {
+            body = await JsonSerializer.DeserializeAsync<JsonElement>(context.Request.Body);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to parse request body");
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsJsonAsync(new { error = "Invalid request body" });
+            return;
+        }
+
         var messages = body.GetProperty("messages");
         var threadId = body.TryGetProperty("threadId", out var tid) ? tid.GetString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString();
         var runId = Guid.NewGuid().ToString();
 
-        var logger = loggerFactory.CreateLogger("AiAgentCanvas.Core.Endpoints.AgUiEndpoint");
         logger.LogInformation("AG-UI request received. ThreadId={ThreadId}, MessageCount={Count}", threadId, messages.GetArrayLength());
 
         var chatMessages = ExtractMessages(messages);
-
-        var session = await agent.CreateSessionAsync(context.RequestAborted);
-        session.StateBag.SetValue("conversationId", threadId);
 
         context.Response.ContentType = "text/event-stream";
         context.Response.Headers.CacheControl = "no-cache";
@@ -52,18 +80,34 @@ public static class AgUiEndpoint
             agentName = agent.Name,
         });
 
-        var sw = Stopwatch.StartNew();
-        await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: context.RequestAborted))
+        try
         {
-            if (update.Text is { Length: > 0 } text)
+            var session = await agent.CreateSessionAsync(context.RequestAborted);
+            session.StateBag.SetValue("conversationId", threadId);
+
+            var sw = Stopwatch.StartNew();
+            await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: context.RequestAborted))
             {
-                await WriteEvent(context, "text.message.content", new { messageId, delta = text });
+                if (update.Text is { Length: > 0 } text)
+                {
+                    await WriteEvent(context, "text.message.content", new { messageId, delta = text });
+                }
             }
+
+            logger.LogInformation("Streaming complete. ThreadId={ThreadId}, RunId={RunId}, ElapsedMs={ElapsedMs}", threadId, runId, sw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during agent execution. ThreadId={ThreadId}", threadId);
+            await WriteEvent(context, "text.message.content", new
+            {
+                messageId,
+                delta = $"\n\n**Error:** {ex.GetType().Name}: {ex.Message}"
+            });
         }
 
         await WriteEvent(context, "text.message.end", new { messageId });
         await WriteEvent(context, "run.finished", new { threadId, runId });
-        logger.LogInformation("Streaming complete. ThreadId={ThreadId}, RunId={RunId}, ElapsedMs={ElapsedMs}", threadId, runId, sw.ElapsedMilliseconds);
     }
 
     private static List<ChatMessage> ExtractMessages(JsonElement messages)

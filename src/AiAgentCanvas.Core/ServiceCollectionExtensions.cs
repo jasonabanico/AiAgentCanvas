@@ -105,7 +105,18 @@ public static class ServiceCollectionExtensions
     {
         app.UseCors();
         app.MapAgUiEndpoints();
-        app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }));
+        app.MapGet("/api/health", (AIFoundryClientFactory factory) =>
+        {
+            try
+            {
+                factory.CreateChatClient();
+                return Results.Ok(new { status = "healthy", ai = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Ok(new { status = "healthy", ai = false, message = ex.Message });
+            }
+        });
         return app;
     }
 }

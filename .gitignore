@@ -8,6 +8,12 @@ obj/
 .vs/
 *.DotSettings.user
 publish/
+**/wwwroot/
+
+## Hangfire
+hangfire.db
+hangfire.db-shm
+hangfire.db-wal
 
 ## Node / Next.js
 node_modules/

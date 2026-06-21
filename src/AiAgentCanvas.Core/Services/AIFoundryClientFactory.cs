@@ -18,11 +18,18 @@ public sealed class AIFoundryClientFactory
 
     public IChatClient CreateChatClient()
     {
+        if (string.IsNullOrWhiteSpace(_options.Endpoint) || _options.Endpoint.Contains("YOUR-RESOURCE"))
+            throw new InvalidOperationException(
+                "AIFoundry:Endpoint is not configured. Set a valid Azure AI Foundry endpoint in appsettings.json.");
+
+        if (!_options.UseAzureCredential && string.IsNullOrWhiteSpace(_options.Key))
+            throw new InvalidOperationException(
+                "AIFoundry:Key is required when UseAzureCredential is false. Set it in appsettings.json.");
+
         var endpoint = new Uri(_options.Endpoint);
         var inner = _options.UseAzureCredential
             ? new ChatCompletionsClient(endpoint, new DefaultAzureCredential())
-            : new ChatCompletionsClient(endpoint, new AzureKeyCredential(
-                _options.Key ?? throw new InvalidOperationException("AIFoundry:Key is required when UseAzureCredential is false.")));
+            : new ChatCompletionsClient(endpoint, new AzureKeyCredential(_options.Key!));
 
         return inner.AsIChatClient(_options.DeploymentName);
     }

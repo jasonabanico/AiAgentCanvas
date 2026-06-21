@@ -6,17 +6,37 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  isError?: boolean;
 }
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ai) {
+          setConfigError(
+            data.message ||
+              "AI service is not configured. Update appsettings.json with valid Azure AI Foundry credentials."
+          );
+        }
+      })
+      .catch(() => {
+        setConfigError(
+          "Cannot reach backend. Make sure the server is running."
+        );
+      });
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -40,6 +60,9 @@ export default function Home() {
       { id: assistantId, role: "assistant", content: "" },
     ]);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     try {
       const res = await fetch("/api/copilotkit", {
         method: "POST",
@@ -51,10 +74,18 @@ export default function Home() {
             content: m.content,
           })),
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeout);
+
       if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
+        const errorBody = await res.json().catch(() => null);
+        const errorMsg =
+          errorBody?.error ||
+          errorBody?.details ||
+          `Server error (${res.status})`;
+        throw new Error(errorMsg);
       }
 
       const reader = res.body?.getReader();
@@ -91,13 +122,18 @@ export default function Home() {
         }
       }
     } catch (err) {
+      clearTimeout(timeout);
+      const message =
+        err instanceof DOMException && err.name === "AbortError"
+          ? "Request timed out after 30 seconds. The AI service may not be configured correctly."
+          : err instanceof Error
+            ? err.message
+            : "Something went wrong";
+
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? {
-                ...m,
-                content: `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
-              }
+            ? { ...m, content: message, isError: true }
             : m
         )
       );
@@ -113,12 +149,19 @@ export default function Home() {
         <p style={styles.subtitle}>Multi-agent enterprise copilot</p>
       </header>
 
+      {configError && (
+        <div style={styles.banner}>
+          <strong>Configuration required:</strong> {configError}
+        </div>
+      )}
+
       <div style={styles.chatArea}>
         {messages.length === 0 && (
           <div style={styles.empty}>
             <p style={styles.emptyTitle}>Welcome to AI Agent Canvas</p>
             <p style={styles.emptyText}>
-              Ask me anything — I can analyze stocks, manage schedules, and more.
+              Ask me anything — I can analyze stocks, manage schedules, and
+              more.
             </p>
           </div>
         )}
@@ -128,7 +171,11 @@ export default function Home() {
             key={m.id}
             style={{
               ...styles.messageBubble,
-              ...(m.role === "user" ? styles.userBubble : styles.assistantBubble),
+              ...(m.role === "user"
+                ? styles.userBubble
+                : m.isError
+                  ? styles.errorBubble
+                  : styles.assistantBubble),
             }}
           >
             <div style={styles.roleLabel}>
@@ -182,6 +229,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.875rem",
     color: "#6b7280",
   },
+  banner: {
+    padding: "12px 24px",
+    background: "#fef3c7",
+    color: "#92400e",
+    borderBottom: "1px solid #fcd34d",
+    fontSize: "0.875rem",
+    lineHeight: 1.5,
+  },
   chatArea: {
     flex: 1,
     overflow: "auto",
@@ -225,6 +280,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     color: "#111827",
     border: "1px solid #e5e7eb",
+  },
+  errorBubble: {
+    alignSelf: "flex-start",
+    background: "#fef2f2",
+    color: "#991b1b",
+    border: "1px solid #fecaca",
   },
   roleLabel: {
     fontSize: "0.75rem",
