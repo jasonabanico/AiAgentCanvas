@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.AgentData.Workflows;
@@ -9,13 +10,13 @@ namespace AiAgentCanvas.AgentData.Workflows;
 public sealed class WorkflowExecutor
 {
     private readonly WorkflowStore _store;
-    private readonly AIAgent _agent;
+    private readonly IServiceProvider _sp;
     private readonly ILogger<WorkflowExecutor> _logger;
 
-    public WorkflowExecutor(WorkflowStore store, AIAgent agent, ILogger<WorkflowExecutor> logger)
+    public WorkflowExecutor(WorkflowStore store, IServiceProvider sp, ILogger<WorkflowExecutor> logger)
     {
         _store = store;
-        _agent = agent;
+        _sp = sp;
         _logger = logger;
     }
 
@@ -48,7 +49,8 @@ public sealed class WorkflowExecutor
             new(ChatRole.User, prompt.ToString()),
         };
 
-        var response = await _agent.RunAsync(messages, cancellationToken: ct);
+        var agent = _sp.GetRequiredService<AIAgent>();
+        var response = await agent.RunAsync(messages, cancellationToken: ct);
         var responseText = response.Text ?? string.Empty;
 
         _logger.LogInformation("Workflow {Name} completed, response length {Length}", workflowName, responseText.Length);

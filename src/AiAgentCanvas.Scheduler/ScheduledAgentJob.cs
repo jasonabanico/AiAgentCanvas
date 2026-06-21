@@ -1,20 +1,21 @@
 using AiAgentCanvas.Abstractions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Scheduler;
 
 public sealed class ScheduledAgentJob
 {
-    private readonly AIAgent _agent;
+    private readonly IServiceProvider _sp;
     private readonly ScheduledTaskStore _store;
     private readonly INotificationSink? _notificationSink;
     private readonly ILogger<ScheduledAgentJob> _logger;
 
-    public ScheduledAgentJob(AIAgent agent, ScheduledTaskStore store, ILogger<ScheduledAgentJob> logger, INotificationSink? notificationSink = null)
+    public ScheduledAgentJob(IServiceProvider sp, ScheduledTaskStore store, ILogger<ScheduledAgentJob> logger, INotificationSink? notificationSink = null)
     {
-        _agent = agent;
+        _sp = sp;
         _store = store;
         _notificationSink = notificationSink;
         _logger = logger;
@@ -24,10 +25,11 @@ public sealed class ScheduledAgentJob
     {
         _logger.LogInformation("Executing scheduled task {TaskId}: {Description}", taskId, description);
 
-        var session = await _agent.CreateSessionAsync();
+        var agent = _sp.GetRequiredService<AIAgent>();
+        var session = await agent.CreateSessionAsync();
         var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
 
-        var response = await _agent.RunAsync(messages, session);
+        var response = await agent.RunAsync(messages, session);
         var resultText = response.Text ?? "(no response)";
 
         _store.SaveResult(taskId, description, resultText);

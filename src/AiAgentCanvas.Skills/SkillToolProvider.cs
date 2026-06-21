@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Skills;
@@ -9,13 +10,13 @@ namespace AiAgentCanvas.Skills;
 public sealed class SkillToolProvider
 {
     private readonly SkillStore _store;
-    private readonly AIAgent _agent;
+    private readonly IServiceProvider _sp;
     private readonly ILogger<SkillToolProvider> _logger;
 
-    public SkillToolProvider(SkillStore store, AIAgent agent, ILogger<SkillToolProvider> logger)
+    public SkillToolProvider(SkillStore store, IServiceProvider sp, ILogger<SkillToolProvider> logger)
     {
         _store = store;
-        _agent = agent;
+        _sp = sp;
         _logger = logger;
     }
 
@@ -83,7 +84,8 @@ public sealed class SkillToolProvider
             new(ChatRole.User, prompt),
         };
 
-        var response = await _agent.RunAsync(messages, cancellationToken: ct);
+        var agent = _sp.GetRequiredService<AIAgent>();
+        var response = await agent.RunAsync(messages, cancellationToken: ct);
         var responseText = response.Text ?? string.Empty;
 
         _logger.LogInformation("Skill {Name} completed, response length {Length}", name, responseText.Length);
