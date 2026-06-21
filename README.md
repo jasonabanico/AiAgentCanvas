@@ -1,6 +1,6 @@
 # AI Agent Canvas
 
-A multi-agent enterprise copilot built with .NET 9, Azure AI Foundry, CopilotKit, and the AG-UI protocol.
+A multi-agent enterprise copilot framework built with .NET 9, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry.
 
 ## Architecture
 
@@ -9,9 +9,13 @@ Frontend (Next.js + CopilotKit)
         │ AG-UI Protocol (SSE)
         ▼
 ASP.NET Core Backend
-├── AiAgentCanvas.Core ─── engine: orchestrator, AG-UI endpoint, DI
-├── MyFirstAgent ─────── earnings surprise scanner (custom agent)
-└── MCP Skills ───────── SEC EDGAR + Yahoo Finance (real APIs)
+├── Core ──────────── MAF ChatClientAgent, AG-UI endpoint, DI
+├── AgentData ─────── personas, workflows, guardrails, entities
+├── Skills ────────── skill registry, MCP connections
+├── Scheduler ─────── Hangfire-based recurring tasks
+├── Security ──────── governance, prompt injection detection
+├── SystemTools ───── file I/O, shell execution (sandboxed)
+└── Custom/ ───────── your agents, tools, and data connections
         │
         ▼
 Azure AI Foundry (AzureOpenAIClient)
@@ -21,21 +25,24 @@ Azure AI Foundry (AzureOpenAIClient)
 
 ```
 src/
-├── AiAgentCanvas/                             # Core engine (framework)
-│   ├── AiAgentCanvas.Abstractions/            # IAgentService, IMcpClient, models
-│   └── AiAgentCanvas.Core/                    # AG-UI endpoint, orchestrator, DI extensions
-├── MCP/                                     # Data connections
-│   └── MCP.MarketData/                      # SEC EDGAR + Yahoo Finance
-├── MyAgents/                                # Custom agent logic (no HTTP, no SDKs)
-│   └── MyFirstAgent/                        # Earnings Surprise Scanner
-└── AiAgentCanvas.Web/                         # Thin composition root
-frontend/                                    # Next.js + CopilotKit chat UI
+├── AiAgentCanvas.Abstractions/     # Shared interfaces and models
+├── AiAgentCanvas.Core/             # MAF agent, AG-UI endpoint, DI extensions
+├── AiAgentCanvas.AgentData/        # Personas, workflows, guardrails, entities, context, profiles
+├── AiAgentCanvas.Skills/           # Skill store, MCP connections, skill authoring
+├── AiAgentCanvas.Scheduler/        # Hangfire scheduled tasks
+├── AiAgentCanvas.Security/         # Agent Governance Toolkit integration
+├── AiAgentCanvas.SystemTools/      # File and shell tools (sandboxed)
+├── AiAgentCanvas.Notifications/    # Notification sink
+├── AiAgentCanvas.Web/              # Composition root (Program.cs)
+└── Custom/                         # Your extensions
+    ├── HelloWorldAgent/            # Example agent prompts
+    ├── MCP.MarketData/             # SEC EDGAR + Yahoo Finance tools
+    └── VectorStore.Sqlite/         # SQLite vector store for RAG
+frontend/                           # Next.js + CopilotKit chat UI
+docs/                               # GitHub Pages documentation site
 ```
 
-Three concerns, three folders:
-- **`AiAgentCanvas/`** — the framework. Keep it.
-- **`MCP/`** — data connections. Add `MCP.Weather/`, `MCP.Calendar/`, etc. as needed.
-- **`MyAgents/`** — your agent logic. Agents call MCP skills by name; they never touch HTTP or APIs directly.
+The `Custom/` folder is where you add your own tool providers, MCP connections, and agent configurations without touching the framework.
 
 ## Quick Start
 
@@ -43,12 +50,12 @@ Three concerns, three folders:
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
-- An Azure AI Foundry deployment (or any OpenAI-compatible endpoint)
-- No additional API keys needed (Yahoo Finance and SEC EDGAR are free, no key required)
+- An Azure OpenAI deployment (or any OpenAI-compatible endpoint)
+- No additional API keys needed (Yahoo Finance and SEC EDGAR are free)
 
 ### 1. Configure
 
-Edit `src/AiAgentCanvas.Web/appsettings.Development.json`:
+Create `src/AiAgentCanvas.Web/appsettings.Development.json`:
 
 ```json
 {
@@ -76,48 +83,50 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Try: *"Scan for earnings surprises"* or *"Scan $NVDA $TSLA $AAPL"*.
+Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and how has it performed over the last month?"*
 
-### Docker Compose
+## Adding Custom Tools
 
-```bash
-AIFOUNDRY_KEY=your-key docker compose up --build
-```
-
-## Adding a New Agent
-
-1. Create a class library under `src/MyAgents/`
-2. Reference `AiAgentCanvas.Abstractions` and `AiAgentCanvas.Skills`
-3. Implement `IAgentService`:
+Create a tool provider class and register it in DI. Tools are automatically available to the agent.
 
 ```csharp
-public class MyAgent : IAgentService
+public sealed class MyToolProvider
 {
-    public string Name => "MyAgent";
-    public string Description => "Does something useful";
-
-    public bool CanHandle(string userMessageLower) =>
-        userMessageLower.Contains("my-keyword");
-
-    public async Task<AgentResponse> HandleAsync(AgentRequest request, CancellationToken ct)
+    public IReadOnlyList<AITool> GetTools()
     {
-        // Your logic here
+        return
+        [
+            AIFunctionFactory.Create(MyAction, "my_action", "Does something useful"),
+        ];
     }
 
-    public async IAsyncEnumerable<string> StreamAsync(AgentRequest request, CancellationToken ct)
+    private string MyAction(string input)
     {
-        // Your streaming logic here
+        return JsonSerializer.Serialize(new { result = "done", input });
     }
 }
 ```
 
-4. Register in `Program.cs`:
+Register in your service extensions:
 
 ```csharp
-builder.Services.AddSingleton<IAgentService, MyAgent>();
+services.AddSingleton<MyToolProvider>();
+services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+    sp.GetRequiredService<MyToolProvider>().GetTools());
 ```
 
-No orchestrator changes needed -- each agent owns its routing via `CanHandle`.
+The MAF `ChatClientAgent` automatically picks up all registered `IReadOnlyList<AITool>` services and makes them available for the LLM to call.
+
+## Key Features
+
+- **55 built-in tools** — market data, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
+- **AG-UI streaming** — real-time SSE responses via CopilotKit
+- **Personas** — switch agent behavior with custom system prompts
+- **Workflows** — define multi-step workflows the agent executes
+- **Guardrails** — policy rules that constrain agent behavior
+- **Scheduled tasks** — Hangfire-powered recurring agent invocations
+- **MCP connections** — connect to external MCP servers at runtime
+- **Security** — OWASP LLM Top 10 coverage via Agent Governance Toolkit
 
 ## Tech Stack
 
@@ -126,10 +135,11 @@ No orchestrator changes needed -- each agent owns its routing via `CanHandle`.
 | Frontend | Next.js 15, React 19, CopilotKit |
 | Protocol | AG-UI (Server-Sent Events) |
 | Backend | ASP.NET Core 9, Minimal APIs |
+| Agent Framework | Microsoft Agent Framework (MAF) |
 | AI | Azure AI Foundry (`Azure.AI.OpenAI`) |
-| Data | SEC EDGAR (free), Yahoo Finance (free, no key) |
-| Auth | Azure Identity (DefaultAzureCredential) |
-| Skills | MCP-compatible interface |
+| Data | SEC EDGAR (free), Yahoo Finance (free) |
+| Scheduling | Hangfire with SQLite |
+| Security | Agent Governance Toolkit |
 
 ## License
 
