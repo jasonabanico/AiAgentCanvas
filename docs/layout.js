@@ -62,11 +62,15 @@ const TOP_NAV = [
 
 function getBasePath() {
   const path = window.location.pathname;
-  const parts = path.split('/');
-  const websiteIdx = parts.indexOf('website');
-  if (websiteIdx === -1) return '';
-  const depth = parts.length - websiteIdx - 2;
-  return depth > 0 ? '../'.repeat(depth) : '';
+  const knownSections = NAV_SECTIONS.map(s => s.basePath);
+  const parts = path.split('/').filter(Boolean);
+  for (let i = 0; i < parts.length; i++) {
+    if (knownSections.includes(parts[i])) {
+      const depth = parts.length - i - 1;
+      return depth > 0 ? '../'.repeat(depth) : '';
+    }
+  }
+  return '';
 }
 
 function getCurrentSection() {
