@@ -111,36 +111,44 @@
 
       <p>The default prompt is configurable via <code>AiAgentCanvasOptions.SystemPrompt</code> or defaults to a generic helpful assistant prompt.</p>
 
-      <h3>PlannerContextProvider</h3>
+      <h3>PlanningMiddleware (Goal Decomposition)</h3>
 
-      <p>Provides <strong>goal decomposition</strong> for complex requests. Before the main agent sees the user's message, the planner makes a lightweight LLM call to decide whether the request needs a multi-step plan. Simple requests (1-2 tool calls) get <code>NO_PLAN</code> and pass through unchanged. Complex requests get a numbered execution plan injected into the instructions.</p>
+      <p>Provides <strong>persistent goal decomposition</strong> for complex multi-step requests. Implemented as agent middleware (not a context provider) so it has access to the session's <code>StateBag</code> for plan persistence across messages.</p>
 
-      <pre><code>public sealed class PlannerContextProvider : AIContextProvider
+      <p>On each user message, the middleware follows this logic:</p>
+
+      <ol>
+        <li><strong>No existing plan:</strong> Makes a lightweight LLM call (MaxOutputTokens=300, Temperature=0) to decide whether the request needs a multi-step plan. Simple requests (1-2 tool calls) get <code>NO_PLAN</code> and pass through unchanged. Complex requests get a numbered execution plan generated and stored in <code>StateBag</code>.</li>
+        <li><strong>Existing plan found:</strong> Makes a continuation call that examines the conversation history to determine which steps are complete. Returns <code>COMPLETED: 1, 2 / REMAINING: 3, 4 / NEXT: 3</code> to track progress, <code>ALL_DONE</code> to clear the plan, or <code>REPLAN</code> if the user changed direction.</li>
+      </ol>
+
+      <pre><code>public sealed class PlanningMiddleware
 {
-    protected override async ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
-        InvokingContext context, CancellationToken cancellationToken)
+    public async Task InvokeAsync(
+        IEnumerable&lt;ChatMessage&gt; messages,
+        AgentSession? session,
+        AgentRunOptions? runOptions,
+        Func&lt;...&gt; nextAsync,
+        CancellationToken ct)
     {
-        var lastUserMessage = context.AIContext.Messages?
-            .LastOrDefault(m =&gt; m.Role == ChatRole.User)?.Text;
+        // Check StateBag for existing plan
+        session?.StateBag.TryGetValue&lt;string&gt;("planner:active_plan", out var existingPlan);
 
-        // Build tool summary from static + dynamic tools
-        var toolSummary = BuildToolSummary();
+        if (existingPlan is not null)
+            planToInject = await EvaluateContinuationAsync(existingPlan, messages, ct);
+        else
+            planToInject = await GenerateNewPlanAsync(lastUserMessage, ct);
 
-        // Fast planning call: MaxOutputTokens=300, Temperature=0
-        var plan = await _chatClient.GetResponseAsync([
-            new(ChatRole.System, plannerPrompt + toolSummary),
-            new(ChatRole.User, lastUserMessage)
-        ], new ChatOptions { MaxOutputTokens = 300, Temperature = 0 });
+        // Persist plan to StateBag for next message
+        session?.StateBag.SetValue("planner:active_plan", planToInject);
 
-        if (!plan.Text.Contains("NO_PLAN"))
-            context.AIContext.Instructions +=
-                $"\nExecution plan (follow in order):\n{plan.Text}";
-
-        return context.AIContext;
+        // Inject plan into messages as system message
+        messageList.Insert(0, new ChatMessage(ChatRole.System, plan));
+        await nextAsync(messageList, session, runOptions, ct);
     }
 }</code></pre>
 
-      <p>The planner is aware of all registered tools (both static startup tools and dynamic MCP tools) and references them by name in the generated plan. The agent's existing tool-calling loop then executes the plan naturally -- calling tools, observing results, and proceeding to the next step. If a step produces unexpected results, the agent can adapt because the plan is advisory, not rigid.</p>
+      <p>The planner is aware of all registered tools (both static startup tools and dynamic MCP tools) and references them by name in the generated plan. The plan persists across messages via <code>StateBag</code>, enabling multi-turn workflows where the agent picks up where it left off. If the user changes direction mid-plan, the continuation evaluator detects this and generates a fresh plan.</p>
 
       <h3>PersonaContextProvider</h3>
 

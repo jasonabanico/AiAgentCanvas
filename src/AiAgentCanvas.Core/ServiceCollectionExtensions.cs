@@ -40,14 +40,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
         services.AddSingleton<AIContextProvider>(sp =>
-            new PlannerContextProvider(
+            new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));
+
+        services.AddSingleton(sp =>
+            new PlanningMiddleware(
                 sp.GetRequiredService<IChatClient>(),
                 sp.GetRequiredService<DynamicToolRegistry>(),
                 sp.GetServices<IReadOnlyList<AITool>>(),
-                sp.GetRequiredService<ILogger<PlannerContextProvider>>()));
-
-        services.AddSingleton<AIContextProvider>(sp =>
-            new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));
+                sp.GetRequiredService<ILoggerFactory>()));
 
         services.AddSingleton(sp =>
         {
@@ -85,7 +85,10 @@ public static class ServiceCollectionExtensions
 
             var agent = new ChatClientAgent(chatClient, agentOptions, loggerFactory, sp);
 
+            var planningMiddleware = sp.GetRequiredService<PlanningMiddleware>();
             var builder = agent.AsBuilder();
+            builder.Use(async (messages, session, runOptions, nextAsync, ct) =>
+                await planningMiddleware.InvokeAsync(messages, session, runOptions, nextAsync, ct));
             builder.Use(async (messages, session, runOptions, nextAsync, ct) =>
             {
                 var logger = loggerFactory.CreateLogger("AiAgentCanvas.Middleware");
