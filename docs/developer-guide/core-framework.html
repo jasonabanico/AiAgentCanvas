@@ -311,10 +311,22 @@ data: {"threadId":"abc-123","runId":"def-456"}</code></pre>
           <tr>
             <td><code>RagContextProvider</code></td>
             <td>Core</td>
-            <td>Injects RAG search results</td>
+            <td>Hybrid search + reranking + cited RAG results</td>
+          </tr>
+          <tr>
+            <td><code>DocumentChunker</code></td>
+            <td>Core</td>
+            <td>Recursive paragraph/sentence text splitter</td>
+          </tr>
+          <tr>
+            <td><code>LlmReranker</code></td>
+            <td>Core</td>
+            <td>LLM-based candidate reranking (top-10 → top-3)</td>
           </tr>
         </tbody>
       </table>
+
+      <p>For full details on the RAG pipeline including hybrid search, metadata filtering, reranking, and citation, see the <a href="rag-pipeline.html">RAG Pipeline</a> guide.</p>
     </main>
   </div>
 </body>

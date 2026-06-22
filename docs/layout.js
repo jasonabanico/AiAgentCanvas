@@ -46,6 +46,7 @@ const NAV_SECTIONS = [
       { title: 'Core Framework', file: 'core-framework.html' },
       { title: 'Agent Data', file: 'agent-data.html' },
       { title: 'Skills & MCP', file: 'skills-and-mcp.html' },
+      { title: 'RAG Pipeline', file: 'rag-pipeline.html' },
       { title: 'Security', file: 'security.html' },
       { title: 'Custom Agents', file: 'custom-agents.html' },
       { title: 'Custom MCP Connections', file: 'custom-mcp-connections.html' },

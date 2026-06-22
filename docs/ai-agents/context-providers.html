@@ -200,37 +200,41 @@
 
       <h3>RagContextProvider</h3>
 
-      <p>Retrieves relevant documents from a vector store and appends them to the instructions:</p>
+      <p>The most sophisticated provider in the chain. It retrieves relevant documents from a vector store using a multi-stage pipeline:</p>
+
+      <ol>
+        <li><strong>Hybrid search</strong> -- combines vector cosine similarity (70%) with FTS5 keyword/BM25 scoring (30%) via the <code>IHybridSearchable</code> interface. Falls back to vector-only search if the store doesn't support hybrid.</li>
+        <li><strong>Metadata filtering</strong> -- optionally filters by <code>Source</code> (exact match) and <code>Tags</code> (contains match) before scoring, reducing the candidate set.</li>
+        <li><strong>LLM reranking</strong> -- sends the top-10 candidates to the LLM to re-score by relevance, then keeps the top-3. Falls back to original ranking on failure.</li>
+        <li><strong>Citation formatting</strong> -- each result is numbered with its source and score, and the LLM is instructed to cite by number.</li>
+      </ol>
 
       <pre><code>public sealed class RagContextProvider : AIContextProvider
 {
     protected override async ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
         InvokingContext context, CancellationToken cancellationToken)
     {
-        var lastUserMessage = context.AIContext.Messages?
-            .LastOrDefault(m =&gt; m.Role == ChatRole.User)?.Text;
-
-        if (string.IsNullOrWhiteSpace(lastUserMessage))
-            return context.AIContext;
-
+        // 1. Embed the user's query
         var queryEmbedding = await _embeddingGenerator
             .GenerateVectorAsync(lastUserMessage, cancellationToken: cancellationToken);
 
-        var results = new List&lt;string&gt;();
-        await foreach (var result in _collection
-            .SearchAsync(queryEmbedding, _topK, cancellationToken: cancellationToken))
-        {
-            results.Add(result.Record.Text);
-        }
+        // 2. Hybrid search (vector + keyword) with metadata filters
+        if (_collection is IHybridSearchable hybridStore)
+            await foreach (var result in hybridStore.HybridSearchAsync(...))
+                candidates.Add(result);
 
-        var ragContext = string.Join("\n\n---\n\n", results);
+        // 3. LLM reranking: top-10 → top-3
+        var results = _reranker is not null
+            ? await _reranker.RerankAsync(query, candidates, topK)
+            : candidates.Take(topK).ToList();
+
+        // 4. Format with citations: [1] (source: X, score: 0.82)
         context.AIContext.Instructions +=
-            $"\n\nRelevant context from documents:\n{ragContext}";
-        return context.AIContext;
+            "Relevant context (cite by number):\n" + ragContext;
     }
 }</code></pre>
 
-      <p>RAG differs from other providers in that it is <strong>query-dependent</strong> -- it reads the last user message, generates an embedding, and searches a vector store for relevant content.</p>
+      <p>RAG differs from other providers in that it is <strong>query-dependent</strong> -- it reads the last user message, generates an embedding, and searches a vector store for relevant content. See the <a href="../developer-guide/rag-pipeline.html">RAG Pipeline</a> developer guide for full details on chunking, hybrid search, reranking, and citation.</p>
 
       <h3>GovernanceContextProvider</h3>
 
