@@ -40,6 +40,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
         services.AddSingleton<AIContextProvider>(sp =>
+            new PlannerContextProvider(
+                sp.GetRequiredService<IChatClient>(),
+                sp.GetRequiredService<DynamicToolRegistry>(),
+                sp.GetServices<IReadOnlyList<AITool>>(),
+                sp.GetRequiredService<ILogger<PlannerContextProvider>>()));
+
+        services.AddSingleton<AIContextProvider>(sp =>
             new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));
 
         services.AddSingleton(sp =>
