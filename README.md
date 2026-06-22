@@ -1,6 +1,5 @@
-# AI Agent Canvas
+# [AI Agent Canvas](https://jasonabanico.github.io/AiAgentCanvas/)
 
-[https://jasonabanico.github.io/AiAgentCanvas/](https://jasonabanico.github.io/AiAgentCanvas/)
 A multi-agent enterprise copilot framework built with .NET 9, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry.
 
 ## Architecture
