@@ -47,6 +47,11 @@
      |
      v
 +------------------------+
+| PlannerContext...      |  --&gt; Decomposes complex requests into step plans
++------------------------+
+     |
+     v
++------------------------+
 | PersonaContextProvider |  --&gt; Appends persona-specific instructions
 +------------------------+
      |
@@ -105,6 +110,37 @@
 }</code></pre>
 
       <p>The default prompt is configurable via <code>AiAgentCanvasOptions.SystemPrompt</code> or defaults to a generic helpful assistant prompt.</p>
+
+      <h3>PlannerContextProvider</h3>
+
+      <p>Provides <strong>goal decomposition</strong> for complex requests. Before the main agent sees the user's message, the planner makes a lightweight LLM call to decide whether the request needs a multi-step plan. Simple requests (1-2 tool calls) get <code>NO_PLAN</code> and pass through unchanged. Complex requests get a numbered execution plan injected into the instructions.</p>
+
+      <pre><code>public sealed class PlannerContextProvider : AIContextProvider
+{
+    protected override async ValueTask&lt;AIContext&gt; ProvideAIContextAsync(
+        InvokingContext context, CancellationToken cancellationToken)
+    {
+        var lastUserMessage = context.AIContext.Messages?
+            .LastOrDefault(m =&gt; m.Role == ChatRole.User)?.Text;
+
+        // Build tool summary from static + dynamic tools
+        var toolSummary = BuildToolSummary();
+
+        // Fast planning call: MaxOutputTokens=300, Temperature=0
+        var plan = await _chatClient.GetResponseAsync([
+            new(ChatRole.System, plannerPrompt + toolSummary),
+            new(ChatRole.User, lastUserMessage)
+        ], new ChatOptions { MaxOutputTokens = 300, Temperature = 0 });
+
+        if (!plan.Text.Contains("NO_PLAN"))
+            context.AIContext.Instructions +=
+                $"\nExecution plan (follow in order):\n{plan.Text}";
+
+        return context.AIContext;
+    }
+}</code></pre>
+
+      <p>The planner is aware of all registered tools (both static startup tools and dynamic MCP tools) and references them by name in the generated plan. The agent's existing tool-calling loop then executes the plan naturally -- calling tools, observing results, and proceeding to the next step. If a step produces unexpected results, the agent can adapt because the plan is advisory, not rigid.</p>
 
       <h3>PersonaContextProvider</h3>
 
