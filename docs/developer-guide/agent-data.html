@@ -22,19 +22,19 @@
 agent-data/
 ├── agent/          &larr; System writes here (seeds + tool-created content)
 │   ├── personas/
-│   ├── guardrails/
-│   ├── workflows/
 │   ├── context/
+│   ├── workflows/
 │   ├── entities/
 │   ├── profiles/
+│   ├── guardrails/
 │   └── goals/
 └── user/           &larr; Hand-written MD files (read-only to system, never overwritten)
     ├── personas/
-    ├── guardrails/
-    ├── workflows/
     ├── context/
+    ├── workflows/
     ├── entities/
     ├── profiles/
+    ├── guardrails/
     └── goals/
       </div>
 
@@ -64,22 +64,16 @@ agent-data/
             <td>Custom agent identities with instructions</td>
           </tr>
           <tr>
-            <td>Guardrails</td>
-            <td><code>agent/guardrails/</code></td>
-            <td><code>user/guardrails/</code></td>
-            <td>Behavioral constraints</td>
+            <td>Context</td>
+            <td><code>agent/context/</code></td>
+            <td><code>user/context/</code></td>
+            <td>Persistent context entries</td>
           </tr>
           <tr>
             <td>Workflows</td>
             <td><code>agent/workflows/</code></td>
             <td><code>user/workflows/</code></td>
             <td>Multi-step workflow definitions</td>
-          </tr>
-          <tr>
-            <td>Context</td>
-            <td><code>agent/context/</code></td>
-            <td><code>user/context/</code></td>
-            <td>Persistent context entries</td>
           </tr>
           <tr>
             <td>Entities</td>
@@ -92,6 +86,12 @@ agent-data/
             <td><code>agent/profiles/</code></td>
             <td><code>user/profiles/</code></td>
             <td>User preference profiles</td>
+          </tr>
+          <tr>
+            <td>Guardrails</td>
+            <td><code>agent/guardrails/</code></td>
+            <td><code>user/guardrails/</code></td>
+            <td>Behavioral constraints</td>
           </tr>
           <tr>
             <td>Goals</td>

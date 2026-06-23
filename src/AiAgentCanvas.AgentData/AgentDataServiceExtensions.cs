@@ -88,29 +88,6 @@ public static class AgentDataServiceExtensions
         return services;
     }
 
-    public static IServiceCollection AddAiAgentCanvasGuardrails(
-        this IServiceCollection services,
-        string rootDirectory = DefaultRoot)
-    {
-        var store = new GuardrailStore(
-            Path.Combine(rootDirectory, "agent", "guardrails"),
-            Path.Combine(rootDirectory, "user", "guardrails"));
-        services.AddSingleton(store);
-        services.AddSingleton<GuardrailToolProvider>();
-        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<GuardrailToolProvider>().GetTools());
-        services.AddSingleton<AIContextProvider>(sp =>
-        {
-            foreach (var seed in sp.GetServices<IGuardrailSeed>())
-            {
-                if (store.Get(seed.Name) is null)
-                    store.Save(seed.Name, seed.Severity, seed.Enabled, seed.Rule);
-            }
-            return new GuardrailContextProvider(store);
-        });
-        return services;
-    }
-
     public static IServiceCollection AddAiAgentCanvasEntities(
         this IServiceCollection services,
         string rootDirectory = DefaultRoot)
@@ -146,6 +123,29 @@ public static class AgentDataServiceExtensions
             sp.GetRequiredService<UserProfileToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
             new UserProfileContextProvider(sp.GetRequiredService<UserProfileStore>()));
+        return services;
+    }
+
+    public static IServiceCollection AddAiAgentCanvasGuardrails(
+        this IServiceCollection services,
+        string rootDirectory = DefaultRoot)
+    {
+        var store = new GuardrailStore(
+            Path.Combine(rootDirectory, "agent", "guardrails"),
+            Path.Combine(rootDirectory, "user", "guardrails"));
+        services.AddSingleton(store);
+        services.AddSingleton<GuardrailToolProvider>();
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<GuardrailToolProvider>().GetTools());
+        services.AddSingleton<AIContextProvider>(sp =>
+        {
+            foreach (var seed in sp.GetServices<IGuardrailSeed>())
+            {
+                if (store.Get(seed.Name) is null)
+                    store.Save(seed.Name, seed.Severity, seed.Enabled, seed.Rule);
+            }
+            return new GuardrailContextProvider(store);
+        });
         return services;
     }
 

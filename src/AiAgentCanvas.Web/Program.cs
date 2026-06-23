@@ -36,13 +36,13 @@ builder.Services.AddAiAgentCanvasSkills();
 builder.Services.AddAiAgentCanvasMcp();
 builder.Services.AddAiAgentCanvasPersonas();
 builder.Services.AddAiAgentCanvasContext();
-builder.Services.AddAiAgentCanvasSkillRegistry();
-builder.Services.AddAiAgentCanvasSkillAuthoring();
 builder.Services.AddAiAgentCanvasWorkflows();
-builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasEntities();
 builder.Services.AddAiAgentCanvasUserProfiles();
+builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasGoals();
+builder.Services.AddAiAgentCanvasSkillRegistry();
+builder.Services.AddAiAgentCanvasSkillAuthoring();
 
 builder.Services.AddAiAgentCanvasInterAgentCommunication(
     personaLookupFactory: sp =>

@@ -29,15 +29,27 @@ public static class HelloWorldServiceExtensions
                 If a tool call fails, tell the user what happened and try an alternative approach.
                 """));
 
-        services.AddSingleton<IGuardrailSeed>(new GuardrailSeed(
-            name: "investment-disclaimer",
-            severity: "high",
-            enabled: true,
-            rule: """
-                Never provide specific buy, sell, or hold recommendations.
-                Always include a disclaimer that the analysis is informational only and not investment advice.
-                Do not predict future stock prices or guarantee returns.
-                If the user asks for a recommendation, explain that you can provide data and analysis but not financial advice.
+        services.AddSingleton<IContextSeed>(new ContextSeed(
+            topic: "financial-analysis-methodology",
+            tags: "finance,methodology",
+            content: """
+                ## Financial Analysis Reference
+
+                ### Key Metrics
+                - **P/E Ratio**: Price / Earnings per Share. Lower may indicate undervaluation; compare within sector.
+                - **Revenue Growth**: Year-over-year revenue change. Consistent growth signals business health.
+                - **Net Income Margin**: Net Income / Revenue. Higher margins indicate operational efficiency.
+                - **EPS**: Earnings per Share. Primary driver of stock valuation.
+
+                ### Data Sources
+                - **Yahoo Finance**: Real-time and delayed quotes, historical prices, volume data.
+                - **SEC EDGAR**: Official filings (10-K, 10-Q). Revenue, income, assets, and EPS from company facts API.
+
+                ### Analysis Framework
+                1. Start with price action (current quote + history) for market sentiment
+                2. Layer in fundamentals (EDGAR) for intrinsic value context
+                3. Compare metrics to sector averages when possible
+                4. Note any divergence between price trend and fundamental performance
                 """));
 
         services.AddSingleton<IWorkflowSeed>(new WorkflowSeed(
@@ -70,29 +82,6 @@ public static class HelloWorldServiceExtensions
                 - Notable observations
 
                 End with the investment disclaimer.
-                """));
-
-        services.AddSingleton<IContextSeed>(new ContextSeed(
-            topic: "financial-analysis-methodology",
-            tags: "finance,methodology",
-            content: """
-                ## Financial Analysis Reference
-
-                ### Key Metrics
-                - **P/E Ratio**: Price / Earnings per Share. Lower may indicate undervaluation; compare within sector.
-                - **Revenue Growth**: Year-over-year revenue change. Consistent growth signals business health.
-                - **Net Income Margin**: Net Income / Revenue. Higher margins indicate operational efficiency.
-                - **EPS**: Earnings per Share. Primary driver of stock valuation.
-
-                ### Data Sources
-                - **Yahoo Finance**: Real-time and delayed quotes, historical prices, volume data.
-                - **SEC EDGAR**: Official filings (10-K, 10-Q). Revenue, income, assets, and EPS from company facts API.
-
-                ### Analysis Framework
-                1. Start with price action (current quote + history) for market sentiment
-                2. Layer in fundamentals (EDGAR) for intrinsic value context
-                3. Compare metrics to sector averages when possible
-                4. Note any divergence between price trend and fundamental performance
                 """));
 
         services.AddSingleton<IEntitySeed>(new EntitySeed(
@@ -129,6 +118,17 @@ public static class HelloWorldServiceExtensions
                 ### Summary
                 - Key observations combining price and fundamental data
                 - Investment disclaimer
+                """));
+
+        services.AddSingleton<IGuardrailSeed>(new GuardrailSeed(
+            name: "investment-disclaimer",
+            severity: "high",
+            enabled: true,
+            rule: """
+                Never provide specific buy, sell, or hold recommendations.
+                Always include a disclaimer that the analysis is informational only and not investment advice.
+                Do not predict future stock prices or guarantee returns.
+                If the user asks for a recommendation, explain that you can provide data and analysis but not financial advice.
                 """));
 
         services.AddSingleton<ISkillSeed>(new SkillSeed(

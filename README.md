@@ -10,7 +10,7 @@ Frontend (Next.js + CopilotKit)
         ▼
 ASP.NET Core Backend
 ├── Core ──────────── MAF ChatClientAgent, AG-UI endpoint, inter-agent comms
-├── AgentData ─────── personas, workflows, guardrails, entities, goals
+├── AgentData ─────── personas, context, workflows, entities, guardrails, goals
 ├── Skills ────────── skill registry, MCP connections
 ├── Scheduler ─────── Hangfire tasks + autonomous execution engine
 ├── Security ──────── governance, prompt injection detection
@@ -27,7 +27,7 @@ Azure AI Foundry (AzureOpenAIClient)
 src/
 ├── AiAgentCanvas.Abstractions/     # Shared interfaces and models
 ├── AiAgentCanvas.Core/             # MAF agent, AG-UI endpoint, agent registry, mailbox, handoff
-├── AiAgentCanvas.AgentData/        # Personas, workflows, guardrails, entities, context, profiles, goals
+├── AiAgentCanvas.AgentData/        # Personas, context, workflows, entities, profiles, guardrails, goals
 ├── AiAgentCanvas.Skills/           # Skill store, MCP connections, skill authoring
 ├── AiAgentCanvas.Scheduler/        # Hangfire scheduled tasks + autonomous execution
 ├── AiAgentCanvas.Security/         # Agent Governance Toolkit integration
@@ -87,7 +87,7 @@ Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and
 
 ## Adding a Custom Agent
 
-See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, guardrails, workflows, context, entities, goals, and skills — and references tools from separate data connection projects.
+See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, context, workflows, entities, user profiles, guardrails, goals, and skills — and references tools from separate data connection projects.
 
 ### 1. Create a service extension that seeds components
 
@@ -104,17 +104,14 @@ public static class HelloWorldServiceExtensions
             description: "A financial analyst that uses market data tools",
             instructions: "You are a financial analyst assistant..."));
 
+        // Also: IContextSeed, IWorkflowSeed, IEntitySeed
+
         services.AddSingleton<IGuardrailSeed>(new GuardrailSeed(
             name: "investment-disclaimer",
             severity: "high", enabled: true,
             rule: "Never provide buy/sell recommendations..."));
 
-        services.AddSingleton<IWorkflowSeed>(new WorkflowSeed(
-            name: "full-stock-analysis",
-            description: "Quote, history, fundamentals, summary",
-            tags: "finance", content: "## Steps..."));
-
-        // Also: IContextSeed, IEntitySeed, IGoalSeed, ISkillSeed, IMcpConnectionSeed
+        // Also: IGoalSeed, ISkillSeed, IMcpConnectionSeed
 
         // Declare tool dependencies (validated at startup)
         services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
@@ -134,15 +131,15 @@ builder.Services.AddHelloWorldAgent();
 
 All seeded components are saved to disk on first startup (seeds never overwrite manual edits). The tools referenced in the persona (`stock_quote`, `stock_history`, `edgar_company_facts`) come from the `MCP.MarketData` data connection registered separately.
 
-**Agents and data connections are separate projects.** Agents define *how* the LLM behaves (via personas, guardrails, workflows, context, entities, skills). Data connections define *what* it can do (via tools). This separation lets multiple agents share the same tools.
+**Agents and data connections are separate projects.** Agents define *how* the LLM behaves (via personas, context, workflows, entities, guardrails, skills). Data connections define *what* it can do (via tools). This separation lets multiple agents share the same tools.
 
 ## Key Features
 
 - **AG-UI streaming** — real-time token-by-token SSE responses via CopilotKit
 - **Personas** — switch agent behavior with custom system prompts
-- **Guardrails** — policy rules that constrain agent behavior
 - **Workflows** — define multi-step procedures the agent executes
-- **70+ built-in tools** — market data, personas, workflows, guardrails, entities, goals, skills, MCP, system tools, and more
+- **Guardrails** — policy rules that constrain agent behavior
+- **70+ built-in tools** — market data, personas, context, workflows, entities, guardrails, goals, skills, MCP, system tools, and more
 - **MCP connections** — connect to external MCP servers at runtime for additional tools
 - **Scheduled tasks** — Hangfire-powered recurring agent invocations
 - **Autonomous execution** — goal-driven work queue with a Hangfire job that claims, executes, and reports on work items without user input
