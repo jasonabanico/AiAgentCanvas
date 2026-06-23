@@ -56,7 +56,7 @@ CopilotKit renders response
 src/
   AiAgentCanvas.Abstractions/    &lt;-- Shared interfaces (no dependencies)
   AiAgentCanvas.Core/            &lt;-- Orchestration engine
-  AiAgentCanvas.AgentData/       &lt;-- MD-persisted agent data (6 domains)
+  AiAgentCanvas.AgentData/       &lt;-- MD-persisted agent data (7 domains)
   AiAgentCanvas.Skills/          &lt;-- Skill store + MCP connections
   AiAgentCanvas.Security/        &lt;-- Governance + rate limiting
   AiAgentCanvas.Scheduler/       &lt;-- Hangfire scheduled tasks
@@ -89,9 +89,9 @@ src/
       <p>Key dependency rules:</p>
 
       <ul>
-        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>, <code>IToolDependencySeed</code>).</li>
-        <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, and the AG-UI endpoint.</li>
-        <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions.</li>
+        <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>, <code>IToolDependencySeed</code>).</li>
+        <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, the AG-UI endpoint, and inter-agent communication (<code>AgentRegistry</code>, <code>AgentMailbox</code>, handoff tools).</li>
+        <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions. AgentData also includes the Goals domain with a SQLite-backed work queue.</li>
         <li><strong>Custom projects</strong> reference <code>Abstractions</code> (for seed interfaces) and optionally <code>Microsoft.Extensions.AI</code> (for data connection tools) -- they never reference Core, AgentData, or any other framework project.</li>
         <li><strong>Web</strong> references everything and wires it together in <code>Program.cs</code>.</li>
       </ul>
@@ -157,6 +157,22 @@ app.UseAiAgentCanvas();          // CORS + AG-UI endpoint + health check
 app.MapNotificationEndpoints();  // SSE notification stream</code></pre>
 
       <p>Tools are registered as <code>IReadOnlyList&lt;AITool&gt;</code> singleton services. The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services at startup and passes them to the <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>. Additionally, <code>DynamicToolRegistry</code> allows runtime tool registration (used by MCP connections).</p>
+
+      <h2>Inter-Agent Communication</h2>
+
+      <p>AI Agent Canvas supports multi-agent collaboration through three mechanisms registered via <code>AddAiAgentCanvasInterAgentCommunication()</code> in Core:</p>
+
+      <ul>
+        <li><strong>Agent Registry</strong> -- Builds and caches named <code>ChatClientAgent</code> instances from persona definitions. Each persona becomes a resolvable agent with its own instructions. Tools: <code>list_available_agents</code>, <code>get_agent_info</code>.</li>
+        <li><strong>Agent Mailbox</strong> -- SQLite-backed per-agent message queue (<code>agentmailbox.db</code>) for asynchronous communication between agents. Tools: <code>send_to_agent</code>, <code>check_inbox</code>, <code>reply_to_message</code>.</li>
+        <li><strong>Handoff</strong> -- Synchronous delegation: one agent calls <code>handoff_to_agent</code> to run a target agent and get the result back in the same turn.</li>
+      </ul>
+
+      <h2>Autonomous Execution</h2>
+
+      <p>The Scheduler project includes an autonomous execution mode built on Hangfire. When enabled, a recurring <code>AutonomousAgentJob</code> polls the work queue for pending items, claims and executes them via <code>AIAgent.RunAsync</code>, and falls back to picking the next active goal when the queue is empty. Goals and work items are managed through the AgentData Goals domain.</p>
+
+      <p>Tools: <code>start_autonomous_mode</code>, <code>stop_autonomous_mode</code>, <code>get_autonomous_status</code> (on the Scheduler), plus <code>create_goal</code>, <code>list_goals</code>, <code>submit_work_item</code>, etc. (on AgentData).</p>
 
       <h2>Next Steps</h2>
 

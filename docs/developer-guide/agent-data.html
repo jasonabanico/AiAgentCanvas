@@ -12,7 +12,7 @@
     <main class="main-content">
       <h1>Agent Data</h1>
 
-      <p>The <code>AiAgentCanvas.AgentData</code> project provides six markdown-persisted data domains. Each domain follows an identical three-class pattern and gives the LLM tools to manage its own configuration at runtime.</p>
+      <p>The <code>AiAgentCanvas.AgentData</code> project provides seven markdown-persisted data domains. Each domain follows an identical three-class pattern and gives the LLM tools to manage its own configuration at runtime.</p>
 
       <h2>Directory Layout</h2>
 
@@ -26,14 +26,16 @@ agent-data/
 │   ├── guardrails/
 │   ├── entities/
 │   ├── workflows/
-│   └── profiles/
+│   ├── profiles/
+│   └── goals/
 └── user/           &larr; Hand-written MD files (read-only to system, never overwritten)
     ├── personas/
     ├── context/
     ├── guardrails/
     ├── entities/
     ├── workflows/
-    └── profiles/
+    ├── profiles/
+    └── goals/
       </div>
 
       <ul>
@@ -43,7 +45,7 @@ agent-data/
 
       <p>Both directories are created automatically on startup. Each store's <code>ListAll()</code> method merges files from both directories, so the LLM sees user-provided and system-created data together.</p>
 
-      <h2>The Six Domains</h2>
+      <h2>The Seven Domains</h2>
 
       <table>
         <thead>
@@ -90,6 +92,12 @@ agent-data/
             <td><code>agent/profiles/</code></td>
             <td><code>user/profiles/</code></td>
             <td>User preference profiles</td>
+          </tr>
+          <tr>
+            <td>Goals</td>
+            <td><code>agent/goals/</code></td>
+            <td><code>user/goals/</code></td>
+            <td>Goals and objectives for autonomous execution</td>
           </tr>
         </tbody>
       </table>
@@ -293,14 +301,15 @@ public static IServiceCollection AddAiAgentCanvasPersonas(
     return services;
 }</code></pre>
 
-      <p>All six domains are registered individually in <code>Program.cs</code>:</p>
+      <p>All seven domains are registered individually in <code>Program.cs</code>:</p>
 
       <pre><code>builder.Services.AddAiAgentCanvasPersonas();
 builder.Services.AddAiAgentCanvasContext();
 builder.Services.AddAiAgentCanvasWorkflows();
 builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasEntities();
-builder.Services.AddAiAgentCanvasUserProfiles();</code></pre>
+builder.Services.AddAiAgentCanvasUserProfiles();
+builder.Services.AddAiAgentCanvasGoals();</code></pre>
 
       <h2>Other Domains</h2>
 
@@ -345,12 +354,17 @@ builder.Services.AddAiAgentCanvasUserProfiles();</code></pre>
             <td><em>(none)</em></td>
             <td>Executed on demand via <code>WorkflowExecutor</code></td>
           </tr>
+          <tr>
+            <td>Goals</td>
+            <td><em>(none)</em></td>
+            <td>Goals are managed via tools only; used by the autonomous execution job</td>
+          </tr>
         </tbody>
       </table>
 
       <h2>Creating a New Domain</h2>
 
-      <p>To add a seventh agent data domain, follow the same pattern:</p>
+      <p>To add a new agent data domain, follow the same pattern:</p>
 
       <ol>
         <li>Create a subdirectory under <code>AiAgentCanvas.AgentData/</code> (e.g., <code>Templates/</code>)</li>

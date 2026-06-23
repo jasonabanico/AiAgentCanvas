@@ -12,11 +12,11 @@
     <main class="main-content">
       <h1>Adding Custom Agents</h1>
 
-      <p>A custom agent in AI Agent Canvas is a self-contained project under <code>src/Custom/</code> that seeds all the components the agent needs to function: <strong>persona</strong>, <strong>guardrails</strong>, <strong>workflows</strong>, <strong>context</strong>, <strong>entities</strong>, <strong>skills</strong>, and <strong>MCP connections</strong>. Agents and data connections are separate projects: agents define <em>how</em> the LLM behaves, data connections define <em>what</em> it can do.</p>
+      <p>A custom agent in AI Agent Canvas is a self-contained project under <code>src/Custom/</code> that seeds all the components the agent needs to function: <strong>persona</strong>, <strong>guardrails</strong>, <strong>workflows</strong>, <strong>context</strong>, <strong>entities</strong>, <strong>goals</strong>, <strong>skills</strong>, and <strong>MCP connections</strong>. Agents and data connections are separate projects: agents define <em>how</em> the LLM behaves, data connections define <em>what</em> it can do.</p>
 
       <h2>How It Works</h2>
 
-      <p>Data connections (like <code>MCP.MarketData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
+      <p>Data connections (like <code>MCP.MarketData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
 
       <h2>Step-by-Step Guide</h2>
 
@@ -263,6 +263,12 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>McpConnectionSeed</code></td>
             <td>name, endpoint, transport</td>
             <td>In-memory (connected at startup)</td>
+          </tr>
+          <tr>
+            <td><code>IGoalSeed</code></td>
+            <td><code>GoalSeed</code></td>
+            <td>name, description, priority, acceptanceCriteria, assignedAgent, content</td>
+            <td><code>agent-data/agent/goals/*.md</code></td>
           </tr>
           <tr>
             <td><code>IToolDependencySeed</code></td>

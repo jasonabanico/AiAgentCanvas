@@ -134,6 +134,142 @@ market briefing</code></pre>
 
       <p><strong>Warning:</strong> The Hangfire dashboard is exposed without authentication by default. In production, configure authentication middleware to restrict access. See the <a href="https://docs.hangfire.io/en/latest/configuration/using-dashboard.html#configuring-authorization">Hangfire documentation</a> for details.</p>
 
+      <h2>Autonomous Execution Mode</h2>
+
+      <p>Beyond scheduled tasks, AI Agent Canvas supports fully autonomous execution. In this mode, the agent works independently on goals without waiting for user input.</p>
+
+      <h3>How It Works</h3>
+
+      <ol>
+        <li><strong>Create goals</strong> -- Define what the agent should achieve using goal management tools or seed goals from custom agents.</li>
+        <li><strong>Enable autonomous mode</strong> -- Ask the agent: <em>"Start autonomous mode"</em>. This registers a Hangfire recurring job.</li>
+        <li><strong>The agent works autonomously</strong> -- The <code>AutonomousAgentJob</code> polls the work queue, claims items, executes them via <code>AIAgent.RunAsync</code>, and saves results. When the queue is empty, it picks the next active goal and creates work items for it.</li>
+        <li><strong>Monitor or stop</strong> -- Ask <em>"Get autonomous status"</em> to check, or <em>"Stop autonomous mode"</em> to disable it.</li>
+      </ol>
+
+      <h3>Goals and Work Queue</h3>
+
+      <p>Goals are markdown-persisted definitions that describe what the agent should accomplish. Each goal has a name, description, priority (critical/high/medium/low), acceptance criteria, and an optional assigned agent.</p>
+
+      <pre><code>Create a goal called "Daily Market Report" with priority high and description
+"Generate a comprehensive market analysis report for the top 10 tech stocks every morning"</code></pre>
+
+      <p>The work queue is a SQLite-backed transient queue (<code>workqueue.db</code>) where individual work items are submitted, claimed, and completed. The autonomous agent job processes items in priority order.</p>
+
+      <pre><code>Submit a work item: "Get stock quotes for AAPL, MSFT, and GOOGL and summarize trends"
+List the work queue
+Get queue stats</code></pre>
+
+      <h3>Goal and Work Queue Tools</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>create_goal</code></td>
+            <td>Create a new goal with priority and acceptance criteria</td>
+          </tr>
+          <tr>
+            <td><code>list_goals</code></td>
+            <td>List all goals, optionally filtered by status</td>
+          </tr>
+          <tr>
+            <td><code>read_goal</code></td>
+            <td>Read the full details of a goal</td>
+          </tr>
+          <tr>
+            <td><code>update_goal_status</code></td>
+            <td>Update a goal's status (active/completed/paused/cancelled)</td>
+          </tr>
+          <tr>
+            <td><code>delete_goal</code></td>
+            <td>Delete a goal</td>
+          </tr>
+          <tr>
+            <td><code>submit_work_item</code></td>
+            <td>Submit a work item to the queue</td>
+          </tr>
+          <tr>
+            <td><code>list_work_queue</code></td>
+            <td>List items in the work queue</td>
+          </tr>
+          <tr>
+            <td><code>cancel_work_item</code></td>
+            <td>Cancel a pending work item</td>
+          </tr>
+          <tr>
+            <td><code>get_queue_stats</code></td>
+            <td>Get work queue statistics</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Autonomous Mode Tools</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>start_autonomous_mode</code></td>
+            <td>Enable autonomous execution and register the Hangfire recurring job</td>
+          </tr>
+          <tr>
+            <td><code>stop_autonomous_mode</code></td>
+            <td>Disable autonomous execution and remove the recurring job</td>
+          </tr>
+          <tr>
+            <td><code>get_autonomous_status</code></td>
+            <td>Check whether autonomous mode is currently enabled</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration</h3>
+
+      <p>Autonomous execution is disabled by default. The options are:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Enabled</code></td>
+            <td><code>false</code></td>
+            <td>Whether autonomous mode is active</td>
+          </tr>
+          <tr>
+            <td><code>MaxIterationsPerRun</code></td>
+            <td><code>5</code></td>
+            <td>Maximum work items to process per job run</td>
+          </tr>
+          <tr>
+            <td><code>PollIntervalSeconds</code></td>
+            <td><code>30</code></td>
+            <td>Seconds between polls when queue is empty</td>
+          </tr>
+          <tr>
+            <td><code>CronExpression</code></td>
+            <td><code>*/30 * * * * *</code></td>
+            <td>Hangfire cron schedule for the recurring job</td>
+          </tr>
+        </tbody>
+      </table>
+
       <h2>Tips</h2>
 
       <ul>

@@ -103,6 +103,10 @@ src/
             <td><code>IToolDependencySeed.cs</code></td>
             <td>Seed interface for declaring required tools, validated at startup</td>
           </tr>
+          <tr>
+            <td><code>IGoalSeed.cs</code></td>
+            <td>Seed interface for shipping goals from custom agents</td>
+          </tr>
         </tbody>
       </table>
 
@@ -150,14 +154,34 @@ src/
             <td><code>Configuration/AIFoundryOptions.cs</code></td>
             <td>Options: Endpoint, Key, DeploymentName, etc.</td>
           </tr>
+          <tr>
+            <td><code>Agents/AgentRegistry.cs</code></td>
+            <td>Builds and caches named agents from persona definitions</td>
+          </tr>
+          <tr>
+            <td><code>Agents/AgentMailbox.cs</code></td>
+            <td>SQLite-backed per-agent message queue (<code>agentmailbox.db</code>)</td>
+          </tr>
+          <tr>
+            <td><code>Agents/HandoffToolProvider.cs</code></td>
+            <td>Synchronous agent-to-agent delegation via <code>handoff_to_agent</code></td>
+          </tr>
+          <tr>
+            <td><code>Agents/AgentRegistryToolProvider.cs</code></td>
+            <td>Tools: <code>list_available_agents</code>, <code>get_agent_info</code></td>
+          </tr>
+          <tr>
+            <td><code>Agents/AgentMailboxToolProvider.cs</code></td>
+            <td>Tools: <code>send_to_agent</code>, <code>check_inbox</code>, <code>reply_to_message</code></td>
+          </tr>
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Azure.AI.OpenAI</p>
+      <p><strong>Dependencies:</strong> Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Azure.AI.OpenAI, Microsoft.Data.Sqlite</p>
 
       <h3>AiAgentCanvas.AgentData</h3>
 
-      <p>Six markdown-persisted data domains. Each domain follows an identical pattern: Store + ToolProvider + AIContextProvider.</p>
+      <p>Seven markdown-persisted data domains. Each domain follows an identical pattern: Store + ToolProvider + AIContextProvider. The Goals domain also includes a SQLite-backed work queue for autonomous execution.</p>
 
       <p>Each domain reads from two directories under <code>agent-data/</code>: <code>agent/</code> (system-written, including seeds and tool-created content) and <code>user/</code> (hand-written markdown files, read-only to the system).</p>
 
@@ -207,6 +231,12 @@ src/
             <td><code>agent-data/agent/profiles/</code></td>
             <td><code>agent-data/user/profiles/</code></td>
           </tr>
+          <tr>
+            <td><code>Goals/</code></td>
+            <td>Goals and work queue for autonomous execution</td>
+            <td><code>agent-data/agent/goals/</code></td>
+            <td><code>agent-data/user/goals/</code></td>
+          </tr>
         </tbody>
       </table>
 
@@ -220,12 +250,12 @@ src/
         <tbody>
           <tr>
             <td><code>AgentDataServiceExtensions.cs</code></td>
-            <td>Six <code>Add*()</code> methods, one per domain</td>
+            <td>Seven <code>Add*()</code> methods, one per domain</td>
           </tr>
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Core, Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI</p>
+      <p><strong>Dependencies:</strong> Core, Abstractions, Microsoft.Agents.AI, Microsoft.Extensions.AI, Microsoft.Data.Sqlite</p>
 
       <h3>AiAgentCanvas.Skills</h3>
 
@@ -307,7 +337,7 @@ src/
 
       <h3>AiAgentCanvas.Scheduler</h3>
 
-      <p>Hangfire-based scheduled task management with SQLite storage.</p>
+      <p>Hangfire-based scheduled task management with SQLite storage. Also includes the autonomous execution engine.</p>
 
       <table>
         <thead>
@@ -321,10 +351,18 @@ src/
             <td><code>SchedulerServiceExtensions.cs</code></td>
             <td><code>AddAiAgentCanvasScheduler()</code></td>
           </tr>
+          <tr>
+            <td><code>AutonomousAgentJob.cs</code></td>
+            <td>Hangfire recurring job that polls the work queue, claims items, and executes them via <code>AIAgent.RunAsync</code></td>
+          </tr>
+          <tr>
+            <td><code>AutonomousExecutionOptions.cs</code></td>
+            <td>Config: <code>Enabled</code>, <code>MaxIterationsPerRun</code>, <code>PollIntervalSeconds</code>, <code>CronExpression</code></td>
+          </tr>
         </tbody>
       </table>
 
-      <p><strong>Dependencies:</strong> Hangfire, Hangfire.Storage.SQLite</p>
+      <p><strong>Dependencies:</strong> Hangfire, Hangfire.Storage.SQLite, AgentData</p>
 
       <h3>AiAgentCanvas.Notifications</h3>
 

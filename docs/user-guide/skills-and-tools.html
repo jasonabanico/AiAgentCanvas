@@ -146,11 +146,58 @@ Install the "financial-report" skill</code></pre>
 
       <ol>
         <li><strong>Built-in tools</strong> -- Compiled into the application (MarketData tools).</li>
-        <li><strong>Agent tools</strong> -- Persona, workflow, entity, scheduling, guardrail, and profile management tools.</li>
+        <li><strong>Agent data tools</strong> -- Persona, workflow, entity, scheduling, guardrail, profile, and goal management tools.</li>
+        <li><strong>Inter-agent tools</strong> -- Agent registry, mailbox, and handoff tools for multi-agent collaboration.</li>
+        <li><strong>Autonomous execution tools</strong> -- Start/stop autonomous mode, manage the work queue.</li>
         <li><strong>Dynamic MCP tools</strong> -- Registered at runtime when you connect an MCP server.</li>
       </ol>
 
       <p>All tools are available to the agent simultaneously. The agent selects the appropriate tool based on your request.</p>
+
+      <h2>Inter-Agent Communication Tools</h2>
+
+      <p>AI Agent Canvas supports multi-agent collaboration. Each persona becomes a named agent that can be messaged, delegated to, or handed off to.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>list_available_agents</code></td>
+            <td>List all agents available for handoff or messaging (built from personas).</td>
+          </tr>
+          <tr>
+            <td><code>get_agent_info</code></td>
+            <td>Get details about a specific agent.</td>
+          </tr>
+          <tr>
+            <td><code>handoff_to_agent</code></td>
+            <td>Delegate a task to another agent synchronously and get the result back.</td>
+          </tr>
+          <tr>
+            <td><code>send_to_agent</code></td>
+            <td>Send an asynchronous message to another agent's mailbox.</td>
+          </tr>
+          <tr>
+            <td><code>check_inbox</code></td>
+            <td>Check for pending messages from other agents.</td>
+          </tr>
+          <tr>
+            <td><code>reply_to_message</code></td>
+            <td>Reply to a message from another agent.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Example usage:</p>
+
+      <pre><code>List available agents
+Hand off to the financial-analyst agent: "Analyze AAPL earnings for Q4"
+Send a message to the code-reviewer agent: "Please review the latest changes"</code></pre>
 
       <h2>Tips</h2>
 
