@@ -32,6 +32,7 @@ public static class HelloWorldServiceExtensions
         services.AddSingleton<IContextSeed>(new ContextSeed(
             topic: "financial-analysis-methodology",
             tags: "finance,methodology",
+            type: "fact",
             content: """
                 ## Financial Analysis Reference
 

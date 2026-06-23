@@ -94,6 +94,7 @@ public static class MyAgentServiceExtensions
         services.AddSingleton&lt;IContextSeed&gt;(new ContextSeed(
             topic: "contoso-return-policy",
             tags: "support,policy",
+            type: "fact",
             content: "Contoso offers 30-day returns on all electronics..."));
 
         // Entity: domain schema
@@ -231,7 +232,7 @@ builder.Services.AddMyAgent();</code></pre>
           <tr>
             <td><code>IContextSeed</code></td>
             <td><code>ContextSeed</code></td>
-            <td>topic, tags, content</td>
+            <td>topic, type, tags, content</td>
             <td><code>agent-data/agent/context/*.md</code></td>
           </tr>
           <tr>

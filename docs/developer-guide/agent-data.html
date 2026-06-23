@@ -67,7 +67,7 @@ agent-data/
             <td>Context</td>
             <td><code>agent/context/</code></td>
             <td><code>user/context/</code></td>
-            <td>Persistent context entries</td>
+            <td>Typed persistent context (fact, reference, decision, feedback)</td>
           </tr>
           <tr>
             <td>Workflows</td>
@@ -306,9 +306,9 @@ public static IServiceCollection AddAiAgentCanvasPersonas(
       <pre><code>builder.Services.AddAiAgentCanvasPersonas();
 builder.Services.AddAiAgentCanvasContext();
 builder.Services.AddAiAgentCanvasWorkflows();
-builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasEntities();
 builder.Services.AddAiAgentCanvasUserProfiles();
+builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasGoals();</code></pre>
 
       <h2>Other Domains</h2>
@@ -332,7 +332,7 @@ builder.Services.AddAiAgentCanvasGoals();</code></pre>
           <tr>
             <td>Context</td>
             <td><code>PersistentContextProvider</code></td>
-            <td>All persistent context entries</td>
+            <td>All persistent context entries, grouped by type (fact, reference, decision, feedback)</td>
           </tr>
           <tr>
             <td>Guardrails</td>
@@ -361,6 +361,54 @@ builder.Services.AddAiAgentCanvasGoals();</code></pre>
           </tr>
         </tbody>
       </table>
+
+      <h2>Context Types</h2>
+
+      <p>Context entries support an optional <code>type</code> field in their YAML frontmatter that categorizes the knowledge. When injected into the system prompt, entries are grouped by type for clarity.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Purpose</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>fact</code></td>
+            <td>Domain knowledge -- things that are true</td>
+            <td>"Our fiscal year starts in April", "The main database is Postgres 16"</td>
+          </tr>
+          <tr>
+            <td><code>reference</code></td>
+            <td>Pointers to external systems and resources</td>
+            <td>"Bug tracker is at linear.app/project-X", "Oncall dashboard at grafana.internal/api-latency"</td>
+          </tr>
+          <tr>
+            <td><code>decision</code></td>
+            <td>Past choices with rationale</td>
+            <td>"Chose GraphQL over REST because clients need flexible queries"</td>
+          </tr>
+          <tr>
+            <td><code>feedback</code></td>
+            <td>Learned behavioral adjustments</td>
+            <td>"User prefers tables over bullet points", "Always include source citations"</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The type field is free-form -- you can use any string, not just the four conventions above. Entries without a type are grouped as "General". When injected into the system prompt, entries are grouped by their type label.</p>
+
+      <h3>File Format</h3>
+
+      <pre><code>---
+topic: fiscal-year-schedule
+type: fact
+tags: finance,calendar
+---
+Our fiscal year runs April 1 through March 31.
+Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar.</code></pre>
 
       <h2>Creating a New Domain</h2>
 

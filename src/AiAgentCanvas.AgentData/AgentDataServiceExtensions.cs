@@ -59,7 +59,7 @@ public static class AgentDataServiceExtensions
             foreach (var seed in sp.GetServices<IContextSeed>())
             {
                 if (store.Get(seed.Topic) is null)
-                    store.Save(seed.Topic, seed.Tags, seed.Content);
+                    store.Save(seed.Topic, seed.Type, seed.Tags, seed.Content);
             }
             return new PersistentContextProvider(store);
         });

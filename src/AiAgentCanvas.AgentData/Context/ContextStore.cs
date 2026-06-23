@@ -6,6 +6,7 @@ namespace AiAgentCanvas.AgentData.Context;
 public sealed class ContextEntry
 {
     public string Topic { get; set; } = string.Empty;
+    public string? Type { get; set; }
     public string? Tags { get; set; }
     public string Content { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
@@ -36,15 +37,19 @@ public sealed class ContextStore
         _readDirectories = dirs.ToArray();
     }
 
-    public void Save(string topic, string? tags, string content)
+    public void Save(string topic, string? type, string? tags, string content)
     {
+        var frontmatter = new Dictionary<string, string>
+        {
+            ["topic"] = topic,
+            ["tags"] = tags ?? "",
+        };
+        if (!string.IsNullOrWhiteSpace(type))
+            frontmatter["type"] = type;
+
         MarkdownFile.Write(
             Path.Combine(_directory, MarkdownFile.SanitizeFileName(topic) + ".md"),
-            new Dictionary<string, string>
-            {
-                ["topic"] = topic,
-                ["tags"] = tags ?? "",
-            },
+            frontmatter,
             content);
     }
 
@@ -64,6 +69,13 @@ public sealed class ContextStore
             .ToList();
     }
 
+    public List<ContextEntry> ListByType(string type)
+    {
+        return ListAll()
+            .Where(e => string.Equals(e.Type, type, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     public string LoadAllContent()
     {
         var entries = ListAll();
@@ -71,10 +83,22 @@ public sealed class ContextStore
 
         var sb = new StringBuilder();
         sb.AppendLine("\n## Persistent Context");
-        foreach (var entry in entries)
+
+        var grouped = entries
+            .GroupBy(e => string.IsNullOrWhiteSpace(e.Type) ? "general" : e.Type.ToLowerInvariant())
+            .OrderBy(g => g.Key);
+
+        foreach (var group in grouped)
         {
-            sb.AppendLine($"\n### {entry.Topic}");
-            sb.AppendLine(entry.Content);
+            var label = group.Key == "general"
+                ? "General"
+                : char.ToUpperInvariant(group.Key[0]) + group.Key[1..];
+            sb.AppendLine($"\n### {label}");
+            foreach (var entry in group)
+            {
+                sb.AppendLine($"\n#### {entry.Topic}");
+                sb.AppendLine(entry.Content);
+            }
         }
         return sb.ToString();
     }
@@ -95,6 +119,7 @@ public sealed class ContextStore
         return new ContextEntry
         {
             Topic = topic,
+            Type = file.Get("type"),
             Tags = file.Get("tags"),
             Content = file.Body,
             FilePath = file.FilePath,
