@@ -253,6 +253,12 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>agent-data/agent/entities/*.md</code></td>
           </tr>
           <tr>
+            <td><code>IGoalSeed</code></td>
+            <td><code>GoalSeed</code></td>
+            <td>name, description, priority, acceptanceCriteria, assignedAgent, content</td>
+            <td><code>agent-data/agent/goals/*.md</code></td>
+          </tr>
+          <tr>
             <td><code>ISkillSeed</code></td>
             <td><code>SkillSeed</code></td>
             <td>name, description, promptTemplate</td>
@@ -263,12 +269,6 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>McpConnectionSeed</code></td>
             <td>name, endpoint, transport</td>
             <td>In-memory (connected at startup)</td>
-          </tr>
-          <tr>
-            <td><code>IGoalSeed</code></td>
-            <td><code>GoalSeed</code></td>
-            <td>name, description, priority, acceptanceCriteria, assignedAgent, content</td>
-            <td><code>agent-data/agent/goals/*.md</code></td>
           </tr>
           <tr>
             <td><code>IToolDependencySeed</code></td>
