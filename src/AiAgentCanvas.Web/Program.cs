@@ -40,6 +40,7 @@ builder.Services.AddAiAgentCanvasWorkflows();
 builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasEntities();
 builder.Services.AddAiAgentCanvasUserProfiles();
+builder.Services.AddAiAgentCanvasGoals();
 
 builder.Services.AddSqliteChatHistory();
 

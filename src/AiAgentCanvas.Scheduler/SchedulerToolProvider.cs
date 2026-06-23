@@ -8,15 +8,18 @@ namespace AiAgentCanvas.Scheduler;
 public sealed class SchedulerToolProvider
 {
     private readonly ScheduledTaskStore _store;
+    private readonly AutonomousExecutionOptions _autonomousOptions;
     private readonly IRecurringJobManager _recurringJobManager;
     private readonly IBackgroundJobClient _backgroundJobClient;
 
     public SchedulerToolProvider(
         ScheduledTaskStore store,
+        AutonomousExecutionOptions autonomousOptions,
         IRecurringJobManager recurringJobManager,
         IBackgroundJobClient backgroundJobClient)
     {
         _store = store;
+        _autonomousOptions = autonomousOptions;
         _recurringJobManager = recurringJobManager;
         _backgroundJobClient = backgroundJobClient;
     }
@@ -35,6 +38,12 @@ public sealed class SchedulerToolProvider
                 "Remove a scheduled task by ID"),
             AIFunctionFactory.Create(GetTaskResults, "get_task_results",
                 "Get recent results from completed scheduled tasks"),
+            AIFunctionFactory.Create(StartAutonomousMode, "start_autonomous_mode",
+                "Enable autonomous execution mode -- the agent will poll for work items and goals and execute them independently"),
+            AIFunctionFactory.Create(StopAutonomousMode, "stop_autonomous_mode",
+                "Disable autonomous execution mode"),
+            AIFunctionFactory.Create(GetAutonomousStatus, "get_autonomous_status",
+                "Check whether autonomous execution mode is currently enabled"),
         ];
     }
 
@@ -111,5 +120,42 @@ public sealed class SchedulerToolProvider
     {
         var results = _store.GetResults(limit);
         return JsonSerializer.Serialize(new { count = results.Count, results }, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    [Description("Enable autonomous execution mode -- the agent will poll for work items and goals and execute them independently")]
+    private string StartAutonomousMode()
+    {
+        _autonomousOptions.Enabled = true;
+        _recurringJobManager.AddOrUpdate<AutonomousAgentJob>(
+            "autonomous-execution",
+            job => job.ExecuteAsync(),
+            _autonomousOptions.CronExpression);
+
+        return JsonSerializer.Serialize(new
+        {
+            status = "enabled",
+            pollInterval = _autonomousOptions.CronExpression,
+            maxIterationsPerRun = _autonomousOptions.MaxIterationsPerRun,
+        });
+    }
+
+    [Description("Disable autonomous execution mode")]
+    private string StopAutonomousMode()
+    {
+        _autonomousOptions.Enabled = false;
+        _recurringJobManager.RemoveIfExists("autonomous-execution");
+
+        return JsonSerializer.Serialize(new { status = "disabled" });
+    }
+
+    [Description("Check whether autonomous execution mode is currently enabled")]
+    private string GetAutonomousStatus()
+    {
+        return JsonSerializer.Serialize(new
+        {
+            enabled = _autonomousOptions.Enabled,
+            maxIterationsPerRun = _autonomousOptions.MaxIterationsPerRun,
+            pollInterval = _autonomousOptions.CronExpression,
+        });
     }
 }

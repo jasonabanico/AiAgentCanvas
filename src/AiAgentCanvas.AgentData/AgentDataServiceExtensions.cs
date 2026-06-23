@@ -1,6 +1,7 @@
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.AgentData.Context;
 using AiAgentCanvas.AgentData.Entities;
+using AiAgentCanvas.AgentData.Goals;
 using AiAgentCanvas.AgentData.Guardrails;
 using AiAgentCanvas.AgentData.Personas;
 using AiAgentCanvas.AgentData.Profiles;
@@ -145,6 +146,33 @@ public static class AgentDataServiceExtensions
             sp.GetRequiredService<UserProfileToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
             new UserProfileContextProvider(sp.GetRequiredService<UserProfileStore>()));
+        return services;
+    }
+
+    public static IServiceCollection AddAiAgentCanvasGoals(
+        this IServiceCollection services,
+        string rootDirectory = DefaultRoot,
+        string workQueueConnectionString = "Data Source=workqueue.db")
+    {
+        var goalStore = new GoalStore(
+            Path.Combine(rootDirectory, "agent", "goals"),
+            Path.Combine(rootDirectory, "user", "goals"));
+        services.AddSingleton(goalStore);
+        services.AddSingleton(new WorkQueueStore(workQueueConnectionString));
+        services.AddSingleton<GoalToolProvider>();
+        services.AddSingleton<WorkQueueToolProvider>();
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+        {
+            foreach (var seed in sp.GetServices<IGoalSeed>())
+            {
+                if (goalStore.Get(seed.Name) is null)
+                    goalStore.Save(seed.Name, seed.Description, seed.Priority, "active",
+                        seed.AcceptanceCriteria, seed.AssignedAgent, seed.Content);
+            }
+            return sp.GetRequiredService<GoalToolProvider>().GetTools();
+        });
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<WorkQueueToolProvider>().GetTools());
         return services;
     }
 }
