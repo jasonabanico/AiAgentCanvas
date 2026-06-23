@@ -15,12 +15,26 @@ public sealed class GuardrailEntry
 public sealed class GuardrailStore
 {
     private readonly string _directory;
+    private readonly string _userDirectory;
+    private readonly string[] _readDirectories;
 
-    public GuardrailStore(string directory)
+    public GuardrailStore(string directory, string userDirectory, params string[] additionalDirectories)
     {
         _directory = directory;
+        _userDirectory = userDirectory;
         if (!Directory.Exists(_directory))
             Directory.CreateDirectory(_directory);
+        if (!Directory.Exists(_userDirectory))
+            Directory.CreateDirectory(_userDirectory);
+
+        var dirs = new List<string> { directory, userDirectory };
+        foreach (var dir in additionalDirectories)
+        {
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            dirs.Add(dir);
+        }
+        _readDirectories = dirs.ToArray();
     }
 
     public void Save(string name, string severity, bool enabled, string rule)
@@ -44,7 +58,8 @@ public sealed class GuardrailStore
 
     public List<GuardrailEntry> ListAll()
     {
-        return MarkdownFile.LoadAll(_directory)
+        return _readDirectories
+            .SelectMany(dir => MarkdownFile.LoadAll(dir))
             .Select(ToEntry)
             .Where(e => e is not null)
             .Cast<GuardrailEntry>()

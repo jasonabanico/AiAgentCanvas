@@ -15,14 +15,28 @@ public sealed class UserProfile
 public sealed class UserProfileStore
 {
     private readonly string _directory;
+    private readonly string _userDirectory;
+    private readonly string[] _readDirectories;
     private readonly string _activeFilePath;
 
-    public UserProfileStore(string directory)
+    public UserProfileStore(string directory, string userDirectory, params string[] additionalDirectories)
     {
         _directory = directory;
+        _userDirectory = userDirectory;
         _activeFilePath = Path.Combine(_directory, ".active");
         if (!Directory.Exists(_directory))
             Directory.CreateDirectory(_directory);
+        if (!Directory.Exists(_userDirectory))
+            Directory.CreateDirectory(_userDirectory);
+
+        var dirs = new List<string> { directory, userDirectory };
+        foreach (var dir in additionalDirectories)
+        {
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            dirs.Add(dir);
+        }
+        _readDirectories = dirs.ToArray();
     }
 
     public void Save(string name, string role, string? timezone, string content)
@@ -72,7 +86,8 @@ public sealed class UserProfileStore
 
     public List<UserProfile> ListAll()
     {
-        return MarkdownFile.LoadAll(_directory)
+        return _readDirectories
+            .SelectMany(dir => MarkdownFile.LoadAll(dir))
             .Select(ToProfile)
             .Where(p => p is not null)
             .Cast<UserProfile>()

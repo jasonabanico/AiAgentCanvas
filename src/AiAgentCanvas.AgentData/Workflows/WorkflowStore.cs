@@ -22,12 +22,26 @@ public sealed class WorkflowDefinition
 public sealed class WorkflowStore
 {
     private readonly string _directory;
+    private readonly string _userDirectory;
+    private readonly string[] _readDirectories;
 
-    public WorkflowStore(string directory)
+    public WorkflowStore(string directory, string userDirectory, params string[] additionalDirectories)
     {
         _directory = directory;
+        _userDirectory = userDirectory;
         if (!Directory.Exists(_directory))
             Directory.CreateDirectory(_directory);
+        if (!Directory.Exists(_userDirectory))
+            Directory.CreateDirectory(_userDirectory);
+
+        var dirs = new List<string> { directory, userDirectory };
+        foreach (var dir in additionalDirectories)
+        {
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            dirs.Add(dir);
+        }
+        _readDirectories = dirs.ToArray();
     }
 
     public void Save(string name, string description, string? tags, string content)
@@ -51,7 +65,8 @@ public sealed class WorkflowStore
 
     public List<WorkflowDefinition> ListAll()
     {
-        return MarkdownFile.LoadAll(_directory)
+        return _readDirectories
+            .SelectMany(dir => MarkdownFile.LoadAll(dir))
             .Select(ToWorkflow)
             .Where(w => w is not null)
             .Cast<WorkflowDefinition>()

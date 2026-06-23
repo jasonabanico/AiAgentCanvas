@@ -14,11 +14,15 @@ namespace AiAgentCanvas.AgentData;
 
 public static class AgentDataServiceExtensions
 {
+    private const string DefaultRoot = "./agent-data";
+
     public static IServiceCollection AddAiAgentCanvasPersonas(
         this IServiceCollection services,
-        string directory = "./agent-data/personas")
+        string rootDirectory = DefaultRoot)
     {
-        var store = new PersonaStore(directory);
+        var store = new PersonaStore(
+            Path.Combine(rootDirectory, "agent", "personas"),
+            Path.Combine(rootDirectory, "user", "personas"));
         services.AddSingleton(store);
         services.AddSingleton<PersonaToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
@@ -40,9 +44,11 @@ public static class AgentDataServiceExtensions
 
     public static IServiceCollection AddAiAgentCanvasContext(
         this IServiceCollection services,
-        string directory = "./agent-data/context")
+        string rootDirectory = DefaultRoot)
     {
-        var store = new ContextStore(directory);
+        var store = new ContextStore(
+            Path.Combine(rootDirectory, "agent", "context"),
+            Path.Combine(rootDirectory, "user", "context"));
         services.AddSingleton(store);
         services.AddSingleton<ContextToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
@@ -61,9 +67,11 @@ public static class AgentDataServiceExtensions
 
     public static IServiceCollection AddAiAgentCanvasWorkflows(
         this IServiceCollection services,
-        string directory = "./agent-data/workflows")
+        string rootDirectory = DefaultRoot)
     {
-        var store = new WorkflowStore(directory);
+        var store = new WorkflowStore(
+            Path.Combine(rootDirectory, "agent", "workflows"),
+            Path.Combine(rootDirectory, "user", "workflows"));
         services.AddSingleton(store);
         services.AddSingleton<WorkflowExecutor>();
         services.AddSingleton<WorkflowToolProvider>();
@@ -81,9 +89,11 @@ public static class AgentDataServiceExtensions
 
     public static IServiceCollection AddAiAgentCanvasGuardrails(
         this IServiceCollection services,
-        string directory = "./agent-data/guardrails")
+        string rootDirectory = DefaultRoot)
     {
-        var store = new GuardrailStore(directory);
+        var store = new GuardrailStore(
+            Path.Combine(rootDirectory, "agent", "guardrails"),
+            Path.Combine(rootDirectory, "user", "guardrails"));
         services.AddSingleton(store);
         services.AddSingleton<GuardrailToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
@@ -102,9 +112,11 @@ public static class AgentDataServiceExtensions
 
     public static IServiceCollection AddAiAgentCanvasEntities(
         this IServiceCollection services,
-        string directory = "./agent-data/entities")
+        string rootDirectory = DefaultRoot)
     {
-        var store = new EntityStore(directory);
+        var store = new EntityStore(
+            Path.Combine(rootDirectory, "agent", "entities"),
+            Path.Combine(rootDirectory, "user", "entities"));
         services.AddSingleton(store);
         services.AddSingleton<EntityToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
@@ -123,9 +135,11 @@ public static class AgentDataServiceExtensions
 
     public static IServiceCollection AddAiAgentCanvasUserProfiles(
         this IServiceCollection services,
-        string directory = "./agent-data/profiles")
+        string rootDirectory = DefaultRoot)
     {
-        services.AddSingleton(new UserProfileStore(directory));
+        services.AddSingleton(new UserProfileStore(
+            Path.Combine(rootDirectory, "agent", "profiles"),
+            Path.Combine(rootDirectory, "user", "profiles")));
         services.AddSingleton<UserProfileToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<UserProfileToolProvider>().GetTools());
