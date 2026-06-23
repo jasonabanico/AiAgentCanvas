@@ -1,6 +1,6 @@
 # [AI Agent Canvas](https://jasonabanico.github.io/AiAgentCanvas/)
 
-A multi-agent enterprise copilot framework built with .NET 9, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry.
+A multi-agent enterprise copilot framework built with .NET 9, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry — with inter-agent communication, autonomous goal execution, and runtime governance.
 
 ## Architecture
 
@@ -9,10 +9,10 @@ Frontend (Next.js + CopilotKit)
         │ AG-UI Protocol (SSE)
         ▼
 ASP.NET Core Backend
-├── Core ──────────── MAF ChatClientAgent, AG-UI endpoint, DI
-├── AgentData ─────── personas, workflows, guardrails, entities
+├── Core ──────────── MAF ChatClientAgent, AG-UI endpoint, inter-agent comms
+├── AgentData ─────── personas, workflows, guardrails, entities, goals
 ├── Skills ────────── skill registry, MCP connections
-├── Scheduler ─────── Hangfire-based recurring tasks
+├── Scheduler ─────── Hangfire tasks + autonomous execution engine
 ├── Security ──────── governance, prompt injection detection
 ├── SystemTools ───── file I/O, shell execution (sandboxed)
 └── Custom/ ───────── your agents, tools, and data connections
@@ -26,10 +26,10 @@ Azure AI Foundry (AzureOpenAIClient)
 ```
 src/
 ├── AiAgentCanvas.Abstractions/     # Shared interfaces and models
-├── AiAgentCanvas.Core/             # MAF agent, AG-UI endpoint, DI extensions
-├── AiAgentCanvas.AgentData/        # Personas, workflows, guardrails, entities, context, profiles
+├── AiAgentCanvas.Core/             # MAF agent, AG-UI endpoint, agent registry, mailbox, handoff
+├── AiAgentCanvas.AgentData/        # Personas, workflows, guardrails, entities, context, profiles, goals
 ├── AiAgentCanvas.Skills/           # Skill store, MCP connections, skill authoring
-├── AiAgentCanvas.Scheduler/        # Hangfire scheduled tasks
+├── AiAgentCanvas.Scheduler/        # Hangfire scheduled tasks + autonomous execution
 ├── AiAgentCanvas.Security/         # Agent Governance Toolkit integration
 ├── AiAgentCanvas.SystemTools/      # File and shell tools (sandboxed)
 ├── AiAgentCanvas.Notifications/    # Notification sink
@@ -87,7 +87,7 @@ Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and
 
 ## Adding a Custom Agent
 
-See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, guardrails, workflows, context, entities, and skills — and references tools from separate data connection projects.
+See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, guardrails, workflows, context, entities, goals, and skills — and references tools from separate data connection projects.
 
 ### 1. Create a service extension that seeds components
 
@@ -114,7 +114,7 @@ public static class HelloWorldServiceExtensions
             description: "Quote, history, fundamentals, summary",
             tags: "finance", content: "## Steps..."));
 
-        // Also: IContextSeed, IEntitySeed, ISkillSeed, IMcpConnectionSeed
+        // Also: IContextSeed, IEntitySeed, IGoalSeed, ISkillSeed, IMcpConnectionSeed
 
         // Declare tool dependencies (validated at startup)
         services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
@@ -138,13 +138,15 @@ All seeded components are saved to disk on first startup (seeds never overwrite 
 
 ## Key Features
 
-- **59 built-in tools** — market data, system tools, scheduling, personas, workflows, guardrails, entities, skills, MCP, file I/O
-- **AG-UI streaming** — real-time SSE responses via CopilotKit
+- **AG-UI streaming** — real-time token-by-token SSE responses via CopilotKit
 - **Personas** — switch agent behavior with custom system prompts
-- **Workflows** — define multi-step workflows the agent executes
 - **Guardrails** — policy rules that constrain agent behavior
+- **Workflows** — define multi-step procedures the agent executes
+- **70+ built-in tools** — market data, personas, workflows, guardrails, entities, goals, skills, MCP, system tools, and more
+- **MCP connections** — connect to external MCP servers at runtime for additional tools
 - **Scheduled tasks** — Hangfire-powered recurring agent invocations
-- **MCP connections** — connect to external MCP servers at runtime
+- **Autonomous execution** — goal-driven work queue with a Hangfire job that claims, executes, and reports on work items without user input
+- **Inter-agent communication** — agent registry, mailbox messaging, and synchronous handoff between named agents built from personas
 - **Security** — OWASP LLM Top 10 coverage via Agent Governance Toolkit
 
 ## Tech Stack
@@ -158,6 +160,8 @@ All seeded components are saved to disk on first startup (seeds never overwrite 
 | AI | Azure AI Foundry (`Azure.AI.OpenAI`) |
 | Data | SEC EDGAR (free), Yahoo Finance (free) |
 | Scheduling | Hangfire with SQLite |
+| Autonomous | Goal Store, Work Queue (SQLite), AutonomousAgentJob |
+| Inter-Agent | Agent Registry, Mailbox (SQLite), Handoff |
 | Security | Agent Governance Toolkit |
 
 ## License
