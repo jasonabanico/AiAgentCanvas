@@ -221,6 +221,12 @@ export Security__RateLimitPerMinute=60</code></pre>
 
       <p>The backend creates and uses these directories at runtime (relative to the working directory):</p>
 
+      <p>Agent data is split into two subdirectories under <code>agent-data/</code>:</p>
+      <ul>
+        <li><strong><code>agent/</code></strong> -- System-managed. Seeds and tool-created content are written here.</li>
+        <li><strong><code>user/</code></strong> -- User-managed. Drop hand-written markdown files here; the system reads them but never overwrites them.</li>
+      </ul>
+
       <table>
         <thead>
           <tr>
@@ -230,28 +236,32 @@ export Security__RateLimitPerMinute=60</code></pre>
         </thead>
         <tbody>
           <tr>
-            <td><code>agent-data/personas/</code></td>
-            <td>Persona definitions (markdown files)</td>
+            <td><code>agent-data/agent/personas/</code></td>
+            <td>System-created persona definitions</td>
           </tr>
           <tr>
-            <td><code>agent-data/workflows/</code></td>
-            <td>Workflow definitions (markdown files)</td>
+            <td><code>agent-data/agent/workflows/</code></td>
+            <td>System-created workflow definitions</td>
           </tr>
           <tr>
-            <td><code>agent-data/guardrails/</code></td>
-            <td>Guardrail rules (markdown files)</td>
+            <td><code>agent-data/agent/guardrails/</code></td>
+            <td>System-created guardrail rules</td>
           </tr>
           <tr>
-            <td><code>agent-data/entities/</code></td>
-            <td>Entity memory (markdown files)</td>
+            <td><code>agent-data/agent/entities/</code></td>
+            <td>System-created entity memory</td>
           </tr>
           <tr>
-            <td><code>agent-data/profiles/</code></td>
-            <td>User profiles (markdown files)</td>
+            <td><code>agent-data/agent/profiles/</code></td>
+            <td>System-created user profiles</td>
           </tr>
           <tr>
-            <td><code>agent-data/context/</code></td>
-            <td>Persistent context entries (markdown files)</td>
+            <td><code>agent-data/agent/context/</code></td>
+            <td>System-created persistent context entries</td>
+          </tr>
+          <tr>
+            <td><code>agent-data/user/*/</code></td>
+            <td>Hand-written markdown files for any domain (read-only to system)</td>
           </tr>
           <tr>
             <td><code>agent-data/skills/</code></td>

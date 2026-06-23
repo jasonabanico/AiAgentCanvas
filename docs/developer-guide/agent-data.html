@@ -14,45 +14,81 @@
 
       <p>The <code>AiAgentCanvas.AgentData</code> project provides six markdown-persisted data domains. Each domain follows an identical three-class pattern and gives the LLM tools to manage its own configuration at runtime.</p>
 
+      <h2>Directory Layout</h2>
+
+      <p>Each domain stores markdown files under a common <code>agent-data/</code> root with two subdirectories:</p>
+
+      <div class="diagram">
+agent-data/
+├── agent/          &larr; System writes here (seeds + tool-created content)
+│   ├── personas/
+│   ├── context/
+│   ├── guardrails/
+│   ├── entities/
+│   ├── workflows/
+│   └── profiles/
+└── user/           &larr; Hand-written MD files (read-only to system, never overwritten)
+    ├── personas/
+    ├── context/
+    ├── guardrails/
+    ├── entities/
+    ├── workflows/
+    └── profiles/
+      </div>
+
+      <ul>
+        <li><strong><code>agent/</code></strong> -- All system writes go here: seed data from custom agents and content created via chat tools (create_persona, save_context, etc.).</li>
+        <li><strong><code>user/</code></strong> -- A place for hand-written markdown files that the system reads but never overwrites. This is the no-code alternative to implementing seed interfaces -- simply drop a properly formatted markdown file into the appropriate subdirectory.</li>
+      </ul>
+
+      <p>Both directories are created automatically on startup. Each store's <code>ListAll()</code> method merges files from both directories, so the LLM sees user-provided and system-created data together.</p>
+
       <h2>The Six Domains</h2>
 
       <table>
         <thead>
           <tr>
             <th>Domain</th>
-            <th>Storage Path</th>
+            <th>Agent Path</th>
+            <th>User Path</th>
             <th>Purpose</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Personas</td>
-            <td><code>agent-data/personas/*.md</code></td>
+            <td><code>agent/personas/</code></td>
+            <td><code>user/personas/</code></td>
             <td>Custom agent identities with instructions</td>
           </tr>
           <tr>
             <td>Context</td>
-            <td><code>agent-data/context/*.md</code></td>
+            <td><code>agent/context/</code></td>
+            <td><code>user/context/</code></td>
             <td>Persistent context entries</td>
           </tr>
           <tr>
             <td>Workflows</td>
-            <td><code>agent-data/workflows/*.md</code></td>
+            <td><code>agent/workflows/</code></td>
+            <td><code>user/workflows/</code></td>
             <td>Multi-step workflow definitions</td>
           </tr>
           <tr>
             <td>Guardrails</td>
-            <td><code>agent-data/guardrails/*.md</code></td>
+            <td><code>agent/guardrails/</code></td>
+            <td><code>user/guardrails/</code></td>
             <td>Behavioral constraints</td>
           </tr>
           <tr>
             <td>Entities</td>
-            <td><code>agent-data/entities/*.md</code></td>
+            <td><code>agent/entities/</code></td>
+            <td><code>user/entities/</code></td>
             <td>Domain entity schemas</td>
           </tr>
           <tr>
             <td>UserProfiles</td>
-            <td><code>agent-data/profiles/*.md</code></td>
+            <td><code>agent/profiles/</code></td>
+            <td><code>user/profiles/</code></td>
             <td>User preference profiles</td>
           </tr>
         </tbody>
@@ -120,12 +156,18 @@ string safe = MarkdownFile.SanitizeFileName("Code Reviewer"); // "code-reviewer"
 
       <pre><code>public sealed class PersonaStore
 {
-    private readonly string _directory;
+    private readonly string _directory;        // agent/ -- system writes here
+    private readonly string _userDirectory;    // user/ -- read-only, never overwritten
+    private readonly string[] _readDirectories;
 
-    public PersonaStore(string directory) { /* creates directory if missing */ }
+    public PersonaStore(string directory, string userDirectory)
+    {
+        // Creates both directories if missing
+    }
 
     public void SavePersona(string name, string description, string instructions)
     {
+        // Always writes to _directory (agent/)
         MarkdownFile.Write(
             Path.Combine(_directory, MarkdownFile.SanitizeFileName(name) + ".md"),
             new Dictionary&lt;string, string&gt;
@@ -138,7 +180,9 @@ string safe = MarkdownFile.SanitizeFileName("Code Reviewer"); // "code-reviewer"
 
     public List&lt;PersonaInfo&gt; ListPersonas()
     {
-        return MarkdownFile.LoadAll(_directory)
+        // Merges files from both agent/ and user/ directories
+        return _readDirectories
+            .SelectMany(dir =&gt; MarkdownFile.LoadAll(dir))
             .Select(ToPersona)
             .Where(p =&gt; p is not null)
             .Cast&lt;PersonaInfo&gt;()
@@ -222,17 +266,27 @@ string safe = MarkdownFile.SanitizeFileName("Code Reviewer"); // "code-reviewer"
 
       <p>The <code>AgentDataServiceExtensions</code> class provides one <code>Add*()</code> method per domain. Each method registers the Store, ToolProvider, tools, and (where applicable) the AIContextProvider.</p>
 
-      <pre><code>public static IServiceCollection AddAiAgentCanvasPersonas(
+      <pre><code>private const string DefaultRoot = "./agent-data";
+
+public static IServiceCollection AddAiAgentCanvasPersonas(
     this IServiceCollection services,
-    string directory = "./agent-data/personas")
+    string rootDirectory = DefaultRoot)
 {
-    services.AddSingleton(new PersonaStore(directory));
+    var store = new PersonaStore(
+        Path.Combine(rootDirectory, "agent", "personas"),   // system writes
+        Path.Combine(rootDirectory, "user", "personas"));   // user-provided (read-only)
+    services.AddSingleton(store);
     services.AddSingleton&lt;PersonaToolProvider&gt;();
     services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
         sp.GetRequiredService&lt;PersonaToolProvider&gt;().GetTools());
     services.AddSingleton&lt;AIContextProvider&gt;(sp =&gt;
     {
-        var store = sp.GetRequiredService&lt;PersonaStore&gt;();
+        // Seed data from custom agents is written to agent/ directory
+        foreach (var seed in sp.GetServices&lt;IPersonaSeed&gt;())
+        {
+            if (store.GetPersona(seed.Name) is null)
+                store.SavePersona(seed.Name, seed.Description, seed.Instructions);
+        }
         var defaultPrompt = sp.GetRequiredService&lt;DefaultSystemPrompt&gt;().Value;
         return new PersonaContextProvider(store, defaultPrompt);
     });

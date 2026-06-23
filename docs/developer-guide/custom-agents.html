@@ -138,7 +138,7 @@ public static class MyAgentServiceExtensions
 
 builder.Services.AddMyAgent();</code></pre>
 
-      <p>The persona is saved to <code>agent-data/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
+      <p>The persona is saved to <code>agent-data/agent/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
 
       <h2>Full Reference: HelloWorldAgent</h2>
 
@@ -207,7 +207,10 @@ builder.Services.AddMyAgent();</code></pre>
         <li>Components are created automatically on first run</li>
         <li>Manual edits to persisted files are preserved (seeds never overwrite)</li>
         <li>Users interact with seeded components the same way as manually created ones</li>
+        <li>Seed data is written to the <code>agent-data/agent/</code> directory</li>
       </ul>
+
+      <p><strong>No-code alternative:</strong> Instead of implementing seed interfaces in code, you can drop hand-written markdown files into the <code>agent-data/user/</code> directories. These files are read alongside system-created data but are never overwritten by the system. Use the same YAML frontmatter format shown in the <a href="agent-data.html">Agent Data</a> documentation.</p>
 
       <table>
         <thead>
@@ -223,31 +226,31 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>IPersonaSeed</code></td>
             <td><code>PersonaSeed</code></td>
             <td>name, description, instructions</td>
-            <td><code>agent-data/personas/*.md</code></td>
+            <td><code>agent-data/agent/personas/*.md</code></td>
           </tr>
           <tr>
             <td><code>IGuardrailSeed</code></td>
             <td><code>GuardrailSeed</code></td>
             <td>name, severity, enabled, rule</td>
-            <td><code>agent-data/guardrails/*.md</code></td>
+            <td><code>agent-data/agent/guardrails/*.md</code></td>
           </tr>
           <tr>
             <td><code>IWorkflowSeed</code></td>
             <td><code>WorkflowSeed</code></td>
             <td>name, description, tags, content</td>
-            <td><code>agent-data/workflows/*.md</code></td>
+            <td><code>agent-data/agent/workflows/*.md</code></td>
           </tr>
           <tr>
             <td><code>IContextSeed</code></td>
             <td><code>ContextSeed</code></td>
             <td>topic, tags, content</td>
-            <td><code>agent-data/context/*.md</code></td>
+            <td><code>agent-data/agent/context/*.md</code></td>
           </tr>
           <tr>
             <td><code>IEntitySeed</code></td>
             <td><code>EntitySeed</code></td>
             <td>name, type, tags, content</td>
-            <td><code>agent-data/entities/*.md</code></td>
+            <td><code>agent-data/agent/entities/*.md</code></td>
           </tr>
           <tr>
             <td><code>ISkillSeed</code></td>

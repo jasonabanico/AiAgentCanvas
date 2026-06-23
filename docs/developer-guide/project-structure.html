@@ -159,44 +159,53 @@ src/
 
       <p>Six markdown-persisted data domains. Each domain follows an identical pattern: Store + ToolProvider + AIContextProvider.</p>
 
+      <p>Each domain reads from two directories under <code>agent-data/</code>: <code>agent/</code> (system-written, including seeds and tool-created content) and <code>user/</code> (hand-written markdown files, read-only to the system).</p>
+
       <table>
         <thead>
           <tr>
             <th>Subdirectory</th>
             <th>Domain</th>
-            <th>Storage Path</th>
+            <th>Agent Path (system writes)</th>
+            <th>User Path (read-only)</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td><code>Personas/</code></td>
             <td>Agent personas with custom instructions</td>
-            <td><code>agent-data/personas/*.md</code></td>
+            <td><code>agent-data/agent/personas/</code></td>
+            <td><code>agent-data/user/personas/</code></td>
           </tr>
           <tr>
             <td><code>Context/</code></td>
             <td>Persistent context entries</td>
-            <td><code>agent-data/context/*.md</code></td>
+            <td><code>agent-data/agent/context/</code></td>
+            <td><code>agent-data/user/context/</code></td>
           </tr>
           <tr>
             <td><code>Workflows/</code></td>
             <td>Multi-step workflows</td>
-            <td><code>agent-data/workflows/*.md</code></td>
+            <td><code>agent-data/agent/workflows/</code></td>
+            <td><code>agent-data/user/workflows/</code></td>
           </tr>
           <tr>
             <td><code>Guardrails/</code></td>
             <td>Behavioral guardrails</td>
-            <td><code>agent-data/guardrails/*.md</code></td>
+            <td><code>agent-data/agent/guardrails/</code></td>
+            <td><code>agent-data/user/guardrails/</code></td>
           </tr>
           <tr>
             <td><code>Entities/</code></td>
             <td>Domain entities and schemas</td>
-            <td><code>agent-data/entities/*.md</code></td>
+            <td><code>agent-data/agent/entities/</code></td>
+            <td><code>agent-data/user/entities/</code></td>
           </tr>
           <tr>
             <td><code>Profiles/</code></td>
             <td>User profiles</td>
-            <td><code>agent-data/profiles/*.md</code></td>
+            <td><code>agent-data/agent/profiles/</code></td>
+            <td><code>agent-data/user/profiles/</code></td>
           </tr>
         </tbody>
       </table>

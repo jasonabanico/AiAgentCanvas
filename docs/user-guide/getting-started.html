@@ -166,8 +166,12 @@ npm run dev</code></pre>
             <td>Next.js + CopilotKit chat UI</td>
           </tr>
           <tr>
-            <td><code>agent-data/</code></td>
-            <td>Runtime data (personas, workflows, entities, guardrails)</td>
+            <td><code>agent-data/agent/</code></td>
+            <td>System-managed runtime data (personas, workflows, entities, guardrails)</td>
+          </tr>
+          <tr>
+            <td><code>agent-data/user/</code></td>
+            <td>User-provided markdown files (read-only to system, never overwritten)</td>
           </tr>
         </tbody>
       </table>
