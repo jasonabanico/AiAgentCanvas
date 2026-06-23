@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Core.Agents;
 using AiAgentCanvas.Core.Configuration;
 using AiAgentCanvas.Core.Endpoints;
 using AiAgentCanvas.Core.Providers;
@@ -127,6 +128,44 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>(),
                 sp.GetRequiredService<ILogger<RagContextProvider>>(),
                 sp.GetRequiredService<LlmReranker>()));
+        return services;
+    }
+
+    public static IServiceCollection AddAiAgentCanvasInterAgentCommunication(
+        this IServiceCollection services,
+        Func<IServiceProvider, Func<string, AgentPersonaInfo?>> personaLookupFactory,
+        Func<IServiceProvider, Func<IEnumerable<AgentPersonaInfo>>> personaListAllFactory,
+        string mailboxConnectionString = "Data Source=agentmailbox.db")
+    {
+        services.AddSingleton(new AgentMailbox(mailboxConnectionString));
+
+        services.AddSingleton(sp =>
+        {
+            var chatClient = sp.GetRequiredService<IChatClient>();
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+            var toolsFactory = () => sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t);
+            var contextProvidersFactory = () => sp.GetServices<AIContextProvider>();
+            var personaLookup = personaLookupFactory(sp);
+            var personaListAll = personaListAllFactory(sp);
+
+            var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
+                personaLookup, personaListAll, loggerFactory);
+
+            registry.RegisterDefault(sp.GetRequiredService<AIAgent>());
+            return registry;
+        });
+
+        services.AddSingleton<AgentRegistryToolProvider>();
+        services.AddSingleton<AgentMailboxToolProvider>();
+        services.AddSingleton<HandoffToolProvider>();
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<AgentRegistryToolProvider>().GetTools());
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<AgentMailboxToolProvider>().GetTools());
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<HandoffToolProvider>().GetTools());
+
         return services;
     }
 
