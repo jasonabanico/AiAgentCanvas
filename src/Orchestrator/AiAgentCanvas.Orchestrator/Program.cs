@@ -10,7 +10,7 @@ using AiAgentCanvas.SystemTools;
 using Hangfire;
 using Hangfire.Storage.SQLite;
 using HelloWorldAgent;
-using MCP.MarketData;
+using MCP.HelloWorldData;
 using VectorStore.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);

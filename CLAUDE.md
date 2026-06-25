@@ -17,7 +17,7 @@ All projects sit flat under `src/`, grouped by solution folders in Visual Studio
   - `AiAgentCanvas.Security` — Microsoft Agent Governance Toolkit integration
   - `AiAgentCanvas.Web` — Thin composition root. Wires everything together.
 - **Custom** (solution folder + `src/Custom/`) — Business/use-case-specific code:
-  - `MCP.MarketData` — SEC EDGAR + Yahoo Finance market data tools
+  - `MCP.HelloWorldData` — SEC EDGAR + Yahoo Finance market data tools
   - `VectorStore.Sqlite` — SQLite vector store for RAG
   - `HelloWorldAgent` — Sample agent (EarningsSurpriseScanner)
 

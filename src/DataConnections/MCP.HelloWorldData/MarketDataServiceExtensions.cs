@@ -2,7 +2,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 
-namespace MCP.MarketData;
+namespace MCP.HelloWorldData;
 
 public static class MarketDataServiceExtensions
 {

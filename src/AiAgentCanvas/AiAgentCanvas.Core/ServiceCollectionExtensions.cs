@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IChatClient>(sp =>
             new ToolDeduplicatingChatClient(sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient()));
         services.AddHttpClient();
+        services.AddSingleton<IAgentMessaging, InProcessAgentMessaging>();
 
         var options = new AiAgentCanvasOptions();
         configure?.Invoke(options);

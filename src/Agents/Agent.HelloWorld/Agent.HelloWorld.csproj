@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

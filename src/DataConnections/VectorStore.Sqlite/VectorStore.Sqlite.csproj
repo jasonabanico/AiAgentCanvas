@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

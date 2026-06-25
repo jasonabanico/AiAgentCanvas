@@ -5,31 +5,35 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AiAgentCanvas", "AiAgentCanvas", "{72696CDF-302E-EF66-82F6-620320370A42}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Web", "src\AiAgentCanvas.Web\AiAgentCanvas.Web.csproj", "{4277630B-073E-4FBF-AB32-9FBF141C020B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Abstractions", "src\AiAgentCanvas\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj", "{0D04FCFA-A4DE-4DFB-9877-7BD6159468FB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Core", "src\AiAgentCanvas.Core\AiAgentCanvas.Core.csproj", "{034A3E9A-52D1-4587-96DC-55D2D834EF37}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Core", "src\AiAgentCanvas\AiAgentCanvas.Core\AiAgentCanvas.Core.csproj", "{034A3E9A-52D1-4587-96DC-55D2D834EF37}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Abstractions", "src\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj", "{0D04FCFA-A4DE-4DFB-9877-7BD6159468FB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.AgentData", "src\AiAgentCanvas\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj", "{1297ACDF-CF52-40B3-9613-ED86F682E417}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.AgentData", "src\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj", "{1297ACDF-CF52-40B3-9613-ED86F682E417}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Scheduler", "src\AiAgentCanvas\AiAgentCanvas.Scheduler\AiAgentCanvas.Scheduler.csproj", "{1456E580-C8E2-4DA0-9D00-6D065E0FA69D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Scheduler", "src\AiAgentCanvas.Scheduler\AiAgentCanvas.Scheduler.csproj", "{1456E580-C8E2-4DA0-9D00-6D065E0FA69D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Skills", "src\AiAgentCanvas\AiAgentCanvas.Skills\AiAgentCanvas.Skills.csproj", "{AA59F727-C66B-433B-AAE9-C44B72BE7380}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Skills", "src\AiAgentCanvas.Skills\AiAgentCanvas.Skills.csproj", "{AA59F727-C66B-433B-AAE9-C44B72BE7380}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Notifications", "src\AiAgentCanvas\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj", "{835A5345-A296-4C7E-B477-DEF5D829A1DD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Notifications", "src\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj", "{835A5345-A296-4C7E-B477-DEF5D829A1DD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.SystemTools", "src\AiAgentCanvas\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj", "{F1FF2D57-CD5F-42F2-9A0C-3F503FCAE7B6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.SystemTools", "src\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj", "{F1FF2D57-CD5F-42F2-9A0C-3F503FCAE7B6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Security", "src\AiAgentCanvas\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj", "{62332F4E-F354-4D7B-8C06-5AD4D293D3E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Security", "src\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj", "{62332F4E-F354-4D7B-8C06-5AD4D293D3E9}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Orchestrator", "Orchestrator", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Custom", "Custom", "{F3846736-565B-9EA7-873C-5ACF842A7768}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Orchestrator", "src\Orchestrator\AiAgentCanvas.Orchestrator\AiAgentCanvas.Orchestrator.csproj", "{4277630B-073E-4FBF-AB32-9FBF141C020B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCP.MarketData", "src\Custom\MCP.MarketData\MCP.MarketData.csproj", "{CC43B71D-2FC5-4A78-BD44-4AE3068851C4}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Agents", "Agents", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorStore.Sqlite", "src\Custom\VectorStore.Sqlite\VectorStore.Sqlite.csproj", "{BC08F414-3D37-40D5-A437-37CB51D9EC2E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agent.HelloWorld", "src\Agents\Agent.HelloWorld\Agent.HelloWorld.csproj", "{F3364C8F-4835-4137-A2EB-2AE85D207541}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldAgent", "src\Custom\HelloWorldAgent\HelloWorldAgent.csproj", "{F3364C8F-4835-4137-A2EB-2AE85D207541}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DataConnections", "DataConnections", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCP.HelloWorldData", "src\DataConnections\MCP.HelloWorldData\MCP.HelloWorldData.csproj", "{CC43B71D-2FC5-4A78-BD44-4AE3068851C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorStore.Sqlite", "src\DataConnections\VectorStore.Sqlite\VectorStore.Sqlite.csproj", "{BC08F414-3D37-40D5-A437-37CB51D9EC2E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -90,17 +94,17 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{4277630B-073E-4FBF-AB32-9FBF141C020B} = {72696CDF-302E-EF66-82F6-620320370A42}
-		{034A3E9A-52D1-4587-96DC-55D2D834EF37} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{0D04FCFA-A4DE-4DFB-9877-7BD6159468FB} = {72696CDF-302E-EF66-82F6-620320370A42}
+		{034A3E9A-52D1-4587-96DC-55D2D834EF37} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{1297ACDF-CF52-40B3-9613-ED86F682E417} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{1456E580-C8E2-4DA0-9D00-6D065E0FA69D} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{AA59F727-C66B-433B-AAE9-C44B72BE7380} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{835A5345-A296-4C7E-B477-DEF5D829A1DD} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{F1FF2D57-CD5F-42F2-9A0C-3F503FCAE7B6} = {72696CDF-302E-EF66-82F6-620320370A42}
 		{62332F4E-F354-4D7B-8C06-5AD4D293D3E9} = {72696CDF-302E-EF66-82F6-620320370A42}
-		{CC43B71D-2FC5-4A78-BD44-4AE3068851C4} = {F3846736-565B-9EA7-873C-5ACF842A7768}
-		{BC08F414-3D37-40D5-A437-37CB51D9EC2E} = {F3846736-565B-9EA7-873C-5ACF842A7768}
-		{F3364C8F-4835-4137-A2EB-2AE85D207541} = {F3846736-565B-9EA7-873C-5ACF842A7768}
+		{4277630B-073E-4FBF-AB32-9FBF141C020B} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{F3364C8F-4835-4137-A2EB-2AE85D207541} = {B2C3D4E5-F6A7-8901-BCDE-F12345678901}
+		{CC43B71D-2FC5-4A78-BD44-4AE3068851C4} = {C3D4E5F6-A7B8-9012-CDEF-123456789012}
+		{BC08F414-3D37-40D5-A437-37CB51D9EC2E} = {C3D4E5F6-A7B8-9012-CDEF-123456789012}
 	EndGlobalSection
 EndGlobal

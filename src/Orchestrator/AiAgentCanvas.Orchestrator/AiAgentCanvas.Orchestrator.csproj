@@ -4,20 +4,20 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <SpaRoot>..\..\frontend</SpaRoot>
+    <SpaRoot>..\..\..\frontend</SpaRoot>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AiAgentCanvas.Core\AiAgentCanvas.Core.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.Scheduler\AiAgentCanvas.Scheduler.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.Skills\AiAgentCanvas.Skills.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
-    <ProjectReference Include="..\Custom\MCP.MarketData\MCP.MarketData.csproj" />
-    <ProjectReference Include="..\Custom\VectorStore.Sqlite\VectorStore.Sqlite.csproj" />
-    <ProjectReference Include="..\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj" />
-    <ProjectReference Include="..\Custom\HelloWorldAgent\HelloWorldAgent.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Core\AiAgentCanvas.Core.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Scheduler\AiAgentCanvas.Scheduler.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Skills\AiAgentCanvas.Skills.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj" />
+    <ProjectReference Include="..\..\DataConnections\MCP.HelloWorldData\MCP.HelloWorldData.csproj" />
+    <ProjectReference Include="..\..\DataConnections\VectorStore.Sqlite\VectorStore.Sqlite.csproj" />
+    <ProjectReference Include="..\..\Agents\Agent.HelloWorld\Agent.HelloWorld.csproj" />
   </ItemGroup>
 
   <ItemGroup>

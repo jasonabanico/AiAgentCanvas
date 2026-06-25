@@ -8,14 +8,11 @@ A multi-agent enterprise copilot framework built with .NET 9, Microsoft Agent Fr
 Frontend (Next.js + CopilotKit)
         │ AG-UI Protocol (SSE)
         ▼
-ASP.NET Core Backend
-├── Core ──────────── MAF ChatClientAgent, AG-UI endpoint, inter-agent comms
-├── AgentData ─────── personas, context, workflows, entities, guardrails, goals
-├── Skills ────────── skill registry, MCP connections
-├── Scheduler ─────── Hangfire tasks + autonomous execution engine
-├── Security ──────── governance, prompt injection detection
-├── SystemTools ───── file I/O, shell execution (sandboxed)
-└── Custom/ ───────── your agents, tools, and data connections
+Orchestrator (ASP.NET Core)
+├── AiAgentCanvas SDK ─── Abstractions, Core, AgentData, Skills, Scheduler, Security, etc.
+├── Agents ────────────── specialist agents (in-process, separable to out-of-process)
+├── DataConnections ───── MCP tools, vector stores
+└── IAgentMessaging ───── in-process messaging (swap to gRPC/queue for out-of-process)
         │
         ▼
 Azure AI Foundry (AzureOpenAIClient)
@@ -25,24 +22,33 @@ Azure AI Foundry (AzureOpenAIClient)
 
 ```
 src/
-├── AiAgentCanvas.Abstractions/     # Shared interfaces and models
-├── AiAgentCanvas.Core/             # MAF agent, AG-UI endpoint, agent registry, mailbox, handoff
-├── AiAgentCanvas.AgentData/        # Personas, context, workflows, entities, profiles, guardrails, goals
-├── AiAgentCanvas.Skills/           # Skill store, MCP connections, skill authoring
-├── AiAgentCanvas.Scheduler/        # Hangfire scheduled tasks + autonomous execution
-├── AiAgentCanvas.Security/         # Agent Governance Toolkit integration
-├── AiAgentCanvas.SystemTools/      # File and shell tools (sandboxed)
-├── AiAgentCanvas.Notifications/    # Notification sink
-├── AiAgentCanvas.Web/              # Composition root (Program.cs)
-└── Custom/                         # Your extensions
-    ├── HelloWorldAgent/            # Starter agent: persona for market data tools
-    ├── MCP.MarketData/             # SEC EDGAR + Yahoo Finance tools
+├── AiAgentCanvas/                  # SDK library (shared by orchestrator and agents)
+│   ├── AiAgentCanvas.Abstractions/ # Interfaces, seed contracts, IAgentMessaging
+│   ├── AiAgentCanvas.Core/         # MAF agent, AG-UI endpoint, agent registry, handoff
+│   ├── AiAgentCanvas.AgentData/    # Personas, context, workflows, entities, profiles, guardrails, goals
+│   ├── AiAgentCanvas.Skills/       # Skill store, MCP connections, skill authoring
+│   ├── AiAgentCanvas.Scheduler/    # Hangfire scheduled tasks + autonomous execution
+│   ├── AiAgentCanvas.Security/     # Agent Governance Toolkit integration
+│   ├── AiAgentCanvas.SystemTools/  # File and shell tools (sandboxed)
+│   └── AiAgentCanvas.Notifications/# Notification sink
+├── Orchestrator/
+│   └── AiAgentCanvas.Orchestrator/ # Composition root (Program.cs) — the web host
+├── Agents/
+│   └── Agent.HelloWorld/           # Starter agent: financial analyst persona
+└── DataConnections/
+    ├── MCP.HelloWorldData/             # SEC EDGAR + Yahoo Finance tools
     └── VectorStore.Sqlite/         # SQLite vector store for RAG
+
+agent-data/                         # Per-agent runtime data (created on first run)
+├── shared/                         # Data inherited by all agents
+├── orchestrator/                   # Orchestrator-specific data
+└── {agent-name}/                   # Agent-specific data
+
 frontend/                           # Next.js + CopilotKit chat UI
 docs/                               # GitHub Pages documentation site
 ```
 
-The `Custom/` folder is where you add your own tool providers, MCP connections, and agent configurations without touching the framework.
+Agents start **in-process** (running inside the Orchestrator) but are designed to separate into independent processes later. The separation seam is `IAgentMessaging` — swap `InProcessAgentMessaging` for a gRPC or message-queue implementation and each agent becomes its own deployable service.
 
 ## Quick Start
 
@@ -55,7 +61,7 @@ The `Custom/` folder is where you add your own tool providers, MCP connections, 
 
 ### 1. Configure
 
-Create `src/AiAgentCanvas.Web/appsettings.Development.json`:
+Create `src/Orchestrator/AiAgentCanvas.Orchestrator/appsettings.Development.json`:
 
 ```json
 {
@@ -71,7 +77,7 @@ Create `src/AiAgentCanvas.Web/appsettings.Development.json`:
 ### 2. Run the Backend
 
 ```bash
-cd src/AiAgentCanvas.Web
+cd src/Orchestrator/AiAgentCanvas.Orchestrator
 dotnet run
 ```
 
@@ -87,7 +93,7 @@ Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and
 
 ## Adding a Custom Agent
 
-See `Custom/HelloWorldAgent/` for a complete working example. A custom agent seeds all the components it needs — persona, context, workflows, entities, user profiles, guardrails, goals, and skills — and references tools from separate data connection projects.
+See `src/Agents/Agent.HelloWorld/` for a complete working example. A custom agent seeds all the components it needs — persona, context, workflows, entities, user profiles, guardrails, goals, and skills — and references tools from separate data connection projects.
 
 ### 1. Create a service extension that seeds components
 
@@ -129,7 +135,7 @@ public static class HelloWorldServiceExtensions
 builder.Services.AddHelloWorldAgent();
 ```
 
-All seeded components are saved to disk on first startup (seeds never overwrite manual edits). The tools referenced in the persona (`stock_quote`, `stock_history`, `edgar_company_facts`) come from the `MCP.MarketData` data connection registered separately.
+All seeded components are saved to disk on first startup (seeds never overwrite manual edits). The tools referenced in the persona (`stock_quote`, `stock_history`, `edgar_company_facts`) come from the `MCP.HelloWorldData` data connection registered separately.
 
 **Agents and data connections are separate projects.** Agents define *how* the LLM behaves (via personas, context, workflows, entities, guardrails, skills). Data connections define *what* it can do (via tools). This separation lets multiple agents share the same tools.
 

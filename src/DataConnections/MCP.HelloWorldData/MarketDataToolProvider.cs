@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
-namespace MCP.MarketData;
+namespace MCP.HelloWorldData;
 
 public sealed class MarketDataToolProvider
 {
