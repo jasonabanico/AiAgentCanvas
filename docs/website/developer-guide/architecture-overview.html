@@ -16,6 +16,8 @@
 
       <h2>Request Flow</h2>
 
+      <img src="../images/request-flow.svg" alt="Request Flow Diagram" style="width:100%; max-width:800px; display:block; margin:1rem auto;">
+
       <div class="diagram">
 User (Browser)
     |
@@ -50,31 +52,38 @@ CopilotKit renders response
 
       <p><strong>Framework projects</strong> (under <code>src/AiAgentCanvas.*</code>) provide the engine: orchestration, tool registry, agent data persistence, skills management, security, scheduling, and notifications. These never change per use case.</p>
 
-      <p><strong>Custom projects</strong> (under <code>src/Custom/</code>) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any framework code.</p>
+      <p><strong>Custom projects</strong> (under <code>src/Agents/</code> and <code>src/DataConnections/</code>) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any framework code.</p>
+
+      <img src="../images/project-structure.svg" alt="Project Structure Diagram" style="width:100%; max-width:800px; display:block; margin:1rem auto;">
 
       <div class="diagram">
 src/
-  AiAgentCanvas.Abstractions/    &lt;-- Shared interfaces (no dependencies)
-  AiAgentCanvas.Core/            &lt;-- Orchestration engine
-  AiAgentCanvas.AgentData/       &lt;-- MD-persisted agent data (7 domains)
-  AiAgentCanvas.Skills/          &lt;-- Skill store + MCP connections
-  AiAgentCanvas.Security/        &lt;-- Governance + rate limiting
-  AiAgentCanvas.Scheduler/       &lt;-- Hangfire scheduled tasks
-  AiAgentCanvas.Notifications/   &lt;-- SSE notification channel
-  AiAgentCanvas.SystemTools/     &lt;-- Optional file I/O + script tools
-  AiAgentCanvas.Web/             &lt;-- Composition root (Program.cs)
-  Custom/
-    HelloWorldAgent/             &lt;-- Starter agent: persona for market data tools
-    MCP.MarketData/              &lt;-- SEC EDGAR + Yahoo Finance tools
-    VectorStore.Sqlite/          &lt;-- SQLite vector store for RAG
+  AiAgentCanvas/                     &lt;-- SDK library
+    AiAgentCanvas.Abstractions/      &lt;-- Shared interfaces (no dependencies)
+    AiAgentCanvas.Core/              &lt;-- Orchestration engine
+    AiAgentCanvas.AgentData/         &lt;-- MD-persisted agent data (7 domains)
+    AiAgentCanvas.Skills/            &lt;-- Skill store + MCP connections
+    AiAgentCanvas.Security/          &lt;-- Governance + rate limiting
+    AiAgentCanvas.Scheduler/         &lt;-- Hangfire scheduled tasks
+    AiAgentCanvas.Notifications/     &lt;-- SSE notification channel
+    AiAgentCanvas.SystemTools/       &lt;-- Optional file I/O + script tools
+  Orchestrator/
+    AiAgentCanvas.Orchestrator/      &lt;-- Composition root (Program.cs)
+  Agents/
+    Agent.HelloWorld/                &lt;-- Starter agent: persona for market data tools
+  DataConnections/
+    MCP.HelloWorldData/              &lt;-- SEC EDGAR + Yahoo Finance tools
+    VectorStore.Sqlite/              &lt;-- SQLite vector store for RAG
       </div>
 
       <h2>Dependency Flow</h2>
 
-      <p>All projects depend downward toward Abstractions. The Web project is the only one that references everything.</p>
+      <p>All projects depend downward toward Abstractions. The Orchestrator is the only project that references everything.</p>
+
+      <img src="../images/architecture-overview.svg" alt="Architecture Overview Diagram" style="width:100%; max-width:800px; display:block; margin:1rem auto;">
 
       <div class="diagram">
-                    AiAgentCanvas.Web
+                AiAgentCanvas.Orchestrator
                    /    |    |    \    \
                   /     |    |     \    \
             Core   AgentData Skills Security  Scheduler  Notifications
@@ -82,8 +91,8 @@ src/
                \      |       |     /
                  Abstractions (shared types)
 
-            Custom/MCP.MarketData  ----&gt; Microsoft.Extensions.AI
-            Custom/HelloWorldAgent ----&gt; Abstractions
+            MCP.HelloWorldData  ----&gt; Microsoft.Extensions.AI
+            Agent.HelloWorld    ----&gt; Abstractions
       </div>
 
       <p>Key dependency rules:</p>
@@ -92,8 +101,9 @@ src/
         <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>, <code>IToolDependencySeed</code>).</li>
         <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, the AG-UI endpoint, and inter-agent communication (<code>AgentRegistry</code>, <code>AgentMailbox</code>, handoff tools).</li>
         <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions. AgentData also includes the Goals domain with a SQLite-backed work queue.</li>
-        <li><strong>Custom projects</strong> reference <code>Abstractions</code> (for seed interfaces) and optionally <code>Microsoft.Extensions.AI</code> (for data connection tools) -- they never reference Core, AgentData, or any other framework project.</li>
-        <li><strong>Web</strong> references everything and wires it together in <code>Program.cs</code>.</li>
+        <li><strong>Agent projects</strong> reference <code>Abstractions</code> (for seed interfaces) -- they never reference Core, AgentData, or any other framework project.</li>
+        <li><strong>DataConnection projects</strong> reference <code>Microsoft.Extensions.AI</code> (for tool definitions) -- they are independent of the SDK.</li>
+        <li><strong>Orchestrator</strong> references everything and wires it together in <code>Program.cs</code>.</li>
       </ul>
 
       <h2>Key Packages</h2>
@@ -185,6 +195,10 @@ app.MapNotificationEndpoints();  // SSE notification stream</code></pre>
         <li><a href="custom-agents.html">Adding Custom Agents</a> -- build your own agent</li>
         <li><a href="custom-mcp-connections.html">Adding Custom MCP Connections</a> -- add data sources</li>
       </ul>
+
+      <div style="margin-top:2rem; padding:1rem; border:1px solid var(--color-border); border-radius:8px; text-align:center;">
+        <a href="../../guides/AI-Agent-Canvas-Guide.pdf" class="btn btn-secondary">Download Complete Guide (PDF)</a>
+      </div>
     </main>
   </div>
 </body>

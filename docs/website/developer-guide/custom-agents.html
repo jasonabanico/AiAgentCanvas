@@ -12,19 +12,19 @@
     <main class="main-content">
       <h1>Adding Custom Agents</h1>
 
-      <p>A custom agent in AI Agent Canvas is a self-contained project under <code>src/Custom/</code> that seeds all the components the agent needs to function: <strong>persona</strong>, <strong>context</strong>, <strong>workflows</strong>, <strong>entities</strong>, <strong>user profiles</strong>, <strong>guardrails</strong>, <strong>goals</strong>, <strong>skills</strong>, and <strong>MCP connections</strong>. Agents and data connections are separate projects: agents define <em>how</em> the LLM behaves, data connections define <em>what</em> it can do.</p>
+      <p>A custom agent in AI Agent Canvas is a self-contained project under <code>src/Agents/</code> that seeds all the components the agent needs to function: <strong>persona</strong>, <strong>context</strong>, <strong>workflows</strong>, <strong>entities</strong>, <strong>user profiles</strong>, <strong>guardrails</strong>, <strong>goals</strong>, <strong>skills</strong>, and <strong>MCP connections</strong>. Agents and data connections are separate projects: agents define <em>how</em> the LLM behaves, data connections define <em>what</em> it can do.</p>
 
       <h2>How It Works</h2>
 
-      <p>Data connections (like <code>MCP.MarketData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
+      <p>Data connections (like <code>MCP.HelloWorldData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
 
       <h2>Step-by-Step Guide</h2>
 
       <h3>Step 1: Create a Project Folder</h3>
 
-      <p>Create a new folder under <code>src/Custom/</code>:</p>
+      <p>Create a new folder under <code>src/Agents/</code>:</p>
 
-      <pre><code>src/Custom/MyAgent/</code></pre>
+      <pre><code>src/Agents/Agent.MyAgent/</code></pre>
 
       <h3>Step 2: Create the .csproj</h3>
 
@@ -43,7 +43,7 @@
   &lt;/ItemGroup&gt;
 
   &lt;ItemGroup&gt;
-    &lt;ProjectReference Include="..\..\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" /&gt;
+    &lt;ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" /&gt;
   &lt;/ItemGroup&gt;
 
 &lt;/Project&gt;</code></pre>
@@ -121,17 +121,17 @@ public static class MyAgentServiceExtensions
 
       <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. The <code>IToolDependencySeed</code> declares this dependency explicitly — at startup the framework validates that all required tools are registered and logs warnings for any missing ones.</p>
 
-      <h3>Step 4: Add ProjectReference in AiAgentCanvas.Web.csproj</h3>
+      <h3>Step 4: Add ProjectReference in AiAgentCanvas.Orchestrator.csproj</h3>
 
-      <p>Open <code>src/AiAgentCanvas.Web/AiAgentCanvas.Web.csproj</code> and add a reference to your project:</p>
+      <p>Open <code>src/Orchestrator/AiAgentCanvas.Orchestrator/AiAgentCanvas.Orchestrator.csproj</code> and add a reference to your project:</p>
 
-      <pre><code>&lt;ProjectReference Include="..\Custom\MyAgent\MyAgent.csproj" /&gt;</code></pre>
+      <pre><code>&lt;ProjectReference Include="..\..\Agents\Agent.MyAgent\Agent.MyAgent.csproj" /&gt;</code></pre>
 
       <h3>Step 5: Add to AiAgentCanvas.sln</h3>
 
-      <p>Add the project to the solution under the Custom solution folder:</p>
+      <p>Add the project to the solution under the Agents solution folder:</p>
 
-      <pre><code>dotnet sln AiAgentCanvas.sln add src/Custom/MyAgent/MyAgent.csproj --solution-folder Custom</code></pre>
+      <pre><code>dotnet sln AiAgentCanvas.sln add src/Agents/Agent.MyAgent/Agent.MyAgent.csproj --solution-folder Agents</code></pre>
 
       <h3>Step 6: Wire Up in Program.cs</h3>
 
@@ -139,11 +139,11 @@ public static class MyAgentServiceExtensions
 
 builder.Services.AddMyAgent();</code></pre>
 
-      <p>The persona is saved to <code>agent-data/agent/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
+      <p>The persona is saved to <code>agent-data/orchestrator/agent/personas/customer-support.md</code> on first startup. Users activate it with: <em>"switch to the customer-support persona"</em>.</p>
 
       <h2>Full Reference: HelloWorldAgent</h2>
 
-      <p>The <code>HelloWorldAgent</code> in <code>src/Custom/HelloWorldAgent/</code> is the built-in starter example. It demonstrates the complete custom agent pattern — a financial analyst that seeds all component types and references tools from the <code>MCP.MarketData</code> data connection.</p>
+      <p>The <code>Agent.HelloWorld</code> in <code>src/Agents/Agent.HelloWorld/</code> is the built-in starter example. It demonstrates the complete custom agent pattern — a financial analyst that seeds all component types and references tools from the <code>MCP.HelloWorldData</code> data connection.</p>
 
       <h3>HelloWorldServiceExtensions.cs</h3>
 
@@ -196,7 +196,7 @@ builder.Services.AddMyAgent();</code></pre>
         </tbody>
       </table>
 
-      <p>The tools (<code>stock_quote</code>, <code>stock_history</code>, <code>edgar_company_facts</code>) are registered by the <code>MCP.MarketData</code> data connection in a separate project. The agent doesn't own or define any tools — it only tells the LLM how to use them.</p>
+      <p>The tools (<code>stock_quote</code>, <code>stock_history</code>, <code>edgar_company_facts</code>) are registered by the <code>MCP.HelloWorldData</code> data connection in a separate project. The agent doesn't own or define any tools — it only tells the LLM how to use them.</p>
 
       <p>Wired in <code>Program.cs</code> with a single line: <code>builder.Services.AddHelloWorldAgent();</code></p>
 
@@ -208,10 +208,10 @@ builder.Services.AddMyAgent();</code></pre>
         <li>Components are created automatically on first run</li>
         <li>Manual edits to persisted files are preserved (seeds never overwrite)</li>
         <li>Users interact with seeded components the same way as manually created ones</li>
-        <li>Seed data is written to the <code>agent-data/agent/</code> directory</li>
+        <li>Seed data is written to the per-agent <code>agent-data/&lt;agent&gt;/agent/</code> directory</li>
       </ul>
 
-      <p><strong>No-code alternative:</strong> Instead of implementing seed interfaces in code, you can drop hand-written markdown files into the <code>agent-data/user/</code> directories. These files are read alongside system-created data but are never overwritten by the system. Use the same YAML frontmatter format shown in the <a href="agent-data.html">Agent Data</a> documentation.</p>
+      <p><strong>No-code alternative:</strong> Instead of implementing seed interfaces in code, you can drop hand-written markdown files into the <code>agent-data/&lt;agent&gt;/user/</code> directories. These files are read alongside system-created data but are never overwritten by the system. Use the same YAML frontmatter format shown in the <a href="agent-data.html">Agent Data</a> documentation.</p>
 
       <table>
         <thead>
@@ -227,37 +227,37 @@ builder.Services.AddMyAgent();</code></pre>
             <td><code>IPersonaSeed</code></td>
             <td><code>PersonaSeed</code></td>
             <td>name, description, instructions</td>
-            <td><code>agent-data/agent/personas/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/personas/*.md</code></td>
           </tr>
           <tr>
             <td><code>IContextSeed</code></td>
             <td><code>ContextSeed</code></td>
             <td>topic, type, tags, content</td>
-            <td><code>agent-data/agent/context/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/context/*.md</code></td>
           </tr>
           <tr>
             <td><code>IWorkflowSeed</code></td>
             <td><code>WorkflowSeed</code></td>
             <td>name, description, tags, content</td>
-            <td><code>agent-data/agent/workflows/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/workflows/*.md</code></td>
           </tr>
           <tr>
             <td><code>IEntitySeed</code></td>
             <td><code>EntitySeed</code></td>
             <td>name, type, tags, content</td>
-            <td><code>agent-data/agent/entities/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/entities/*.md</code></td>
           </tr>
           <tr>
             <td><code>IGuardrailSeed</code></td>
             <td><code>GuardrailSeed</code></td>
             <td>name, severity, enabled, rule</td>
-            <td><code>agent-data/agent/guardrails/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/guardrails/*.md</code></td>
           </tr>
           <tr>
             <td><code>IGoalSeed</code></td>
             <td><code>GoalSeed</code></td>
             <td>name, description, priority, acceptanceCriteria, assignedAgent, content</td>
-            <td><code>agent-data/agent/goals/*.md</code></td>
+            <td><code>agent-data/&lt;agent&gt;/agent/goals/*.md</code></td>
           </tr>
           <tr>
             <td><code>ISkillSeed</code></td>
@@ -288,7 +288,7 @@ builder.Services.AddMyAgent();</code></pre>
 
       <ol>
         <li>Build the solution: <code>dotnet build AiAgentCanvas.sln</code></li>
-        <li>Run the backend: <code>cd src/AiAgentCanvas.Web &amp;&amp; dotnet run</code></li>
+        <li>Run the backend: <code>cd src/Orchestrator/AiAgentCanvas.Orchestrator &amp;&amp; dotnet run</code></li>
         <li>Run the frontend: <code>cd frontend &amp;&amp; npm run dev</code></li>
         <li>Open the CopilotKit UI and interact with your agent</li>
         <li>Check the console logs for tool calls and governance events</li>

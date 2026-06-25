@@ -16,29 +16,34 @@
 
       <h2>Solution Layout</h2>
 
-      <p>The solution is organized into two solution folders:</p>
+      <p>The solution is organized into four top-level folders:</p>
 
       <ul>
-        <li><strong>AiAgentCanvas</strong> -- framework projects that ship as-is</li>
-        <li><strong>Custom</strong> -- business-specific projects you create and modify</li>
+        <li><strong>AiAgentCanvas</strong> -- SDK library projects that ship as-is</li>
+        <li><strong>Orchestrator</strong> -- the composition root that wires everything together</li>
+        <li><strong>Agents</strong> -- business-specific agent projects you create and modify</li>
+        <li><strong>DataConnections</strong> -- tool providers and vector stores</li>
       </ul>
 
       <div class="diagram">
 AiAgentCanvas.sln
 src/
-  AiAgentCanvas.Abstractions/   Shared types (zero dependencies)
-  AiAgentCanvas.Core/           Orchestration engine
-  AiAgentCanvas.AgentData/      Markdown-persisted agent data
-  AiAgentCanvas.Skills/         Skill store + MCP connections
-  AiAgentCanvas.Security/       Governance + rate limiting
-  AiAgentCanvas.Scheduler/      Hangfire scheduled tasks
-  AiAgentCanvas.Notifications/  In-memory notification sink + SSE
-  AiAgentCanvas.SystemTools/    Optional file I/O and script tools
-  AiAgentCanvas.Web/            Composition root
-  Custom/
-    HelloWorldAgent/            Starter agent: persona for market data tools
-    MCP.MarketData/             SEC EDGAR + Yahoo Finance tools
-    VectorStore.Sqlite/         SQLite vector store for RAG
+  AiAgentCanvas/                      SDK library
+    AiAgentCanvas.Abstractions/       Shared types (zero dependencies)
+    AiAgentCanvas.Core/               Orchestration engine
+    AiAgentCanvas.AgentData/          Markdown-persisted agent data
+    AiAgentCanvas.Skills/             Skill store + MCP connections
+    AiAgentCanvas.Security/           Governance + rate limiting
+    AiAgentCanvas.Scheduler/          Hangfire scheduled tasks
+    AiAgentCanvas.Notifications/      In-memory notification sink + SSE
+    AiAgentCanvas.SystemTools/        Optional file I/O and script tools
+  Orchestrator/
+    AiAgentCanvas.Orchestrator/       Composition root
+  Agents/
+    Agent.HelloWorld/                 Starter agent: persona for market data tools
+  DataConnections/
+    MCP.HelloWorldData/                   SEC EDGAR + Yahoo Finance tools
+    VectorStore.Sqlite/               SQLite vector store for RAG
       </div>
 
       <h2>Framework Projects</h2>
@@ -107,6 +112,10 @@ src/
             <td><code>IToolDependencySeed.cs</code></td>
             <td>Seed interface for declaring required tools, validated at startup</td>
           </tr>
+          <tr>
+            <td><code>IAgentMessaging.cs</code></td>
+            <td>Interface for agent-to-agent communication</td>
+          </tr>
         </tbody>
       </table>
 
@@ -173,6 +182,10 @@ src/
           <tr>
             <td><code>Agents/AgentMailboxToolProvider.cs</code></td>
             <td>Tools: <code>send_to_agent</code>, <code>check_inbox</code>, <code>reply_to_message</code></td>
+          </tr>
+          <tr>
+            <td><code>Agents/InProcessAgentMessaging.cs</code></td>
+            <td>In-process implementation of <code>IAgentMessaging</code> for agent-to-agent communication</td>
           </tr>
         </tbody>
       </table>
@@ -406,9 +419,9 @@ src/
 
       <p><strong>Dependencies:</strong> Microsoft.Extensions.AI</p>
 
-      <h3>AiAgentCanvas.Web</h3>
+      <h3>AiAgentCanvas.Orchestrator</h3>
 
-      <p>The composition root. Contains only <code>Program.cs</code> and configuration files. This is the only project that references all other projects.</p>
+      <p>The composition root (located in <code>src/Orchestrator/AiAgentCanvas.Orchestrator/</code>). Contains only <code>Program.cs</code> and configuration files. This is the only project that references all other projects.</p>
 
       <table>
         <thead>
@@ -433,13 +446,13 @@ src/
         </tbody>
       </table>
 
-      <h2>Custom Projects</h2>
+      <h2>Agent Projects</h2>
 
-      <p>The <code>src/Custom/</code> folder is where you add all business-specific code. Each custom project is a standalone class library that gets wired into the composition root.</p>
+      <p>The <code>src/Agents/</code> folder is where you add all business-specific agent code. Each agent project is a standalone class library that gets wired into the composition root.</p>
 
-      <h3>Custom/HelloWorldAgent</h3>
+      <h3>Agent.HelloWorld</h3>
 
-      <p>A complete starter example demonstrating the custom agent pattern. Seeds all component types (persona, guardrail, workflow, context, entity, skill) for a financial analyst that references tools from the <code>MCP.MarketData</code> data connection. Copy this project as a template for your own agents.</p>
+      <p>A complete starter example demonstrating the custom agent pattern (located in <code>src/Agents/Agent.HelloWorld/</code>). Seeds all component types (persona, guardrail, workflow, context, entity, skill) for a financial analyst that references tools from the <code>MCP.HelloWorldData</code> data connection. Copy this project as a template for your own agents.</p>
 
       <table>
         <thead>
@@ -458,9 +471,11 @@ src/
 
       <p><strong>Dependencies:</strong> Abstractions</p>
 
-      <h3>Custom/MCP.MarketData</h3>
+      <h2>Data Connection Projects</h2>
 
-      <p>A data connection providing SEC EDGAR and Yahoo Finance tools. Demonstrates the ToolProvider + ServiceExtensions pattern.</p>
+      <h3>MCP.HelloWorldData</h3>
+
+      <p>A data connection providing SEC EDGAR and Yahoo Finance tools (located in <code>src/DataConnections/MCP.HelloWorldData/</code>). Demonstrates the ToolProvider + ServiceExtensions pattern.</p>
 
       <table>
         <thead>
@@ -483,18 +498,18 @@ src/
 
       <p><strong>Dependencies:</strong> Microsoft.Extensions.AI, Microsoft.Extensions.Http.Resilience</p>
 
-      <h3>Custom/VectorStore.Sqlite</h3>
+      <h3>VectorStore.Sqlite</h3>
 
-      <p>A SQLite-based vector store used for RAG (Retrieval-Augmented Generation).</p>
+      <p>A SQLite-based vector store used for RAG (Retrieval-Augmented Generation), located in <code>src/DataConnections/VectorStore.Sqlite/</code>.</p>
 
-      <h2>Adding Your Own Custom Projects</h2>
+      <h2>Adding Your Own Projects</h2>
 
       <ol>
-        <li>Create a new folder under <code>src/Custom/</code></li>
+        <li>Create a new folder under <code>src/Agents/</code> (for agents) or <code>src/DataConnections/</code> (for tool providers)</li>
         <li>Add a <code>.csproj</code> targeting <code>net9.0</code></li>
         <li>Implement your agent prompts or tool providers</li>
-        <li>Add a <code>ProjectReference</code> in <code>AiAgentCanvas.Web.csproj</code></li>
-        <li>Add the project to <code>AiAgentCanvas.sln</code> under the Custom solution folder</li>
+        <li>Add a <code>ProjectReference</code> in <code>AiAgentCanvas.Orchestrator.csproj</code></li>
+        <li>Add the project to <code>AiAgentCanvas.sln</code> under the appropriate solution folder</li>
         <li>Wire up in <code>Program.cs</code></li>
       </ol>
 

@@ -12,7 +12,7 @@
     <main class="main-content">
       <h1>Configuration</h1>
 
-      <p>All backend configuration lives in <code>src/AiAgentCanvas.Web/appsettings.json</code>. This page covers every section and how to customize it for your environment.</p>
+      <p>All backend configuration lives in <code>src/Orchestrator/AiAgentCanvas.Orchestrator/appsettings.json</code>. This page covers every section and how to customize it for your environment.</p>
 
       <h2>Configuration File Structure</h2>
 
@@ -221,10 +221,10 @@ export Security__RateLimitPerMinute=60</code></pre>
 
       <p>The backend creates and uses these directories at runtime (relative to the working directory):</p>
 
-      <p>Agent data is split into two subdirectories under <code>agent-data/</code>:</p>
+      <p>Agent data uses per-agent directories under <code>agent-data/</code>. Each agent directory contains <code>agent/</code> (system-managed) and <code>user/</code> (hand-written, read-only to system) subdirectories:</p>
       <ul>
-        <li><strong><code>agent/</code></strong> -- System-managed. Seeds and tool-created content are written here.</li>
-        <li><strong><code>user/</code></strong> -- User-managed. Drop hand-written markdown files here; the system reads them but never overwrites them.</li>
+        <li><strong><code>orchestrator/</code></strong> -- The orchestrator's own agent data.</li>
+        <li><strong><code>shared/</code></strong> -- Data accessible to all agents.</li>
       </ul>
 
       <table>
@@ -236,32 +236,36 @@ export Security__RateLimitPerMinute=60</code></pre>
         </thead>
         <tbody>
           <tr>
-            <td><code>agent-data/agent/personas/</code></td>
+            <td><code>agent-data/orchestrator/agent/personas/</code></td>
             <td>System-created persona definitions</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/context/</code></td>
+            <td><code>agent-data/orchestrator/agent/context/</code></td>
             <td>System-created persistent context entries</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/workflows/</code></td>
+            <td><code>agent-data/orchestrator/agent/workflows/</code></td>
             <td>System-created workflow definitions</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/entities/</code></td>
+            <td><code>agent-data/orchestrator/agent/entities/</code></td>
             <td>System-created entity memory</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/profiles/</code></td>
+            <td><code>agent-data/orchestrator/agent/profiles/</code></td>
             <td>System-created user profiles</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/guardrails/</code></td>
+            <td><code>agent-data/orchestrator/agent/guardrails/</code></td>
             <td>System-created guardrail rules</td>
           </tr>
           <tr>
-            <td><code>agent-data/user/*/</code></td>
+            <td><code>agent-data/orchestrator/user/*/</code></td>
             <td>Hand-written markdown files for any domain (read-only to system)</td>
+          </tr>
+          <tr>
+            <td><code>agent-data/shared/agent/*/</code></td>
+            <td>Shared data accessible to all agents</td>
           </tr>
           <tr>
             <td><code>agent-data/skills/</code></td>
@@ -272,7 +276,7 @@ export Security__RateLimitPerMinute=60</code></pre>
             <td>SQLite database for skill records</td>
           </tr>
           <tr>
-            <td><code>agent-data/agent/goals/</code></td>
+            <td><code>agent-data/orchestrator/agent/goals/</code></td>
             <td>System-created goal definitions for autonomous execution</td>
           </tr>
           <tr>

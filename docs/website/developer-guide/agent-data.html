@@ -16,34 +16,41 @@
 
       <h2>Directory Layout</h2>
 
-      <p>Each domain stores markdown files under a common <code>agent-data/</code> root with two subdirectories:</p>
+      <p>Agent data defaults to per-agent directories under a common <code>agent-data/</code> root. The orchestrator and each agent get their own subdirectory, with a <code>shared/</code> directory for cross-agent data. Each subdirectory contains <code>agent/</code> (system writes) and <code>user/</code> (hand-written, read-only to system) folders:</p>
 
       <div class="diagram">
 agent-data/
-├── agent/          &larr; System writes here (seeds + tool-created content)
-│   ├── personas/
-│   ├── context/
-│   ├── workflows/
-│   ├── entities/
-│   ├── profiles/
-│   ├── guardrails/
-│   └── goals/
-└── user/           &larr; Hand-written MD files (read-only to system, never overwritten)
-    ├── personas/
-    ├── context/
-    ├── workflows/
-    ├── entities/
-    ├── profiles/
-    ├── guardrails/
-    └── goals/
+├── orchestrator/       &larr; Orchestrator's own agent data
+│   ├── agent/          &larr; System writes here (seeds + tool-created content)
+│   │   ├── personas/
+│   │   ├── context/
+│   │   ├── workflows/
+│   │   ├── entities/
+│   │   ├── profiles/
+│   │   ├── guardrails/
+│   │   └── goals/
+│   └── user/           &larr; Hand-written MD files (read-only to system, never overwritten)
+│       ├── personas/
+│       ├── context/
+│       └── ...
+└── shared/             &larr; Shared data accessible to all agents
+    ├── agent/
+    │   ├── personas/
+    │   ├── context/
+    │   └── ...
+    └── user/
+        ├── personas/
+        ├── context/
+        └── ...
       </div>
 
       <ul>
         <li><strong><code>agent/</code></strong> -- All system writes go here: seed data from custom agents and content created via chat tools (create_persona, save_context, etc.).</li>
         <li><strong><code>user/</code></strong> -- A place for hand-written markdown files that the system reads but never overwrites. This is the no-code alternative to implementing seed interfaces -- simply drop a properly formatted markdown file into the appropriate subdirectory.</li>
+        <li><strong><code>shared/</code></strong> -- Data that is accessible to all agents. Use the <code>sharedRootDirectory</code> parameter when registering domains to enable shared data alongside per-agent data.</li>
       </ul>
 
-      <p>Both directories are created automatically on startup. Each store's <code>ListAll()</code> method merges files from both directories, so the LLM sees user-provided and system-created data together.</p>
+      <p>All directories are created automatically on startup. Each store's <code>ListAll()</code> method merges files from both the per-agent and shared directories, so the LLM sees user-provided, system-created, and shared data together.</p>
 
       <h2>The Seven Domains</h2>
 
@@ -274,15 +281,20 @@ string safe = MarkdownFile.SanitizeFileName("Code Reviewer"); // "code-reviewer"
 
       <p>The <code>AgentDataServiceExtensions</code> class provides one <code>Add*()</code> method per domain. Each method registers the Store, ToolProvider, tools, and (where applicable) the AIContextProvider.</p>
 
-      <pre><code>private const string DefaultRoot = "./agent-data";
+      <pre><code>private const string DefaultRoot = "./agent-data/orchestrator";
+private const string DefaultSharedRoot = "./agent-data/shared";
 
 public static IServiceCollection AddAiAgentCanvasPersonas(
     this IServiceCollection services,
-    string rootDirectory = DefaultRoot)
+    string rootDirectory = DefaultRoot,
+    string? sharedRootDirectory = DefaultSharedRoot)
 {
     var store = new PersonaStore(
         Path.Combine(rootDirectory, "agent", "personas"),   // system writes
-        Path.Combine(rootDirectory, "user", "personas"));   // user-provided (read-only)
+        Path.Combine(rootDirectory, "user", "personas"),    // user-provided (read-only)
+        sharedRootDirectory is not null
+            ? Path.Combine(sharedRootDirectory, "agent", "personas")
+            : null);                                        // shared data (optional)
     services.AddSingleton(store);
     services.AddSingleton&lt;PersonaToolProvider&gt;();
     services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;

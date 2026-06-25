@@ -94,7 +94,7 @@ function buildHeader() {
   const header = document.createElement('header');
   header.className = 'site-header';
   header.innerHTML = `
-    <a href="${base}index.html" class="logo"><span>AI Agent Canvas</span></a>
+    <a href="${base}../index.html" class="logo"><span>AI Agent Canvas</span></a>
     <button class="menu-toggle" onclick="toggleMobileNav()" aria-label="Toggle menu">&#9776;</button>
     <nav>
       ${TOP_NAV.map(n => `<a href="${base}${n.href}" class="${currentSection && n.href.includes(currentSection) ? 'active' : ''}">${n.title}</a>`).join('')}
