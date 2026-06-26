@@ -436,4 +436,4 @@ The service catalog is maintained as managed entities:
 
 ---
 
-> **[Download the complete PDF guide](guides/AI-Agent-Canvas-Guide.pdf)**
+> **[Download the complete PDF guide](guides/AI-Agent-Canvas-Guide.pdf)** | **[AI-First Company Guide](guides/AI-First-Company-Guide.pdf)**

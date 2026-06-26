@@ -1465,4 +1465,4 @@ The AG-UI protocol provides a clean boundary between the .NET agent backend and 
 
 ---
 
-> **[Download the complete PDF guide](guides/AI-Agent-Canvas-Guide.pdf)**
+> **[Download the complete PDF guide](guides/AI-Agent-Canvas-Guide.pdf)** | **[AI-First Company Guide](guides/AI-First-Company-Guide.pdf)**

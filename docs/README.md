@@ -23,6 +23,7 @@ The **Markdown** files are readable directly in GitHub and VS Code. The **Websit
 ## Downloadable Guides
 
 - [AI Agent Canvas Complete Guide (PDF)](guides/AI-Agent-Canvas-Guide.pdf)
+- [AI-First Company Guide (PDF)](guides/AI-First-Company-Guide.pdf)
 
 ## Folder Structure
 
@@ -35,7 +36,8 @@ docs/
 ├── user-guide.md               # User Guide (markdown)
 ├── developer-guide.md          # Developer Guide (markdown)
 ├── guides/
-│   └── AI-Agent-Canvas-Guide.pdf
+│   ├── AI-Agent-Canvas-Guide.pdf
+│   └── AI-First-Company-Guide.pdf
 ├── website/
 │   ├── styles.css
 │   ├── layout.js
@@ -45,5 +47,4 @@ docs/
 │   ├── user-guide/             # 8 HTML pages
 │   └── developer-guide/        # 9 HTML pages
 ├── generate_pdf.py             # PDF generator script
-└── generate_dsar_agent_pdf.py  # DSAR guide generator (internal)
 ```
