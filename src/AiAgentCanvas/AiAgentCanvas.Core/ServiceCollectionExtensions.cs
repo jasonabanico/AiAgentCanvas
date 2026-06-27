@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 
@@ -103,6 +104,10 @@ public static class ServiceCollectionExtensions
             return (AIAgent)builder.Build(sp);
         });
 
+        services.AddSingleton<AIHealthCheck>();
+        services.AddHostedService(sp => sp.GetRequiredService<AIHealthCheck>());
+        services.AddHealthChecks().AddCheck<AIHealthCheck>("ai-agent-pipeline");
+
         services.AddCors(cors =>
         {
             cors.AddDefaultPolicy(policy =>
@@ -153,7 +158,9 @@ public static class ServiceCollectionExtensions
             var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
                 personaLookup, personaListAll, loggerFactory);
 
-            registry.RegisterDefault(sp.GetRequiredService<AIAgent>());
+            // Defer RegisterDefault to avoid circular dependency:
+            // AIAgent -> IReadOnlyList<AITool> -> AgentRegistryToolProvider -> AgentRegistry -> AIAgent
+            registry.SetDefaultAgentFactory(() => sp.GetRequiredService<AIAgent>());
             return registry;
         });
 
@@ -174,19 +181,31 @@ public static class ServiceCollectionExtensions
     {
         app.UseCors();
         app.MapAgUiEndpoints();
-        app.MapGet("/api/health", (AIFoundryClientFactory factory) =>
+        app.MapHealthChecks("/api/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
-            try
-            {
-                factory.CreateChatClient();
-                return Results.Ok(new { status = "healthy", ai = true });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Ok(new { status = "healthy", ai = false, message = ex.Message });
-            }
+            ResponseWriter = WriteHealthResponse,
         });
         return app;
+    }
+
+    private static async Task WriteHealthResponse(HttpContext context, HealthReport report)
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            duration_ms = report.TotalDuration.TotalMilliseconds,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration_ms = e.Value.Duration.TotalMilliseconds,
+                data = e.Value.Data,
+                error = e.Value.Exception?.Message,
+            }),
+        };
+        await context.Response.WriteAsJsonAsync(result);
     }
 }
 

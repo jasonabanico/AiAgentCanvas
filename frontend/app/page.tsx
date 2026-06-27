@@ -13,7 +13,11 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{
+    status: string;
+    message: string;
+    details?: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,20 +48,42 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    setHealthStatus({ status: "checking", message: "Running health checks..." });
     fetch("/api/health")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.ai) {
-          setConfigError(
-            data.message ||
-              "AI service is not configured. Update appsettings.json with valid Azure AI Foundry credentials."
-          );
+        if (data.status === "Healthy") {
+          const durationMs = Math.round(data.duration_ms);
+          setHealthStatus({
+            status: "healthy",
+            message: `All systems operational (${durationMs}ms)`,
+          });
+          setTimeout(() => setHealthStatus(null), 5000);
+        } else {
+          const check = data.checks?.[0];
+          const checkData = check?.data || {};
+          const parts: string[] = [];
+          if (checkData.ai_connectivity === "fail")
+            parts.push("Azure AI endpoint is not responding");
+          if (checkData.agent_pipeline === "timeout")
+            parts.push("Agent pipeline timed out — too many tools or slow model");
+          if (checkData.agent_pipeline === "fail")
+            parts.push("Agent pipeline error: " + (checkData.agent_error || "unknown"));
+          if (checkData.agent_pipeline === "no_output")
+            parts.push("Agent pipeline returned no output");
+
+          setHealthStatus({
+            status: data.status === "Degraded" ? "degraded" : "unhealthy",
+            message: check?.description || "System is not healthy",
+            details: parts.join(". ") || check?.error || undefined,
+          });
         }
       })
       .catch(() => {
-        setConfigError(
-          "Cannot reach backend. Make sure the server is running."
-        );
+        setHealthStatus({
+          status: "unhealthy",
+          message: "Cannot reach backend. Make sure the server is running.",
+        });
       });
   }, []);
 
@@ -84,7 +110,7 @@ export default function Home() {
     ]);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     try {
       const res = await fetch("/api/copilotkit", {
@@ -148,7 +174,7 @@ export default function Home() {
       clearTimeout(timeout);
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "Request timed out after 30 seconds. The AI service may not be configured correctly."
+          ? "Request timed out after 120 seconds. The AI service may not be configured correctly."
           : err instanceof Error
             ? err.message
             : "Something went wrong";
@@ -172,9 +198,30 @@ export default function Home() {
         <p style={styles.subtitle}>Multi-agent enterprise copilot</p>
       </header>
 
-      {configError && (
-        <div style={styles.banner}>
-          <strong>Configuration required:</strong> {configError}
+      {healthStatus && (
+        <div
+          style={{
+            ...styles.banner,
+            ...(healthStatus.status === "healthy"
+              ? styles.bannerHealthy
+              : healthStatus.status === "checking"
+                ? styles.bannerChecking
+                : styles.bannerUnhealthy),
+          }}
+        >
+          <strong>
+            {healthStatus.status === "healthy"
+              ? "✓"
+              : healthStatus.status === "checking"
+                ? "⟳"
+                : "✗"}
+          </strong>{" "}
+          {healthStatus.message}
+          {healthStatus.details && (
+            <span style={{ display: "block", marginTop: "4px", opacity: 0.85 }}>
+              {healthStatus.details}
+            </span>
+          )}
         </div>
       )}
 
@@ -254,11 +301,24 @@ const styles: Record<string, React.CSSProperties> = {
   },
   banner: {
     padding: "12px 24px",
-    background: "#fef3c7",
-    color: "#92400e",
-    borderBottom: "1px solid #fcd34d",
+    borderBottom: "1px solid",
     fontSize: "0.875rem",
     lineHeight: 1.5,
+  },
+  bannerHealthy: {
+    background: "#f0fdf4",
+    color: "#166534",
+    borderBottomColor: "#86efac",
+  },
+  bannerChecking: {
+    background: "#f0f9ff",
+    color: "#1e40af",
+    borderBottomColor: "#93c5fd",
+  },
+  bannerUnhealthy: {
+    background: "#fef2f2",
+    color: "#991b1b",
+    borderBottomColor: "#fecaca",
   },
   chatArea: {
     flex: 1,

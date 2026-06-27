@@ -83,7 +83,7 @@ public static class AgUiEndpoint
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
-            cts.CancelAfter(TimeSpan.FromSeconds(60));
+            cts.CancelAfter(TimeSpan.FromSeconds(120));
 
             logger.LogInformation("Creating agent session. ThreadId={ThreadId}", threadId);
             var session = await agent.CreateSessionAsync(cts.Token);
@@ -103,11 +103,11 @@ public static class AgUiEndpoint
         }
         catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
         {
-            logger.LogWarning("Agent execution timed out after 60s. ThreadId={ThreadId}", threadId);
+            logger.LogWarning("Agent execution timed out after 120s. ThreadId={ThreadId}", threadId);
             await WriteEvent(context, "text.message.content", new
             {
                 messageId,
-                delta = "\n\n**Error:** Request timed out after 60 seconds. Check your Azure AI endpoint and credentials."
+                delta = "\n\n**Error:** Request timed out after 120 seconds. Check your Azure AI endpoint and credentials."
             });
         }
         catch (Exception ex)

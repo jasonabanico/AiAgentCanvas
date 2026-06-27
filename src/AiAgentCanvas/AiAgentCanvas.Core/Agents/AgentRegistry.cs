@@ -21,6 +21,7 @@ public sealed class AgentRegistry
     private readonly Func<string, AgentPersonaInfo?> _personaLookup;
     private readonly Func<IEnumerable<AgentPersonaInfo>> _personaListAll;
     private readonly ILoggerFactory _loggerFactory;
+    private Func<AIAgent>? _defaultAgentFactory;
 
     public AgentRegistry(
         IChatClient chatClient,
@@ -43,13 +44,27 @@ public sealed class AgentRegistry
         _agents["default"] = agent;
     }
 
+    public void SetDefaultAgentFactory(Func<AIAgent> factory)
+    {
+        _defaultAgentFactory = factory;
+    }
+
     public AIAgent? Resolve(string name)
     {
         if (_agents.TryGetValue(name, out var cached))
             return cached;
 
         if (name.Equals("default", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_defaultAgentFactory is { } factory)
+            {
+                var defaultAgent = factory();
+                _agents["default"] = defaultAgent;
+                _defaultAgentFactory = null;
+                return defaultAgent;
+            }
             return _agents.GetValueOrDefault("default");
+        }
 
         var persona = _personaLookup(name);
         if (persona is null) return null;
