@@ -94,7 +94,7 @@ This guide walks you through installing, configuring, and running AI Agent Canva
 
 Before you begin, make sure you have the following installed:
 
-- **.NET 9 SDK** -- [Download from Microsoft](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **.NET SDK** -- [Download from Microsoft](https://dotnet.microsoft.com/download/dotnet/9.0)
 - **Node.js 18+** -- [Download from nodejs.org](https://nodejs.org/)
 - **Azure AI Foundry account** (or any OpenAI-compatible endpoint) -- You need an endpoint URL, an API key, and a model deployment name.
 

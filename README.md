@@ -1,6 +1,6 @@
 # [AI Agent Canvas](https://jasonabanico.github.io/AiAgentCanvas/)
 
-A multi-agent enterprise copilot platform built with .NET 9, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry — with inter-agent communication, autonomous goal execution, and runtime governance.
+A multi-agent enterprise copilot platform built with .NET, Microsoft Agent Framework (MAF), CopilotKit, and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry — with inter-agent communication, autonomous goal execution, and runtime governance.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ Agents start **in-process** (running inside the Orchestrator) but are designed t
 
 ### Prerequisites
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download)
+- [.NET SDK](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - An Azure OpenAI deployment (or any OpenAI-compatible endpoint)
 - No additional API keys needed (Yahoo Finance and SEC EDGAR are free)

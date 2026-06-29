@@ -83,7 +83,7 @@
 
 ## Architecture Overview
 
-AI Agent Canvas is a .NET 9 multi-agent copilot platform built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.
+AI Agent Canvas is a .NET multi-agent copilot platform built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.
 
 ### Request Flow
 
