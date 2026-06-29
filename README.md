@@ -145,7 +145,7 @@ All seeded components are saved to disk on first startup (seeds never overwrite 
 - **Personas** — switch agent behavior with custom system prompts
 - **Workflows** — define multi-step procedures the agent executes
 - **Guardrails** — policy rules that constrain agent behavior
-- **70+ built-in tools** — market data, personas, context, workflows, entities, guardrails, goals, skills, MCP, system tools, and more
+- **70+ built-in tools** — personas, context, workflows, entities, guardrails, goals, skills, MCP, system tools, and more
 - **MCP connections** — connect to external MCP servers at runtime for additional tools
 - **Scheduled tasks** — Hangfire-powered recurring agent invocations
 - **Autonomous execution** — goal-driven work queue with a Hangfire job that claims, executes, and reports on work items without user input

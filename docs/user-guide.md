@@ -441,7 +441,7 @@ A typical tool call flow:
 3. The tool executes and returns data.
 4. The agent incorporates the result into its response.
 
-The agent has access to 70+ built-in tools spanning market data, personas, context, workflows, entities, user profiles, guardrails, goals, skills, scheduling, and MCP connections. See [Skills & Tools](#skills--tools) for details.
+The agent has access to 70+ built-in tools spanning personas, context, workflows, entities, user profiles, guardrails, goals, skills, scheduling, and MCP connections. See [Skills & Tools](#skills--tools) for details.
 
 ### Conversation Context
 
