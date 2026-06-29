@@ -195,7 +195,7 @@ Try these to explore the main features:
 | `src/AiAgentCanvas/` | SDK library projects (Core, AgentData, Security, Skills, etc.) |
 | `src/Orchestrator/AiAgentCanvas.Orchestrator/` | Composition root -- wires everything together |
 | `src/Agents/Agent.HelloWorld/` | Starter example: persona seed for market data tools |
-| `src/DataConnections/MCP.HelloWorldData/` | SEC EDGAR + Yahoo Finance data tools |
+| `src/DataConnections/MCP.HelloWorldData/` | Sample data connection (SEC EDGAR + Yahoo Finance) |
 | `src/DataConnections/VectorStore.Sqlite/` | SQLite vector store for RAG |
 | `frontend/` | Next.js + CopilotKit chat UI |
 | `agent-data/orchestrator/` | Orchestrator's runtime data (personas, context, workflows, entities, guardrails) |
@@ -619,7 +619,7 @@ AI Agent Canvas comes with built-in tools and lets you create custom skills and 
 
 ### Built-In Tools
 
-The following tools are available out of the box when the MarketData MCP module is enabled:
+The following sample tools are included when the MarketData MCP module is enabled:
 
 | Tool | Description |
 |------|-------------|
@@ -748,7 +748,7 @@ Removes the connection and unregisters its tools.
 
 AI Agent Canvas uses a dynamic tool registry that aggregates tools from multiple sources:
 
-1. **Built-in tools** -- Compiled into the application (MarketData tools).
+1. **Sample tools** -- Compiled into the application (e.g., MarketData tools). Replace or extend with your own.
 2. **Agent data tools** -- Persona, context, workflow, entity, profile, guardrail, and goal management tools.
 3. **Scheduling and autonomous tools** -- Scheduled tasks, start/stop autonomous mode, manage the work queue.
 4. **Inter-agent tools** -- Agent registry, mailbox, and handoff tools for multi-agent collaboration.

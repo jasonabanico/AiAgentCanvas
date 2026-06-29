@@ -36,7 +36,7 @@ src/
 ├── Agents/
 │   └── Agent.HelloWorld/           # Starter agent: financial analyst persona
 └── DataConnections/
-    ├── MCP.HelloWorldData/             # SEC EDGAR + Yahoo Finance tools
+    ├── MCP.HelloWorldData/             # Sample data connection (SEC EDGAR + Yahoo Finance)
     └── VectorStore.Sqlite/         # SQLite vector store for RAG
 
 agent-data/                         # Per-agent runtime data (created on first run)
@@ -57,7 +57,7 @@ Agents start **in-process** (running inside the Orchestrator) but are designed t
 - [.NET SDK](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - An Azure OpenAI deployment (or any OpenAI-compatible endpoint)
-- No additional API keys needed (Yahoo Finance and SEC EDGAR are free)
+- No additional API keys needed for the included samples (Yahoo Finance and SEC EDGAR are free)
 
 ### 1. Configure
 
@@ -161,7 +161,7 @@ All seeded components are saved to disk on first startup (seeds never overwrite 
 | Backend | ASP.NET Core 9, Minimal APIs |
 | Agent Framework | Microsoft Agent Framework (MAF) |
 | AI | Azure AI Foundry (`Azure.AI.OpenAI`) |
-| Data | SEC EDGAR (free), Yahoo Finance (free) |
+| Data | MCP tool providers (sample: SEC EDGAR, Yahoo Finance) |
 | Scheduling | Hangfire with SQLite |
 | Autonomous | Goal Store, Work Queue (SQLite), AutonomousAgentJob |
 | Inter-Agent | Agent Registry, Mailbox (SQLite), Handoff |

@@ -139,7 +139,7 @@ src/
   Agents/
     Agent.HelloWorld/                <-- Starter agent: persona for market data tools
   DataConnections/
-    MCP.HelloWorldData/              <-- SEC EDGAR + Yahoo Finance tools
+    MCP.HelloWorldData/              <-- Sample data connection (SEC EDGAR + Yahoo Finance)
     VectorStore.Sqlite/              <-- SQLite vector store for RAG
 ```
 
@@ -246,7 +246,7 @@ src/
   Agents/
     Agent.HelloWorld/                 Starter agent: persona for market data tools
   DataConnections/
-    MCP.HelloWorldData/                   SEC EDGAR + Yahoo Finance tools
+    MCP.HelloWorldData/                   Sample data connection (SEC EDGAR + Yahoo Finance)
     VectorStore.Sqlite/               SQLite vector store for RAG
 ```
 
@@ -410,7 +410,7 @@ A complete starter example demonstrating the custom agent pattern (located in `s
 
 #### MCP.HelloWorldData
 
-A data connection providing SEC EDGAR and Yahoo Finance tools (located in `src/DataConnections/MCP.HelloWorldData/`). Demonstrates the ToolProvider + ServiceExtensions pattern.
+A sample data connection providing SEC EDGAR and Yahoo Finance tools (located in `src/DataConnections/MCP.HelloWorldData/`). Demonstrates the ToolProvider + ServiceExtensions pattern. Copy this project as a template for your own data connections.
 
 | File | Purpose |
 |------|---------|
@@ -2258,7 +2258,7 @@ dotnet sln AiAgentCanvas.sln add src/Custom/MCP.Weather/MCP.Weather.csproj --sol
 
 ### Full Reference: MCP.HelloWorldData
 
-The `MCP.HelloWorldData` project in `src/Custom/MCP.HelloWorldData/` is the built-in reference implementation. It provides three tools for stock market data.
+The `MCP.HelloWorldData` project in `src/Custom/MCP.HelloWorldData/` is the included sample implementation. It provides three tools for stock market data.
 
 #### MarketDataToolProvider.cs
 
