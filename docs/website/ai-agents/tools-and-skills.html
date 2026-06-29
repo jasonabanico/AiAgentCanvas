@@ -18,11 +18,11 @@
 
       <p>In the Microsoft.Extensions.AI ecosystem, a tool is represented by the <code>AITool</code> base class. The most common concrete type is <code>AIFunction</code>, which wraps a .NET method so the LLM can call it.</p>
 
-      <p>The LLM never executes tools directly. Instead, it receives tool <strong>schemas</strong> (name, description, parameter definitions) and decides when to call them. The framework handles execution and feeds results back.</p>
+      <p>The LLM never executes tools directly. Instead, it receives tool <strong>schemas</strong> (name, description, parameter definitions) and decides when to call them. The platform handles execution and feeds results back.</p>
 
       <h3>AIFunction and AIFunctionFactory</h3>
 
-      <p><code>AIFunctionFactory.Create</code> is the primary way to define tools in AI Agent Canvas. It takes a delegate and metadata, producing an <code>AITool</code> the framework can register:</p>
+      <p><code>AIFunctionFactory.Create</code> is the primary way to define tools in AI Agent Canvas. It takes a delegate and metadata, producing an <code>AITool</code> the platform can register:</p>
 
       <pre><code>public IReadOnlyList&lt;AITool&gt; GetTools()
 {
@@ -67,7 +67,7 @@ private async Task&lt;string&gt; ConnectMcpServer(
                    |
                    v
            +----------------+
-           | Framework      |
+           | Platform       |
            | executes       |
            | ListMcp...()   |
            +-------+--------+
@@ -91,8 +91,8 @@ private async Task&lt;string&gt; ConnectMcpServer(
       <p>Key points about tool execution:</p>
 
       <ol>
-        <li><strong>The LLM chooses</strong> -- The framework never forces a tool call. The LLM infers from context and tool descriptions.</li>
-        <li><strong>The framework executes</strong> -- Tool methods run in the server process, not in the LLM. This is important for security and data access.</li>
+        <li><strong>The LLM chooses</strong> -- The platform never forces a tool call. The LLM infers from context and tool descriptions.</li>
+        <li><strong>The platform executes</strong> -- Tool methods run in the server process, not in the LLM. This is important for security and data access.</li>
         <li><strong>Results feed back</strong> -- Tool output becomes a new message in the conversation, and the LLM generates its response with that information.</li>
         <li><strong>Multiple rounds</strong> -- The LLM can call multiple tools in sequence, using each result to inform the next step.</li>
       </ol>
@@ -221,7 +221,7 @@ private async Task&lt;string&gt; ConnectMcpServer(
 
       <h3>Running a Skill</h3>
 
-      <p>When the skill is invoked via <code>run_skill</code>, the framework substitutes the <code>{input}</code> placeholder and sends the expanded prompt to the agent:</p>
+      <p>When the skill is invoked via <code>run_skill</code>, the platform substitutes the <code>{input}</code> placeholder and sends the expanded prompt to the agent:</p>
 
       <pre><code>private async Task&lt;string&gt; RunSkill(string name, string input, CancellationToken ct)
 {

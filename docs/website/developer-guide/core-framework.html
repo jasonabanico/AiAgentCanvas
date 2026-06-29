@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Core Framework - AI Agent Canvas</title>
+  <title>Core Platform - AI Agent Canvas</title>
   <link rel="stylesheet" href="../styles.css">
   <script src="../layout.js"></script>
 </head>
 <body>
   <div class="page-layout">
     <main class="main-content">
-      <h1>Core Framework</h1>
+      <h1>Core Platform</h1>
 
       <p>The <code>AiAgentCanvas.Core</code> project is the orchestration engine. It registers the LLM client, manages tools and context providers, and exposes the AG-UI SSE endpoint that CopilotKit connects to.</p>
 
@@ -257,7 +257,7 @@ data: {"threadId":"abc-123","runId":"def-456"}</code></pre>
 
       <h2>Context Provider Pipeline</h2>
 
-      <p><code>AIContextProvider</code> subclasses form a pipeline that runs before each LLM invocation. Each provider can modify the <code>AIContext</code> (instructions, tools, or other metadata). The framework registers several providers:</p>
+      <p><code>AIContextProvider</code> subclasses form a pipeline that runs before each LLM invocation. Each provider can modify the <code>AIContext</code> (instructions, tools, or other metadata). The platform registers several providers:</p>
 
       <table>
         <thead>

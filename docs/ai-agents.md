@@ -131,13 +131,13 @@ This loop continues until the agent determines the task is complete or reaches a
 
 ### Where AI Agent Canvas Fits
 
-AI Agent Canvas is a **multi-agent enterprise copilot framework** built on three pillars:
+AI Agent Canvas is a **multi-agent enterprise copilot platform** built on three pillars:
 
 - **Microsoft Agent Framework (MAF)** for agent orchestration and the LLM execution loop
 - **Azure AI Foundry** as the LLM provider (GPT-4o, GPT-4.1, and other models)
 - **CopilotKit** with the AG-UI protocol for real-time streaming to the frontend
 
-The framework is designed around separation of concerns:
+The platform is designed around separation of concerns:
 
 ```
 +---------------------------------------------+
@@ -156,7 +156,7 @@ The framework is designed around separation of concerns:
 - **MCP** provides data connections. Each MCP project implements data access for a specific domain.
 - **MyAgents** contains custom agent reasoning logic. Agents are pure reasoning -- no HTTP calls, no SDK imports for data. They access data exclusively through tools provided by MCP connections.
 
-This architecture means you can build enterprise copilots by composing **agents** (reasoning), **MCP connections** (data), and **context providers** (behavioral instructions) without modifying the core framework.
+This architecture means you can build enterprise copilots by composing **agents** (reasoning), **MCP connections** (data), and **context providers** (behavioral instructions) without modifying the core platform.
 
 ---
 
@@ -177,7 +177,7 @@ services.AddChatClient(sp =>
     sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient());
 ```
 
-This abstraction means the framework is not locked to a specific LLM provider. Swapping from Azure AI Foundry to another provider requires only changing the `IChatClient` registration.
+This abstraction means the platform is not locked to a specific LLM provider. Swapping from Azure AI Foundry to another provider requires only changing the `IChatClient` registration.
 
 #### ChatClientAgent
 
@@ -378,11 +378,11 @@ Tools are how AI agents interact with the world. Without tools, an agent can onl
 
 In the Microsoft.Extensions.AI ecosystem, a tool is represented by the `AITool` base class. The most common concrete type is `AIFunction`, which wraps a .NET method so the LLM can call it.
 
-The LLM never executes tools directly. Instead, it receives tool **schemas** (name, description, parameter definitions) and decides when to call them. The framework handles execution and feeds results back.
+The LLM never executes tools directly. Instead, it receives tool **schemas** (name, description, parameter definitions) and decides when to call them. The platform handles execution and feeds results back.
 
 #### AIFunction and AIFunctionFactory
 
-`AIFunctionFactory.Create` is the primary way to define tools in AI Agent Canvas. It takes a delegate and metadata, producing an `AITool` the framework can register:
+`AIFunctionFactory.Create` is the primary way to define tools in AI Agent Canvas. It takes a delegate and metadata, producing an `AITool` the platform can register:
 
 ```csharp
 public IReadOnlyList<AITool> GetTools()
@@ -432,7 +432,7 @@ User: "What MCP servers are connected?"
                    |
                    v
            +----------------+
-           | Framework      |
+           | Platform       |
            | executes       |
            | ListMcp...()   |
            +-------+--------+
@@ -456,8 +456,8 @@ User: "What MCP servers are connected?"
 
 Key points about tool execution:
 
-1. **The LLM chooses** -- The framework never forces a tool call. The LLM infers from context and tool descriptions.
-2. **The framework executes** -- Tool methods run in the server process, not in the LLM. This is important for security and data access.
+1. **The LLM chooses** -- The platform never forces a tool call. The LLM infers from context and tool descriptions.
+2. **The platform executes** -- Tool methods run in the server process, not in the LLM. This is important for security and data access.
 3. **Results feed back** -- Tool output becomes a new message in the conversation, and the LLM generates its response with that information.
 4. **Multiple rounds** -- The LLM can call multiple tools in sequence, using each result to inform the next step.
 
@@ -556,7 +556,7 @@ private string CreateSkill(string name, string description, string promptTemplat
 
 #### Running a Skill
 
-When the skill is invoked via `run_skill`, the framework substitutes the `{input}` placeholder and sends the expanded prompt to the agent:
+When the skill is invoked via `run_skill`, the platform substitutes the `{input}` placeholder and sends the expanded prompt to the agent:
 
 ```csharp
 private async Task<string> RunSkill(string name, string input, CancellationToken ct)
@@ -648,7 +648,7 @@ AI Agent Canvas implements MCP through two main components:
 
 #### McpClient and HttpClientTransport
 
-The framework uses the `ModelContextProtocol.Client` library to connect to MCP servers:
+The platform uses the `ModelContextProtocol.Client` library to connect to MCP servers:
 
 ```csharp
 IClientTransport clientTransport = transport.ToLowerInvariant() switch
@@ -742,7 +742,7 @@ AI Agent Canvas uses both MCP tools and local tools. Understanding the distincti
 | Availability | Always available | Only while connected |
 | Schema source | `[Description]` attributes | MCP server's tool listing |
 
-From the LLM's perspective, both types are identical. The framework abstracts the execution mechanism, so the agent reasons about tools purely based on their names and descriptions.
+From the LLM's perspective, both types are identical. The platform abstracts the execution mechanism, so the agent reasons about tools purely based on their names and descriptions.
 
 ### Tool Composition Example
 

@@ -4,7 +4,7 @@
 
 - [Architecture Overview](#architecture-overview)
   - [Request Flow](#request-flow)
-  - [Framework vs Custom Separation](#framework-vs-custom-separation)
+  - [Platform vs Custom Separation](#platform-vs-custom-separation)
   - [Dependency Flow](#dependency-flow)
   - [Key Packages](#key-packages)
   - [Extension Method Pattern](#extension-method-pattern)
@@ -12,11 +12,11 @@
   - [Autonomous Execution](#autonomous-execution)
 - [Project Structure](#project-structure)
   - [Solution Layout](#solution-layout)
-  - [Framework Projects](#framework-projects)
+  - [Platform Projects](#platform-projects)
   - [Agent Projects](#agent-projects)
   - [Data Connection Projects](#data-connection-projects)
   - [Adding Your Own Projects](#adding-your-own-projects)
-- [Core Framework](#core-framework)
+- [Core Platform](#core-platform)
   - [ServiceCollectionExtensions](#servicecollectionextensions)
   - [AIFoundryClientFactory](#aifoundryclientfactory)
   - [AgUiEndpoint](#aguiendpoint)
@@ -83,7 +83,7 @@
 
 ## Architecture Overview
 
-AI Agent Canvas is a .NET 9 multi-agent copilot framework built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.
+AI Agent Canvas is a .NET 9 multi-agent copilot platform built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.
 
 ### Request Flow
 
@@ -115,13 +115,13 @@ Streaming Response
 CopilotKit renders response
 ```
 
-### Framework vs Custom Separation
+### Platform vs Custom Separation
 
-The solution enforces a strict boundary between framework code and business logic.
+The solution enforces a strict boundary between platform code and business logic.
 
-**Framework projects** (under `src/AiAgentCanvas.*`) provide the engine: orchestration, tool registry, agent data persistence, skills management, security, scheduling, and notifications. These never change per use case.
+**Platform projects** (under `src/AiAgentCanvas.*`) provide the engine: orchestration, tool registry, agent data persistence, skills management, security, scheduling, and notifications. These never change per use case.
 
-**Custom projects** (under `src/Agents/` and `src/DataConnections/`) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any framework code.
+**Custom projects** (under `src/Agents/` and `src/DataConnections/`) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any platform code.
 
 ```
 src/
@@ -165,7 +165,7 @@ Key dependency rules:
 - **Abstractions** has zero project references. It defines `MarkdownFile`, `DocumentRecord`, `INotificationSink`, `IToolGovernanceWrapper`, and the seed interfaces (`IPersonaSeed`, `IGuardrailSeed`, `IWorkflowSeed`, `IContextSeed`, `IEntitySeed`, `IGoalSeed`, `ISkillSeed`, `IMcpConnectionSeed`, `IToolDependencySeed`).
 - **Core** references Abstractions. It provides `IChatClient` registration, `DynamicToolRegistry`, `AIContextProvider` base, tool governance wiring, the AG-UI endpoint, and inter-agent communication (`AgentRegistry`, `AgentMailbox`, handoff tools).
 - **AgentData, Skills, Security, Scheduler, Notifications** each reference Core and/or Abstractions. AgentData also includes the Goals domain with a SQLite-backed work queue.
-- **Agent projects** reference `Abstractions` (for seed interfaces) -- they never reference Core, AgentData, or any other framework project.
+- **Agent projects** reference `Abstractions` (for seed interfaces) -- they never reference Core, AgentData, or any other platform project.
 - **DataConnection projects** reference `Microsoft.Extensions.AI` (for tool definitions) -- they are independent of the SDK.
 - **Orchestrator** references everything and wires it together in `Program.cs`.
 
@@ -198,7 +198,7 @@ app.UseAiAgentCanvas();          // CORS + AG-UI endpoint + health check
 app.MapNotificationEndpoints();  // SSE notification stream
 ```
 
-Tools are registered as `IReadOnlyList<AITool>` singleton services. The Core framework collects all registered `IReadOnlyList<AITool>` services at startup and passes them to the `ChatClientAgent` via `ChatOptions.Tools`. Additionally, `DynamicToolRegistry` allows runtime tool registration (used by MCP connections).
+Tools are registered as `IReadOnlyList<AITool>` singleton services. The Core platform collects all registered `IReadOnlyList<AITool>` services at startup and passes them to the `ChatClientAgent` via `ChatOptions.Tools`. Additionally, `DynamicToolRegistry` allows runtime tool registration (used by MCP connections).
 
 ### Inter-Agent Communication
 
@@ -250,7 +250,7 @@ src/
     VectorStore.Sqlite/               SQLite vector store for RAG
 ```
 
-### Framework Projects
+### Platform Projects
 
 #### AiAgentCanvas.Abstractions
 
@@ -436,7 +436,7 @@ See [Adding Custom Agents](#adding-custom-agents) and [Adding Custom MCP Connect
 
 ---
 
-## Core Framework
+## Core Platform
 
 The `AiAgentCanvas.Core` project is the orchestration engine. It registers the LLM client, manages tools and context providers, and exposes the AG-UI SSE endpoint that CopilotKit connects to.
 
@@ -670,7 +670,7 @@ Both paths result in the LLM seeing all available tools in its context window. W
 
 ### Context Provider Pipeline
 
-`AIContextProvider` subclasses form a pipeline that runs before each LLM invocation. Each provider can modify the `AIContext` (instructions, tools, or other metadata). The framework registers several providers:
+`AIContextProvider` subclasses form a pipeline that runs before each LLM invocation. Each provider can modify the `AIContext` (instructions, tools, or other metadata). The platform registers several providers:
 
 | Provider | Source | Purpose |
 |----------|--------|---------|
@@ -1873,7 +1873,7 @@ A custom agent in AI Agent Canvas is a self-contained project under `src/Agents/
 
 ### How It Works
 
-Data connections (like `MCP.HelloWorldData`) register tools as `IReadOnlyList<AITool>` services. Custom agents seed their components via seed interfaces (`IPersonaSeed`, `IContextSeed`, `IWorkflowSeed`, `IEntitySeed`, `IGuardrailSeed`, `IGoalSeed`, `ISkillSeed`, `IMcpConnectionSeed`) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.
+Data connections (like `MCP.HelloWorldData`) register tools as `IReadOnlyList<AITool>` services. Custom agents seed their components via seed interfaces (`IPersonaSeed`, `IContextSeed`, `IWorkflowSeed`, `IEntitySeed`, `IGuardrailSeed`, `IGoalSeed`, `ISkillSeed`, `IMcpConnectionSeed`) that the platform resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.
 
 ### Step-by-Step Guide
 
@@ -1982,7 +1982,7 @@ public static class MyAgentServiceExtensions
 }
 ```
 
-The tools referenced in the persona (`search_kb`, `lookup_order`) come from a separate data connection project. The `IToolDependencySeed` declares this dependency explicitly -- at startup the framework validates that all required tools are registered and logs warnings for any missing ones.
+The tools referenced in the persona (`search_kb`, `lookup_order`) come from a separate data connection project. The `IToolDependencySeed` declares this dependency explicitly -- at startup the platform validates that all required tools are registered and logs warnings for any missing ones.
 
 #### Step 4: Add ProjectReference in AiAgentCanvas.Orchestrator.csproj
 
@@ -2034,7 +2034,7 @@ Wired in `Program.cs` with a single line: `builder.Services.AddHelloWorldAgent()
 
 ### Component Seeding
 
-Seed interfaces let custom agents ship their own data. At startup, the framework resolves all registered seed services and saves any that don't already exist on disk (or in the database for skills). This means:
+Seed interfaces let custom agents ship their own data. At startup, the platform resolves all registered seed services and saves any that don't already exist on disk (or in the database for skills). This means:
 
 - Components are created automatically on first run
 - Manual edits to persisted files are preserved (seeds never overwrite)
@@ -2077,7 +2077,7 @@ The term "MCP connection" here refers to a local tool provider project (not an e
 
 ### How Tool Registration Works
 
-The Core framework collects all `IReadOnlyList<AITool>` singleton services at startup and passes them to the `ChatClientAgent`:
+The Core platform collects all `IReadOnlyList<AITool>` singleton services at startup and passes them to the `ChatClientAgent`:
 
 ```csharp
 // Inside AddAiAgentCanvas() in Core:
@@ -2230,7 +2230,7 @@ public static class WeatherServiceExtensions
 }
 ```
 
-The critical line is the `IReadOnlyList<AITool>` registration. This is how the Core framework discovers your tools.
+The critical line is the `IReadOnlyList<AITool>` registration. This is how the Core platform discovers your tools.
 
 #### Step 4: Wire Up in Program.cs
 

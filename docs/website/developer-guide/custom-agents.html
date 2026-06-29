@@ -16,7 +16,7 @@
 
       <h2>How It Works</h2>
 
-      <p>Data connections (like <code>MCP.HelloWorldData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the framework resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
+      <p>Data connections (like <code>MCP.HelloWorldData</code>) register tools as <code>IReadOnlyList&lt;AITool&gt;</code> services. Custom agents seed their components via seed interfaces (<code>IPersonaSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>) that the platform resolves at startup. Seeded data is saved to disk (or database) if it doesn't already exist, preserving any manual edits.</p>
 
       <h2>Step-by-Step Guide</h2>
 
@@ -119,7 +119,7 @@ public static class MyAgentServiceExtensions
     }
 }</code></pre>
 
-      <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. The <code>IToolDependencySeed</code> declares this dependency explicitly — at startup the framework validates that all required tools are registered and logs warnings for any missing ones.</p>
+      <p>The tools referenced in the persona (<code>search_kb</code>, <code>lookup_order</code>) come from a separate data connection project. The <code>IToolDependencySeed</code> declares this dependency explicitly — at startup the platform validates that all required tools are registered and logs warnings for any missing ones.</p>
 
       <h3>Step 4: Add ProjectReference in AiAgentCanvas.Orchestrator.csproj</h3>
 
@@ -202,7 +202,7 @@ builder.Services.AddMyAgent();</code></pre>
 
       <h2>Component Seeding</h2>
 
-      <p>Seed interfaces let custom agents ship their own data. At startup, the framework resolves all registered seed services and saves any that don't already exist on disk (or in the database for skills). This means:</p>
+      <p>Seed interfaces let custom agents ship their own data. At startup, the platform resolves all registered seed services and saves any that don't already exist on disk (or in the database for skills). This means:</p>
 
       <ul>
         <li>Components are created automatically on first run</li>

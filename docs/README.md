@@ -4,10 +4,10 @@ Build intelligent multi-agent enterprise copilots with .NET and CopilotKit. Orch
 
 ## Key Features
 
-- **Multi-Agent Architecture** -- Compose specialized agents that collaborate through a shared tool registry. Each agent owns its reasoning domain while the framework handles orchestration, context injection, and streaming.
+- **Multi-Agent Architecture** -- Compose specialized agents that collaborate through a shared tool registry. Each agent owns its reasoning domain while the platform handles orchestration, context injection, and streaming.
 - **Model Context Protocol** -- Connect to any data source through standardized MCP integrations. Agents access external systems through tools without importing SDKs or making HTTP calls directly.
 - **Enterprise Security** -- OWASP LLM Top 10 coverage via Microsoft Agent Governance Toolkit. Prompt injection detection, tool-call filtering, audit logging, and rate limiting built in.
-- **Extensible by Design** -- Add custom agents, tools, and MCP connections without touching the framework. Pure separation between the engine and your business logic.
+- **Extensible by Design** -- Add custom agents, tools, and MCP connections without touching the platform. Pure separation between the engine and your business logic.
 
 ## Documentation
 

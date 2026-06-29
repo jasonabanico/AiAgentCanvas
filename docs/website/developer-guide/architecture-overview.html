@@ -12,7 +12,7 @@
     <main class="main-content">
       <h1>Architecture Overview</h1>
 
-      <p>AI Agent Canvas is a .NET 9 multi-agent copilot framework built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.</p>
+      <p>AI Agent Canvas is a .NET 9 multi-agent copilot platform built on Microsoft's Agent Framework (MAF) and Microsoft.Extensions.AI. It connects a CopilotKit frontend to Azure AI Foundry models through an AG-UI Server-Sent Events protocol, with dynamic tool registration, governance, and markdown-persisted agent data.</p>
 
       <h2>Request Flow</h2>
 
@@ -46,13 +46,13 @@ Streaming Response
 CopilotKit renders response
       </div>
 
-      <h2>Framework vs Custom Separation</h2>
+      <h2>Platform vs Custom Separation</h2>
 
-      <p>The solution enforces a strict boundary between framework code and business logic.</p>
+      <p>The solution enforces a strict boundary between platform code and business logic.</p>
 
-      <p><strong>Framework projects</strong> (under <code>src/AiAgentCanvas.*</code>) provide the engine: orchestration, tool registry, agent data persistence, skills management, security, scheduling, and notifications. These never change per use case.</p>
+      <p><strong>Platform projects</strong> (under <code>src/AiAgentCanvas.*</code>) provide the engine: orchestration, tool registry, agent data persistence, skills management, security, scheduling, and notifications. These never change per use case.</p>
 
-      <p><strong>Custom projects</strong> (under <code>src/Agents/</code> and <code>src/DataConnections/</code>) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any framework code.</p>
+      <p><strong>Custom projects</strong> (under <code>src/Agents/</code> and <code>src/DataConnections/</code>) hold all business-specific code: agent prompts, MCP data connections, custom vector stores. You add your own projects here without modifying any platform code.</p>
 
       <img src="../images/project-structure.svg" alt="Project Structure Diagram" style="width:100%; max-width:800px; display:block; margin:1rem auto;">
 
@@ -101,7 +101,7 @@ src/
         <li><strong>Abstractions</strong> has zero project references. It defines <code>MarkdownFile</code>, <code>DocumentRecord</code>, <code>INotificationSink</code>, <code>IToolGovernanceWrapper</code>, and the seed interfaces (<code>IPersonaSeed</code>, <code>IGuardrailSeed</code>, <code>IWorkflowSeed</code>, <code>IContextSeed</code>, <code>IEntitySeed</code>, <code>IGoalSeed</code>, <code>ISkillSeed</code>, <code>IMcpConnectionSeed</code>, <code>IToolDependencySeed</code>).</li>
         <li><strong>Core</strong> references Abstractions. It provides <code>IChatClient</code> registration, <code>DynamicToolRegistry</code>, <code>AIContextProvider</code> base, tool governance wiring, the AG-UI endpoint, and inter-agent communication (<code>AgentRegistry</code>, <code>AgentMailbox</code>, handoff tools).</li>
         <li><strong>AgentData, Skills, Security, Scheduler, Notifications</strong> each reference Core and/or Abstractions. AgentData also includes the Goals domain with a SQLite-backed work queue.</li>
-        <li><strong>Agent projects</strong> reference <code>Abstractions</code> (for seed interfaces) -- they never reference Core, AgentData, or any other framework project.</li>
+        <li><strong>Agent projects</strong> reference <code>Abstractions</code> (for seed interfaces) -- they never reference Core, AgentData, or any other platform project.</li>
         <li><strong>DataConnection projects</strong> reference <code>Microsoft.Extensions.AI</code> (for tool definitions) -- they are independent of the SDK.</li>
         <li><strong>Orchestrator</strong> references everything and wires it together in <code>Program.cs</code>.</li>
       </ul>
@@ -166,7 +166,7 @@ app.UseAiAgentCanvasSecurity();  // Security middleware
 app.UseAiAgentCanvas();          // CORS + AG-UI endpoint + health check
 app.MapNotificationEndpoints();  // SSE notification stream</code></pre>
 
-      <p>Tools are registered as <code>IReadOnlyList&lt;AITool&gt;</code> singleton services. The Core framework collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services at startup and passes them to the <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>. Additionally, <code>DynamicToolRegistry</code> allows runtime tool registration (used by MCP connections).</p>
+      <p>Tools are registered as <code>IReadOnlyList&lt;AITool&gt;</code> singleton services. The Core platform collects all registered <code>IReadOnlyList&lt;AITool&gt;</code> services at startup and passes them to the <code>ChatClientAgent</code> via <code>ChatOptions.Tools</code>. Additionally, <code>DynamicToolRegistry</code> allows runtime tool registration (used by MCP connections).</p>
 
       <h2>Inter-Agent Communication</h2>
 
@@ -188,7 +188,7 @@ app.MapNotificationEndpoints();  // SSE notification stream</code></pre>
 
       <ul>
         <li><a href="project-structure.html">Project Structure</a> -- detailed breakdown of every project</li>
-        <li><a href="core-framework.html">Core Framework</a> -- how orchestration, tools, and context work</li>
+        <li><a href="core-framework.html">Core Platform</a> -- how orchestration, tools, and context work</li>
         <li><a href="agent-data.html">Agent Data</a> -- the 6 markdown-persisted data domains</li>
         <li><a href="skills-and-mcp.html">Skills and MCP</a> -- skill management and MCP connections</li>
         <li><a href="security.html">Security</a> -- governance policies and rate limiting</li>

@@ -17,7 +17,7 @@
   <rect x="40" y="76" width="720" height="32" rx="10" fill="#1e3a5f"/>
   <rect x="40" y="96" width="720" height="12" fill="#1e3a5f"/>
   <text x="60" y="98" fill="#60a5fa" font-size="13" font-weight="700">AiAgentCanvas (SDK)</text>
-  <text x="680" y="98" fill="#94a3b8" font-size="10" text-anchor="end">Framework layer -- no business logic</text>
+  <text x="680" y="98" fill="#94a3b8" font-size="10" text-anchor="end">Platform layer -- no business logic</text>
 
   <!-- Row 1 -->
   <rect x="60" y="120" width="160" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
@@ -111,13 +111,13 @@
   <text x="60" y="655" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">KEY PRINCIPLES</text>
 
   <circle cx="70" cy="680" r="4" fill="#3b82f6"/>
-  <text x="84" y="684" fill="#94a3b8" font-size="11">Framework projects never change per use case</text>
+  <text x="84" y="684" fill="#94a3b8" font-size="11">Platform projects never change per use case</text>
 
   <circle cx="70" cy="704" r="4" fill="#8b5cf6"/>
   <text x="84" y="708" fill="#94a3b8" font-size="11">Custom projects hold all business-specific code (agents, MCP connections, vector stores)</text>
 
   <circle cx="70" cy="728" r="4" fill="#22c55e"/>
-  <text x="84" y="732" fill="#94a3b8" font-size="11">Custom projects only reference Abstractions and Microsoft.Extensions.AI -- never Core or other framework projects</text>
+  <text x="84" y="732" fill="#94a3b8" font-size="11">Custom projects only reference Abstractions and Microsoft.Extensions.AI -- never Core or other platform projects</text>
 
   <circle cx="70" cy="752" r="4" fill="#f59e0b"/>
   <text x="84" y="756" fill="#94a3b8" font-size="11">Web is the composition root that wires everything together via extension methods</text>

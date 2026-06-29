@@ -121,7 +121,7 @@ From the repository root, restore packages and build the solution:
 dotnet build AiAgentCanvas.sln
 ```
 
-A successful build compiles the core framework, agents, MCP connections, scheduler, skills engine, and the web host.
+A successful build compiles the core platform, agents, MCP connections, scheduler, skills engine, and the web host.
 
 ### Configure Your AI Endpoint
 
@@ -158,7 +158,7 @@ cd src/Orchestrator/AiAgentCanvas.Orchestrator
 dotnet run
 ```
 
-The backend starts on `http://localhost:5000` by default. You should see log output confirming that the agent framework, scheduler, and tool providers have loaded.
+The backend starts on `http://localhost:5000` by default. You should see log output confirming that the agent platform, scheduler, and tool providers have loaded.
 
 ### Run the Frontend
 

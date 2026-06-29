@@ -46,7 +46,7 @@
 
       <h3>McpClient and HttpClientTransport</h3>
 
-      <p>The framework uses the <code>ModelContextProtocol.Client</code> library to connect to MCP servers:</p>
+      <p>The platform uses the <code>ModelContextProtocol.Client</code> library to connect to MCP servers:</p>
 
       <pre><code>IClientTransport clientTransport = transport.ToLowerInvariant() switch
 {
@@ -165,7 +165,7 @@ _registry.Register($"mcp:{name}", aiTools);</code></pre>
         </tbody>
       </table>
 
-      <p>From the LLM's perspective, both types are identical. The framework abstracts the execution mechanism, so the agent reasons about tools purely based on their names and descriptions.</p>
+      <p>From the LLM's perspective, both types are identical. The platform abstracts the execution mechanism, so the agent reasons about tools purely based on their names and descriptions.</p>
 
       <h2>Tool Composition Example</h2>
 

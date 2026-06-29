@@ -18,7 +18,7 @@
 
       <h2>How Tool Registration Works</h2>
 
-      <p>The Core framework collects all <code>IReadOnlyList&lt;AITool&gt;</code> singleton services at startup and passes them to the <code>ChatClientAgent</code>:</p>
+      <p>The Core platform collects all <code>IReadOnlyList&lt;AITool&gt;</code> singleton services at startup and passes them to the <code>ChatClientAgent</code>:</p>
 
       <pre><code>// Inside AddAiAgentCanvas() in Core:
 var tools = sp.GetServices&lt;IReadOnlyList&lt;AITool&gt;&gt;().SelectMany(t =&gt; t).ToList();
@@ -163,7 +163,7 @@ public static class WeatherServiceExtensions
     }
 }</code></pre>
 
-      <p>The critical line is the <code>IReadOnlyList&lt;AITool&gt;</code> registration. This is how the Core framework discovers your tools.</p>
+      <p>The critical line is the <code>IReadOnlyList&lt;AITool&gt;</code> registration. This is how the Core platform discovers your tools.</p>
 
       <h3>Step 4: Wire Up in Program.cs</h3>
 
