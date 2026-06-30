@@ -35,8 +35,8 @@ public sealed class WorkQueueToolProvider
     private string SubmitWorkItem(
         [Description("Description of the work to be done")] string description,
         [Description("Priority: critical, high, medium, low")] string priority,
-        [Description("Agent persona to assign this to (optional)")] string? assignedAgent,
-        [Description("Goal this work item contributes to (optional)")] string? goalName)
+        [Description("Agent persona to assign this to (optional)")] string? assignedAgent = null,
+        [Description("Goal this work item contributes to (optional)")] string? goalName = null)
     {
         var id = _store.Submit(description, priority, assignedAgent, goalName);
         _logger.LogInformation("Submitted work item {Id}: {Description}", id, description);
@@ -46,7 +46,7 @@ public sealed class WorkQueueToolProvider
 
     [Description("List work items in the queue")]
     private string ListWorkQueue(
-        [Description("Filter by status: pending, claimed, completed, failed, cancelled (leave empty for all)")] string? status,
+        [Description("Filter by status: pending, claimed, completed, failed, cancelled (leave empty for all)")] string? status = null,
         [Description("Maximum items to return (default: 20)")] int limit = 20)
     {
         var items = _store.List(status, limit);

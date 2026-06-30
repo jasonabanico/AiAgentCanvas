@@ -40,7 +40,7 @@ public sealed class WorkflowToolProvider
         [Description("Name of the workflow (e.g. 'daily-market-scan')")] string name,
         [Description("Short description of what the workflow does")] string description,
         [Description("Workflow steps in markdown format")] string steps,
-        [Description("Comma-separated tags for categorization")] string? tags)
+        [Description("Comma-separated tags for categorization")] string? tags = null)
     {
         var existing = _store.Get(name);
         if (existing is not null)
@@ -88,8 +88,8 @@ public sealed class WorkflowToolProvider
     [Description("Execute a saved workflow with optional input")]
     private async Task<string> RunWorkflow(
         [Description("The name of the workflow to run")] string name,
-        [Description("Optional input to pass to the workflow")] string? input,
-        CancellationToken ct)
+        CancellationToken ct,
+        [Description("Optional input to pass to the workflow")] string? input = null)
     {
         return await _executor.ExecuteAsync(name, input, ct);
     }

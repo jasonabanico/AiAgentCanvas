@@ -37,8 +37,8 @@ public sealed class ContextToolProvider
     private string SaveContext(
         [Description("Topic name for this context (e.g. 'project-goals', 'team-preferences')")] string topic,
         [Description("The context content in markdown")] string content,
-        [Description("Context type for categorization (e.g. fact, reference, decision, feedback, or any custom type). Omit for general.")] string? type,
-        [Description("Comma-separated tags for categorization")] string? tags)
+        [Description("Context type for categorization (e.g. fact, reference, decision, feedback, or any custom type). Omit for general.")] string? type = null,
+        [Description("Comma-separated tags for categorization")] string? tags = null)
     {
         var existing = _store.Get(topic);
         if (existing is not null)
@@ -54,8 +54,8 @@ public sealed class ContextToolProvider
     private string UpdateContext(
         [Description("The topic name of the context to update")] string topic,
         [Description("New content (replaces existing content)")] string content,
-        [Description("Context type for categorization (e.g. fact, reference, decision, feedback, or any custom type). Omit to keep current.")] string? type,
-        [Description("New comma-separated tags (leave empty to keep current)")] string? tags)
+        [Description("Context type for categorization (e.g. fact, reference, decision, feedback, or any custom type). Omit to keep current.")] string? type = null,
+        [Description("New comma-separated tags (leave empty to keep current)")] string? tags = null)
     {
         var existing = _store.Get(topic);
         if (existing is null)
@@ -72,7 +72,7 @@ public sealed class ContextToolProvider
 
     [Description("List all persistent context entries, optionally filtered by type")]
     private string ListContext(
-        [Description("Filter by type (e.g. fact, reference, decision, feedback). Omit to list all.")] string? type)
+        [Description("Filter by type (e.g. fact, reference, decision, feedback). Omit to list all.")] string? type = null)
     {
         var entries = string.IsNullOrWhiteSpace(type)
             ? _store.ListAll()

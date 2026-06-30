@@ -55,7 +55,7 @@ public sealed class PersonaToolProvider
     private string UpdatePersona(
         [Description("The name of the persona to update")] string name,
         [Description("New instructions (replaces existing)")] string instructions,
-        [Description("New description (leave empty to keep current)")] string? description)
+        [Description("New description (leave empty to keep current)")] string? description = null)
     {
         var existing = _store.GetPersona(name);
         if (existing is null)

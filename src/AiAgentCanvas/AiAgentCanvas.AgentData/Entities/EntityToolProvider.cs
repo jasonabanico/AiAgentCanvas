@@ -40,7 +40,7 @@ public sealed class EntityToolProvider
         [Description("Entity name (e.g. 'Acme Corp', 'Jane Smith', 'Project Atlas')")] string name,
         [Description("Entity type (e.g. 'person', 'company', 'project', 'product', 'team')")] string type,
         [Description("Structured content using markdown. Use ## sections for Attributes, Relationships, and Notes")] string content,
-        [Description("Comma-separated tags for categorization (e.g. 'client,enterprise' or 'engineering,backend')")] string? tags)
+        [Description("Comma-separated tags for categorization (e.g. 'client,enterprise' or 'engineering,backend')")] string? tags = null)
     {
         var existing = _store.Get(name);
         if (existing is not null)
@@ -56,8 +56,8 @@ public sealed class EntityToolProvider
     private string UpdateEntity(
         [Description("The name of the entity to update")] string name,
         [Description("New content (replaces existing content). Use markdown sections.")] string content,
-        [Description("New type (leave empty to keep current)")] string? type,
-        [Description("New comma-separated tags (leave empty to keep current)")] string? tags)
+        [Description("New type (leave empty to keep current)")] string? type = null,
+        [Description("New comma-separated tags (leave empty to keep current)")] string? tags = null)
     {
         var existing = _store.Get(name);
         if (existing is null)

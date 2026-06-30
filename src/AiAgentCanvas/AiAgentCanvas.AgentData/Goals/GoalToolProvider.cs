@@ -54,7 +54,7 @@ public sealed class GoalToolProvider
 
     [Description("List all goals, optionally filtered by status")]
     private string ListGoals(
-        [Description("Filter by status: active, completed, blocked, cancelled (leave empty for all)")] string? status)
+        [Description("Filter by status: active, completed, blocked, cancelled (leave empty for all)")] string? status = null)
     {
         var goals = string.IsNullOrWhiteSpace(status) ? _store.ListAll() : _store.ListAll()
             .Where(g => g.Status.Equals(status, StringComparison.OrdinalIgnoreCase))
