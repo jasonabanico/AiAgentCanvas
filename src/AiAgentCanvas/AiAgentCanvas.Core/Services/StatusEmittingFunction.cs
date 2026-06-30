@@ -9,36 +9,52 @@ public sealed class ToolStatusEvent
     public bool IsComplete { get; init; }
 }
 
-public sealed class ToolStatusChannel
+public sealed class ToolStatusBroker
 {
-    private readonly Channel<ToolStatusEvent> _channel = Channel.CreateUnbounded<ToolStatusEvent>();
-    public ChannelWriter<ToolStatusEvent> Writer => _channel.Writer;
-    public ChannelReader<ToolStatusEvent> Reader => _channel.Reader;
+    private volatile Channel<ToolStatusEvent>? _current;
+
+    public Channel<ToolStatusEvent> Start()
+    {
+        var channel = Channel.CreateUnbounded<ToolStatusEvent>();
+        _current = channel;
+        return channel;
+    }
+
+    public void Stop() => _current = null;
+
+    internal Channel<ToolStatusEvent>? Current => _current;
 }
 
 internal sealed class StatusEmittingFunction : DelegatingAIFunction
 {
-    private readonly ToolStatusChannel _statusChannel;
+    private readonly ToolStatusBroker _broker;
 
-    public StatusEmittingFunction(AIFunction inner, ToolStatusChannel statusChannel)
+    public StatusEmittingFunction(AIFunction inner, ToolStatusBroker broker)
         : base(inner)
     {
-        _statusChannel = statusChannel;
+        _broker = broker;
     }
 
     protected override async ValueTask<object?> InvokeCoreAsync(
         AIFunctionArguments arguments,
         CancellationToken cancellationToken)
     {
-        await _statusChannel.Writer.WriteAsync(
-            new ToolStatusEvent { ToolName = InnerFunction.Name, IsComplete = false },
-            cancellationToken);
+        var channel = _broker.Current;
+        if (channel is not null)
+        {
+            await channel.Writer.WriteAsync(
+                new ToolStatusEvent { ToolName = InnerFunction.Name, IsComplete = false },
+                cancellationToken);
+        }
 
         var result = await base.InvokeCoreAsync(arguments, cancellationToken);
 
-        await _statusChannel.Writer.WriteAsync(
-            new ToolStatusEvent { ToolName = InnerFunction.Name, IsComplete = true },
-            cancellationToken);
+        if (channel is not null)
+        {
+            await channel.Writer.WriteAsync(
+                new ToolStatusEvent { ToolName = InnerFunction.Name, IsComplete = true },
+                cancellationToken);
+        }
 
         return result;
     }

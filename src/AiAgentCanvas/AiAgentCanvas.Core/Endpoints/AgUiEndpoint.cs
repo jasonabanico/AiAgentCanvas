@@ -93,29 +93,35 @@ public static class AgUiEndpoint
             logger.LogInformation("Starting agent streaming. ThreadId={ThreadId}, Messages={Messages}", threadId, string.Join("; ", chatMessages.Select(m => $"{m.Role}: {m.Text?[..Math.Min(m.Text.Length, 50)]}")));
             var sw = Stopwatch.StartNew();
 
-            var toolStatusChannel = sp.GetService<ToolStatusChannel>();
+            var broker = sp.GetService<ToolStatusBroker>();
+            var channel = broker?.Start();
             var writeLock = new SemaphoreSlim(1, 1);
 
-            var drainTask = toolStatusChannel is not null
-                ? DrainToolStatusAsync(context, toolStatusChannel, writeLock, cts.Token)
+            var drainTask = channel is not null
+                ? DrainToolStatusAsync(context, channel, writeLock, cts.Token)
                 : Task.CompletedTask;
 
-            await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
+            try
             {
-                if (update.Text is { Length: > 0 } text)
+                await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
                 {
-                    await writeLock.WaitAsync(cts.Token);
-                    try { await WriteEvent(context, "text.message.content", new { messageId, delta = text }); }
-                    finally { writeLock.Release(); }
+                    if (update.Text is { Length: > 0 } text)
+                    {
+                        await writeLock.WaitAsync(cts.Token);
+                        try { await WriteEvent(context, "text.message.content", new { messageId, delta = text }); }
+                        finally { writeLock.Release(); }
+                    }
                 }
             }
-
-            if (toolStatusChannel is not null)
+            finally
             {
-                await toolStatusChannel.Writer.WriteAsync(
-                    new ToolStatusEvent { ToolName = "", IsComplete = true }, cts.Token);
+                if (channel is not null)
+                {
+                    channel.Writer.TryComplete();
+                }
+                broker?.Stop();
+                await drainTask;
             }
-            await drainTask;
 
             logger.LogInformation("Streaming complete. ThreadId={ThreadId}, RunId={RunId}, ElapsedMs={ElapsedMs}", threadId, runId, sw.ElapsedMilliseconds);
         }
@@ -166,13 +172,15 @@ public static class AgUiEndpoint
     }
 
     private static async Task DrainToolStatusAsync(
-        HttpContext context, ToolStatusChannel channel, SemaphoreSlim writeLock, CancellationToken ct)
+        HttpContext context,
+        System.Threading.Channels.Channel<ToolStatusEvent> channel,
+        SemaphoreSlim writeLock,
+        CancellationToken ct)
     {
         try
         {
             await foreach (var status in channel.Reader.ReadAllAsync(ct))
             {
-                if (status.ToolName == "" && status.IsComplete) break;
                 await writeLock.WaitAsync(ct);
                 try
                 {

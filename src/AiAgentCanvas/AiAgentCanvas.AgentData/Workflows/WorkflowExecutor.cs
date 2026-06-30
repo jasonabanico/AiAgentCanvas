@@ -49,8 +49,10 @@ public sealed class WorkflowExecutor
             new(ChatRole.User, prompt.ToString()),
         };
 
-        var agent = _sp.GetRequiredService<AIAgent>();
-        var response = await agent.RunAsync(messages, cancellationToken: ct);
+        var chatClient = _sp.GetRequiredService<IChatClient>();
+        var tools = _sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+        var options = new ChatOptions { Tools = tools };
+        var response = await chatClient.GetResponseAsync(messages, options, ct);
         var responseText = response.Text ?? string.Empty;
 
         _logger.LogInformation("Workflow {Name} completed, response length {Length}", workflowName, responseText.Length);

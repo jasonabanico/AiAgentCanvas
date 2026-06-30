@@ -77,13 +77,16 @@ public sealed class SkillToolProvider
         var prompt = skill.PromptTemplate.Replace("{input}", input);
         _logger.LogInformation("Running skill {Name} with input length {Length}", name, input.Length);
 
+        var chatClient = _sp.GetRequiredService<IChatClient>();
+        var tools = _sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+
         var messages = new List<ChatMessage>
         {
             new(ChatRole.User, prompt),
         };
 
-        var agent = _sp.GetRequiredService<AIAgent>();
-        var response = await agent.RunAsync(messages, cancellationToken: ct);
+        var options = new ChatOptions { Tools = tools };
+        var response = await chatClient.GetResponseAsync(messages, options, ct);
         var responseText = response.Text ?? string.Empty;
 
         _logger.LogInformation("Skill {Name} completed, response length {Length}", name, responseText.Length);
