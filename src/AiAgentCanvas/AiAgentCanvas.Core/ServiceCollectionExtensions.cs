@@ -42,8 +42,10 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
-        services.AddSingleton<AIContextProvider>(sp =>
+        services.AddSingleton(sp =>
             new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));
+
+        services.AddSingleton<ToolStatusChannel>();
 
         services.AddSingleton(sp =>
             new PlanningMiddleware(
@@ -61,9 +63,14 @@ public static class ServiceCollectionExtensions
 
             var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
             var governanceWrapper = sp.GetService<IToolGovernanceWrapper>();
-            var tools = governanceWrapper is not null
-                ? rawTools.Select(t => t is AIFunction fn ? (AITool)governanceWrapper.Wrap(fn) : t).ToList()
-                : rawTools;
+            var toolStatusChannel = sp.GetRequiredService<ToolStatusChannel>();
+            var tools = rawTools.Select(t =>
+            {
+                if (t is not AIFunction fn) return t;
+                if (governanceWrapper is not null) fn = governanceWrapper.Wrap(fn);
+                fn = new StatusEmittingFunction(fn, toolStatusChannel);
+                return (AITool)fn;
+            }).ToList();
             var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
             toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));

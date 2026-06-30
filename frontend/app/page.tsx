@@ -18,6 +18,8 @@ export default function Home() {
     message: string;
     details?: string;
   } | null>(null);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const toolStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -143,6 +145,7 @@ export default function Home() {
       if (!reader) throw new Error("No response stream");
 
       let buffer = "";
+      let currentEvent = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -152,10 +155,19 @@ export default function Home() {
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.delta) {
+              if (currentEvent === "tool.status") {
+                if (!data.isComplete && data.toolName) {
+                  setToolStatus(`Calling ${data.toolName}...`);
+                  if (toolStatusTimerRef.current) clearTimeout(toolStatusTimerRef.current);
+                } else {
+                  toolStatusTimerRef.current = setTimeout(() => setToolStatus(null), 1500);
+                }
+              } else if (data.delta) {
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId
@@ -167,6 +179,8 @@ export default function Home() {
             } catch {
               // skip non-JSON lines
             }
+          } else if (line === "") {
+            currentEvent = "";
           }
         }
       }
@@ -188,11 +202,13 @@ export default function Home() {
       );
     } finally {
       setIsLoading(false);
+      setToolStatus(null);
     }
   }
 
   return (
     <div style={styles.container}>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
       <header style={styles.header}>
         <h1 style={styles.title}>AI Agent Canvas</h1>
         <p style={styles.subtitle}>Multi-agent enterprise copilot</p>
@@ -258,6 +274,13 @@ export default function Home() {
         ))}
         <div ref={messagesEndRef} />
       </div>
+
+      {toolStatus && (
+        <div style={styles.toolStatusBar}>
+          <span style={styles.toolStatusDot} />
+          {toolStatus}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={styles.inputArea}>
         <input
@@ -406,5 +429,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9375rem",
     cursor: "pointer",
     fontFamily: "inherit",
+  },
+  toolStatusBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 24px",
+    fontSize: "0.8125rem",
+    color: "#6b7280",
+    background: "#f9fafb",
+    borderTop: "1px solid #e5e7eb",
+  },
+  toolStatusDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    background: "#2563eb",
+    animation: "pulse 1s infinite",
   },
 };

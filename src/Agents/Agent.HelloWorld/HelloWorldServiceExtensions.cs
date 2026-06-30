@@ -136,7 +136,7 @@ public static class HelloWorldServiceExtensions
             name: "compare-stocks",
             description: "Compare two or more stocks side by side with price and fundamental data",
             promptTemplate: """
-                Compare the following stocks: {{tickers}}
+                Compare the following stocks: {input}
 
                 For each stock:
                 1. Get the current quote using stock_quote
