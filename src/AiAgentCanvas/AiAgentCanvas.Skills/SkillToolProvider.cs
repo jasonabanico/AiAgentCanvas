@@ -77,8 +77,9 @@ public sealed class SkillToolProvider
         var prompt = skill.PromptTemplate.Replace("{input}", input);
         _logger.LogInformation("Running skill {Name} with input length {Length}", name, input.Length);
 
-        var chatClient = _sp.GetRequiredService<IChatClient>();
+        var innerClient = _sp.GetRequiredService<IChatClient>();
         var tools = _sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+        using var chatClient = new FunctionInvokingChatClient(innerClient);
 
         var messages = new List<ChatMessage>
         {

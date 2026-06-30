@@ -49,8 +49,9 @@ public sealed class WorkflowExecutor
             new(ChatRole.User, prompt.ToString()),
         };
 
-        var chatClient = _sp.GetRequiredService<IChatClient>();
+        var innerClient = _sp.GetRequiredService<IChatClient>();
         var tools = _sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+        using var chatClient = new FunctionInvokingChatClient(innerClient);
         var options = new ChatOptions { Tools = tools };
         var response = await chatClient.GetResponseAsync(messages, options, ct);
         var responseText = response.Text ?? string.Empty;
