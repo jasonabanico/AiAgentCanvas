@@ -146,27 +146,32 @@ export default function Home() {
 
       let buffer = "";
       let currentEvent = "";
+      console.log("[SSE] Reader started, reading stream...");
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        console.log("[SSE] raw chunk:", JSON.stringify(chunk.slice(0, 200)));
+        buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
         for (const line of lines) {
           if (line.startsWith("event: ")) {
             currentEvent = line.slice(7).trim();
+            console.log("[SSE] event type:", currentEvent);
           } else if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
               if (currentEvent === "tool.status") {
+                if (toolStatusTimerRef.current) clearTimeout(toolStatusTimerRef.current);
                 if (!data.isComplete && data.toolName) {
                   setToolStatus(`Calling ${data.toolName}...`);
-                  if (toolStatusTimerRef.current) clearTimeout(toolStatusTimerRef.current);
-                } else {
-                  toolStatusTimerRef.current = setTimeout(() => setToolStatus(null), 1500);
+                } else if (data.isComplete && data.toolName) {
+                  setToolStatus(`${data.toolName} completed`);
                 }
+                toolStatusTimerRef.current = setTimeout(() => setToolStatus(null), 2000);
               } else if (data.delta) {
                 setMessages((prev) =>
                   prev.map((m) =>
