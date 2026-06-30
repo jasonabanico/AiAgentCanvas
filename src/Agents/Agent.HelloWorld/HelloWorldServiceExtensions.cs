@@ -150,6 +150,34 @@ public static class HelloWorldServiceExtensions
                 End with a brief summary of key differences and the investment disclaimer.
                 """));
 
+        services.AddSingleton<IGoalSeed>(new GoalSeed(
+            name: "daily-market-briefing",
+            description: "Prepare a daily market briefing for tracked stocks",
+            priority: "medium",
+            acceptanceCriteria: "A summary covering current price, daily change, and any notable movements for all tracked stocks",
+            assignedAgent: "financial-analyst",
+            content: """
+                ## Daily Market Briefing
+
+                Each day, compile a brief market update:
+                1. Get current quotes for tracked stocks (AAPL, MSFT, GOOGL)
+                2. Note any stocks with daily change > 2% (up or down)
+                3. Summarize overall market direction
+                4. Flag any stocks that may warrant closer analysis
+                """));
+
+        services.AddSingleton<IUserProfileSeed>(new UserProfileSeed(
+            name: "default-analyst",
+            role: "Financial Analyst",
+            timezone: "UTC",
+            content: """
+                ## Preferences
+                - Preferred tickers: AAPL, MSFT, GOOGL
+                - Analysis depth: comprehensive (quote + history + fundamentals)
+                - Report format: structured with headers and key metrics highlighted
+                - Always include data sources and timestamps
+                """));
+
         services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
             agentName: "financial-analyst",
             requiredTools: ["stock_quote", "stock_history", "edgar_company_facts"]));

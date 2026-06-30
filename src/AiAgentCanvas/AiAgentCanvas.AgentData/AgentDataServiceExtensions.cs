@@ -131,15 +131,23 @@ public static class AgentDataServiceExtensions
         string rootDirectory = DefaultRoot,
         string sharedRootDirectory = DefaultSharedRoot)
     {
-        services.AddSingleton(new UserProfileStore(
+        var store = new UserProfileStore(
             Path.Combine(rootDirectory, "agent", "profiles"),
             Path.Combine(rootDirectory, "user", "profiles"),
-            SharedDirs(sharedRootDirectory, "profiles")));
+            SharedDirs(sharedRootDirectory, "profiles"));
+        services.AddSingleton(store);
         services.AddSingleton<UserProfileToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<UserProfileToolProvider>().GetTools());
         services.AddSingleton<AIContextProvider>(sp =>
-            new UserProfileContextProvider(sp.GetRequiredService<UserProfileStore>()));
+        {
+            foreach (var seed in sp.GetServices<IUserProfileSeed>())
+            {
+                if (store.Get(seed.Name) is null)
+                    store.Save(seed.Name, seed.Role, seed.Timezone, seed.Content);
+            }
+            return new UserProfileContextProvider(store);
+        });
         return services;
     }
 
