@@ -50,6 +50,7 @@ const NAV_SECTIONS = [
       { title: 'Security', file: 'security.html' },
       { title: 'Custom Agents', file: 'custom-agents.html' },
       { title: 'Custom MCP Connections', file: 'custom-mcp-connections.html' },
+      { title: 'Behavior Patterns', file: 'behavior-patterns.html' },
     ]
   }
 ];
