@@ -81,10 +81,11 @@ public static class AgUiEndpoint
             agentName = agent.Name,
         });
 
+        var idleTimeout = TimeSpan.FromSeconds(120);
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
-            cts.CancelAfter(TimeSpan.FromSeconds(120));
+            cts.CancelAfter(idleTimeout);
 
             logger.LogInformation("Creating agent session. ThreadId={ThreadId}", threadId);
             var session = await agent.CreateSessionAsync(cts.Token);
@@ -98,13 +99,14 @@ public static class AgUiEndpoint
             var writeLock = new SemaphoreSlim(1, 1);
 
             var drainTask = channel is not null
-                ? DrainToolStatusAsync(context, channel, writeLock, cts.Token)
+                ? DrainToolStatusAsync(context, channel, writeLock, cts, idleTimeout)
                 : Task.CompletedTask;
 
             try
             {
                 await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
                 {
+                    cts.CancelAfter(idleTimeout);
                     if (update.Text is { Length: > 0 } text)
                     {
                         await writeLock.WaitAsync(cts.Token);
@@ -127,11 +129,11 @@ public static class AgUiEndpoint
         }
         catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
         {
-            logger.LogWarning("Agent execution timed out after 120s. ThreadId={ThreadId}", threadId);
+            logger.LogWarning("Agent execution idle timeout after {Seconds}s. ThreadId={ThreadId}", idleTimeout.TotalSeconds, threadId);
             await WriteEvent(context, "text.message.content", new
             {
                 messageId,
-                delta = "\n\n**Error:** Request timed out after 120 seconds. Check your Azure AI endpoint and credentials."
+                delta = $"\n\n**Error:** No progress for {idleTimeout.TotalSeconds} seconds. The agent may be stuck or the AI service is not responding."
             });
         }
         catch (Exception ex)
@@ -175,13 +177,15 @@ public static class AgUiEndpoint
         HttpContext context,
         System.Threading.Channels.Channel<ToolStatusEvent> channel,
         SemaphoreSlim writeLock,
-        CancellationToken ct)
+        CancellationTokenSource cts,
+        TimeSpan idleTimeout)
     {
         try
         {
-            await foreach (var status in channel.Reader.ReadAllAsync(ct))
+            await foreach (var status in channel.Reader.ReadAllAsync(cts.Token))
             {
-                await writeLock.WaitAsync(ct);
+                cts.CancelAfter(idleTimeout);
+                await writeLock.WaitAsync(cts.Token);
                 try
                 {
                     await WriteEvent(context, "tool.status", new

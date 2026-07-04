@@ -112,7 +112,7 @@ export default function Home() {
     ]);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const timeout = setTimeout(() => controller.abort(), 300000);
 
     try {
       const res = await fetch("/api/copilotkit", {
@@ -193,7 +193,7 @@ export default function Home() {
       clearTimeout(timeout);
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "Request timed out after 120 seconds. The AI service may not be configured correctly."
+          ? "Request timed out after 5 minutes. The AI service may be slow or not configured correctly."
           : err instanceof Error
             ? err.message
             : "Something went wrong";

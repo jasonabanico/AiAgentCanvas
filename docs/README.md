@@ -11,14 +11,12 @@ Build intelligent multi-agent enterprise copilots with .NET and CopilotKit. Orch
 
 ## Documentation
 
-| Section | Markdown | Website |
-|---------|----------|---------|
-| **AI Agents** | [ai-agents.md](ai-agents.md) | [website/ai-agents/](website/ai-agents/what-are-ai-agents.html) |
-| **Use Cases** | [use-cases.md](use-cases.md) | [website/use-cases/](website/use-cases/index.html) |
-| **User Guide** | [user-guide.md](user-guide.md) | [website/user-guide/](website/user-guide/getting-started.html) |
-| **Developer Guide** | [developer-guide.md](developer-guide.md) | [website/developer-guide/](website/developer-guide/architecture-overview.html) |
-
-The **Markdown** files are readable directly in GitHub and VS Code. The **Website** files are the full HTML documentation with navigation, styling, and diagrams.
+| Section | Hub Page | Sub-Pages |
+|---------|----------|-----------|
+| **AI Agents** | [ai-agents.md](ai-agents.md) | [Fundamentals](ai-agents-fundamentals.md), [Framework](ai-agents-framework.md), [Tools](ai-agents-tools.md), [MCP](ai-agents-mcp.md), [Context](ai-agents-context.md), [Protocol](ai-agents-protocol.md) |
+| **Use Cases** | [use-cases.md](use-cases.md) | |
+| **User Guide** | [user-guide.md](user-guide.md) | [Getting Started](user-guide-getting-started.md), [Configuration](user-guide-configuration.md), [Chat](user-guide-chat.md), [Personas](user-guide-personas.md), [Skills](user-guide-skills.md), [Scheduling](user-guide-scheduling.md), [Workflows](user-guide-workflows.md), [Security](user-guide-security.md) |
+| **Developer Guide** | [developer-guide.md](developer-guide.md) | [Architecture](developer-guide-architecture.md), [Agent Data](developer-guide-agent-data.md), [Skills & MCP](developer-guide-skills-mcp.md), [RAG](developer-guide-rag.md), [Security](developer-guide-security.md), [Adding Agents](developer-guide-adding-agents.md), [Behavior Patterns](developer-guide-behavior-patterns.md) |
 
 ## Downloadable Guides
 
@@ -29,22 +27,33 @@ The **Markdown** files are readable directly in GitHub and VS Code. The **Websit
 
 ```
 docs/
-├── README.md                   # This file
-├── index.html                  # Website landing page
-├── ai-agents.md                # AI Agents (markdown)
-├── use-cases.md                # Use Cases (markdown)
-├── user-guide.md               # User Guide (markdown)
-├── developer-guide.md          # Developer Guide (markdown)
+├── README.md                              # This file
+├── ai-agents.md                           # AI Agents hub
+├── ai-agents-fundamentals.md              # What are AI agents
+├── ai-agents-framework.md                 # Microsoft Agent Framework
+├── ai-agents-tools.md                     # Tools and skills
+├── ai-agents-mcp.md                       # Model Context Protocol
+├── ai-agents-context.md                   # Context providers
+├── ai-agents-protocol.md                  # AG-UI protocol
+├── use-cases.md                           # Use cases
+├── user-guide.md                          # User Guide hub
+├── user-guide-getting-started.md          # Getting started
+├── user-guide-configuration.md            # Configuration reference
+├── user-guide-chat.md                     # Chat interface
+├── user-guide-personas.md                 # Personas
+├── user-guide-skills.md                   # Skills & tools
+├── user-guide-scheduling.md               # Scheduling
+├── user-guide-workflows.md                # Workflows
+├── user-guide-security.md                 # Security
+├── developer-guide.md                     # Developer Guide hub
+├── developer-guide-architecture.md        # Architecture & core platform
+├── developer-guide-agent-data.md          # Agent data domains
+├── developer-guide-skills-mcp.md          # Skills & MCP connections
+├── developer-guide-rag.md                 # RAG pipeline
+├── developer-guide-security.md            # Security internals
+├── developer-guide-adding-agents.md       # Adding custom agents
+├── developer-guide-behavior-patterns.md   # Agent behavior patterns
 ├── guides/
 │   ├── AI-Agent-Canvas-Guide.pdf
 │   └── AI-First-Company-Guide.pdf
-├── website/
-│   ├── styles.css
-│   ├── layout.js
-│   ├── images/                 # Architecture diagrams (SVG)
-│   ├── ai-agents/              # 6 HTML pages
-│   ├── use-cases/              # 6 HTML pages
-│   ├── user-guide/             # 8 HTML pages
-│   └── developer-guide/        # 9 HTML pages
-├── generate_pdf.py             # PDF generator script
 ```

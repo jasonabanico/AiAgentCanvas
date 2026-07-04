@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ public sealed class AgentRegistry
     private readonly Func<IEnumerable<AIContextProvider>> _contextProvidersFactory;
     private readonly Func<string, AgentPersonaInfo?> _personaLookup;
     private readonly Func<IEnumerable<AgentPersonaInfo>> _personaListAll;
+    private readonly IReadOnlyDictionary<string, IAgentToolsSeed> _toolSeeds;
     private readonly ILoggerFactory _loggerFactory;
     private Func<AIAgent>? _defaultAgentFactory;
 
@@ -29,6 +31,7 @@ public sealed class AgentRegistry
         Func<IEnumerable<AIContextProvider>> contextProvidersFactory,
         Func<string, AgentPersonaInfo?> personaLookup,
         Func<IEnumerable<AgentPersonaInfo>> personaListAll,
+        IReadOnlyDictionary<string, IAgentToolsSeed> toolSeeds,
         ILoggerFactory loggerFactory)
     {
         _chatClient = chatClient;
@@ -36,6 +39,7 @@ public sealed class AgentRegistry
         _contextProvidersFactory = contextProvidersFactory;
         _personaLookup = personaLookup;
         _personaListAll = personaListAll;
+        _toolSeeds = toolSeeds;
         _loggerFactory = loggerFactory;
     }
 
@@ -96,7 +100,10 @@ public sealed class AgentRegistry
 
     private AIAgent BuildAgentForPersona(AgentPersonaInfo persona)
     {
-        var tools = _toolsFactory().ToList();
+        var allTools = _toolsFactory().ToList();
+        var tools = _toolSeeds.TryGetValue(persona.Name, out var seed)
+            ? allTools.Where(t => seed.ToolNames.Contains(t.Name)).ToList()
+            : allTools;
         var contextProviders = _contextProvidersFactory().ToList();
 
         var agentOptions = new ChatClientAgentOptions

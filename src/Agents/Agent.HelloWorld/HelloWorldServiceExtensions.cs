@@ -178,9 +178,9 @@ public static class HelloWorldServiceExtensions
                 - Always include data sources and timestamps
                 """));
 
-        services.AddSingleton<IToolDependencySeed>(new ToolDependencySeed(
+        services.AddSingleton<IAgentToolsSeed>(new AgentToolsSeed(
             agentName: "financial-analyst",
-            requiredTools: ["stock_quote", "stock_history", "edgar_company_facts"]));
+            toolNames: ["stock_quote", "stock_history", "edgar_company_facts"]));
 
         return services;
     }

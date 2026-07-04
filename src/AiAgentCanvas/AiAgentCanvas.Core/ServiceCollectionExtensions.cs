@@ -76,19 +76,24 @@ public static class ServiceCollectionExtensions
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));
 
             var toolNames = new HashSet<string>(tools.Select(t => t.Name));
-            foreach (var dep in sp.GetServices<IToolDependencySeed>())
+            var agentToolSeeds = sp.GetServices<IAgentToolsSeed>().ToDictionary(s => s.AgentName, StringComparer.OrdinalIgnoreCase);
+            foreach (var seed in agentToolSeeds.Values)
             {
-                var missing = dep.RequiredTools.Where(t => !toolNames.Contains(t)).ToList();
+                var missing = seed.ToolNames.Where(t => !toolNames.Contains(t)).ToList();
                 if (missing.Count > 0)
-                    toolLogger.LogWarning("Agent '{AgentName}' requires tools not registered: {MissingTools}",
-                        dep.AgentName, string.Join(", ", missing));
+                    toolLogger.LogWarning("Agent '{AgentName}' declares tools not registered: {MissingTools}",
+                        seed.AgentName, string.Join(", ", missing));
             }
+
+            var defaultTools = agentToolSeeds.TryGetValue(options.AgentName, out var defaultSeed)
+                ? tools.Where(t => defaultSeed.ToolNames.Contains(t.Name)).ToList()
+                : tools;
 
             var agentOptions = new ChatClientAgentOptions
             {
                 Name = options.AgentName,
                 Description = options.AgentDescription,
-                ChatOptions = new ChatOptions { Tools = tools },
+                ChatOptions = new ChatOptions { Tools = defaultTools },
                 ChatHistoryProvider = chatHistoryProvider,
                 AIContextProviders = contextProviders.Count > 0 ? contextProviders : null,
             };
@@ -161,9 +166,10 @@ public static class ServiceCollectionExtensions
             var contextProvidersFactory = () => sp.GetServices<AIContextProvider>();
             var personaLookup = personaLookupFactory(sp);
             var personaListAll = personaListAllFactory(sp);
+            var toolSeeds = sp.GetServices<IAgentToolsSeed>().ToDictionary(s => s.AgentName, StringComparer.OrdinalIgnoreCase);
 
             var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
-                personaLookup, personaListAll, loggerFactory);
+                personaLookup, personaListAll, toolSeeds, loggerFactory);
 
             // Defer RegisterDefault to avoid circular dependency:
             // AIAgent -> IReadOnlyList<AITool> -> AgentRegistryToolProvider -> AgentRegistry -> AIAgent
