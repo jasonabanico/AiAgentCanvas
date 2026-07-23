@@ -1,14 +1,15 @@
 using System.ComponentModel;
 using System.Text.Json;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace AiAgentCanvas.Core.Agents;
 
 public sealed class AgentRegistryToolProvider
 {
-    private readonly AgentRegistry _registry;
+    private readonly IAgentRegistry _registry;
 
-    public AgentRegistryToolProvider(AgentRegistry registry)
+    public AgentRegistryToolProvider(IAgentRegistry registry)
     {
         _registry = registry;
     }

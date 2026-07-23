@@ -1,24 +1,13 @@
+using AiAgentCanvas.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace AiAgentCanvas.Core.Agents;
 
-public sealed class AgentMessage
-{
-    public string Id { get; set; } = string.Empty;
-    public string Sender { get; set; } = string.Empty;
-    public string Recipient { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public string Status { get; set; } = "pending";
-    public string? Response { get; set; }
-    public string CreatedAt { get; set; } = string.Empty;
-    public string? RespondedAt { get; set; }
-}
-
-public sealed class AgentMailbox : IDisposable
+public sealed class SqliteAgentMailbox : IAgentMailbox, IDisposable
 {
     private readonly SqliteConnection _connection;
 
-    public AgentMailbox(string connectionString)
+    public SqliteAgentMailbox(string connectionString)
     {
         _connection = new SqliteConnection(connectionString);
         _connection.Open();
@@ -60,7 +49,7 @@ public sealed class AgentMailbox : IDisposable
         return id;
     }
 
-    public List<AgentMessage> CheckInbox(string recipient, bool pendingOnly = true)
+    public List<MailboxMessage> CheckInbox(string recipient, bool pendingOnly = true)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = pendingOnly
@@ -68,7 +57,7 @@ public sealed class AgentMailbox : IDisposable
             : "SELECT id, sender, recipient, message, status, response, created_at, responded_at FROM agent_messages WHERE recipient = @recipient ORDER BY created_at DESC LIMIT 50";
         cmd.Parameters.AddWithValue("@recipient", recipient);
 
-        var messages = new List<AgentMessage>();
+        var messages = new List<MailboxMessage>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
             messages.Add(ReadMessage(reader));
@@ -100,7 +89,7 @@ public sealed class AgentMailbox : IDisposable
         return cmd.ExecuteNonQuery() > 0;
     }
 
-    public AgentMessage? GetMessage(string messageId)
+    public MailboxMessage? GetMessage(string messageId)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT id, sender, recipient, message, status, response, created_at, responded_at FROM agent_messages WHERE id = @id";
@@ -118,7 +107,7 @@ public sealed class AgentMailbox : IDisposable
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
-    private static AgentMessage ReadMessage(SqliteDataReader reader) => new()
+    private static MailboxMessage ReadMessage(SqliteDataReader reader) => new()
     {
         Id = reader.GetString(0),
         Sender = reader.GetString(1),

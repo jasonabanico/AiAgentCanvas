@@ -1,20 +1,17 @@
 using System.ComponentModel;
 using System.Text.Json;
-using Microsoft.Agents.AI;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Core.Agents;
 
 public sealed class HandoffToolProvider
 {
-    private readonly AgentRegistry _registry;
-    private readonly ILogger<HandoffToolProvider> _logger;
+    private readonly IAgentHandoff _handoff;
 
-    public HandoffToolProvider(AgentRegistry registry, ILogger<HandoffToolProvider> logger)
+    public HandoffToolProvider(IAgentHandoff handoff)
     {
-        _registry = registry;
-        _logger = logger;
+        _handoff = handoff;
     }
 
     public IReadOnlyList<AITool> GetTools()
@@ -32,38 +29,13 @@ public sealed class HandoffToolProvider
         [Description("The task or question to delegate to the target agent")] string context,
         [Description("Whether the result should be returned to you for further processing (true) or streamed directly to the user (false)")] bool returnToMe = true)
     {
-        var agent = _registry.Resolve(targetAgent);
-        if (agent is null)
-            return JsonSerializer.Serialize(new { error = $"Agent '{targetAgent}' not found. Use list_available_agents to see available agents." });
-
-        _logger.LogInformation("Handing off to agent {Target} with context: {Context}",
-            targetAgent, context.Length > 100 ? context[..100] + "..." : context);
-
-        try
+        var result = await _handoff.HandoffAsync(targetAgent, context);
+        return JsonSerializer.Serialize(new
         {
-            var session = await agent.CreateSessionAsync();
-            var messages = new List<ChatMessage> { new(ChatRole.User, context) };
-            var response = await agent.RunAsync(messages, session);
-            var resultText = response.Text ?? "(no response from agent)";
-
-            _logger.LogInformation("Handoff to {Target} completed. Response length: {Length}", targetAgent, resultText.Length);
-
-            return JsonSerializer.Serialize(new
-            {
-                status = "completed",
-                agent = targetAgent,
-                response = resultText,
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Handoff to agent {Target} failed", targetAgent);
-            return JsonSerializer.Serialize(new
-            {
-                status = "failed",
-                agent = targetAgent,
-                error = ex.Message,
-            });
-        }
+            status = result.Status,
+            agent = result.Agent,
+            response = result.Response,
+            error = result.Error,
+        });
     }
 }

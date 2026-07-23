@@ -6,14 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Core.Agents;
 
-public sealed class AgentPersonaInfo
-{
-    public required string Name { get; init; }
-    public required string Description { get; init; }
-    public required string Instructions { get; init; }
-}
-
-public sealed class AgentRegistry
+public sealed class AgentRegistry : IAgentRegistry
 {
     private readonly ConcurrentDictionary<string, AIAgent> _agents = new(StringComparer.OrdinalIgnoreCase);
     private readonly IChatClient _chatClient;

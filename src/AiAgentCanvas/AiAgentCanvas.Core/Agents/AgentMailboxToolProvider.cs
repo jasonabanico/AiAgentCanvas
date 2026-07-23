@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -7,11 +8,11 @@ namespace AiAgentCanvas.Core.Agents;
 
 public sealed class AgentMailboxToolProvider
 {
-    private readonly AgentMailbox _mailbox;
-    private readonly AgentRegistry _registry;
+    private readonly IAgentMailbox _mailbox;
+    private readonly IAgentRegistry _registry;
     private readonly ILogger<AgentMailboxToolProvider> _logger;
 
-    public AgentMailboxToolProvider(AgentMailbox mailbox, AgentRegistry registry, ILogger<AgentMailboxToolProvider> logger)
+    public AgentMailboxToolProvider(IAgentMailbox mailbox, IAgentRegistry registry, ILogger<AgentMailboxToolProvider> logger)
     {
         _mailbox = mailbox;
         _registry = registry;

@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.AgentData;
 using AiAgentCanvas.AgentData.Personas;
 using AiAgentCanvas.Core;

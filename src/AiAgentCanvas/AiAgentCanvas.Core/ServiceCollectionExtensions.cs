@@ -155,7 +155,7 @@ public static class ServiceCollectionExtensions
         Func<IServiceProvider, Func<IEnumerable<AgentPersonaInfo>>> personaListAllFactory,
         string mailboxConnectionString = "Data Source=agentmailbox.db")
     {
-        services.AddSingleton(new AgentMailbox(mailboxConnectionString));
+        services.AddSingleton<IAgentMailbox>(new SqliteAgentMailbox(mailboxConnectionString));
 
         services.AddSingleton(sp =>
         {
@@ -171,11 +171,11 @@ public static class ServiceCollectionExtensions
             var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
                 personaLookup, personaListAll, toolSeeds, loggerFactory);
 
-            // Defer RegisterDefault to avoid circular dependency:
-            // AIAgent -> IReadOnlyList<AITool> -> AgentRegistryToolProvider -> AgentRegistry -> AIAgent
             registry.SetDefaultAgentFactory(() => sp.GetRequiredService<AIAgent>());
             return registry;
         });
+        services.AddSingleton<IAgentRegistry>(sp => sp.GetRequiredService<AgentRegistry>());
+        services.AddSingleton<IAgentHandoff, InProcessAgentHandoff>();
 
         services.AddSingleton<AgentRegistryToolProvider>();
         services.AddSingleton<AgentMailboxToolProvider>();
