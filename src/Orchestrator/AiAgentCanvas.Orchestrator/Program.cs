@@ -66,7 +66,8 @@ builder.Services.AddAiAgentCanvasInterAgentCommunication(
             Description = p.Description,
             Instructions = p.Instructions,
         });
-    });
+    },
+    agentName: "AiAgentCanvas");
 
 builder.Services.AddSqliteChatHistory();
 
@@ -82,6 +83,7 @@ app.UseAiAgentCanvasSecurity();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAiAgentCanvas();
+app.MapA2AEndpoints();
 app.MapNotificationEndpoints();
 app.MapFallbackToFile("index.html");
 

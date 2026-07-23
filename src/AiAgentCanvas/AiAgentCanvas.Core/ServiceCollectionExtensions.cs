@@ -1,4 +1,5 @@
 #pragma warning disable MAAI001
+#pragma warning disable MEAI001
 
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Agents;
@@ -131,10 +132,8 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Func<IServiceProvider, Func<string, AgentPersonaInfo?>> personaLookupFactory,
         Func<IServiceProvider, Func<IEnumerable<AgentPersonaInfo>>> personaListAllFactory,
-        string mailboxConnectionString = "Data Source=agentmailbox.db")
+        string agentName = "AiAgentCanvas")
     {
-        services.AddSingleton<IAgentMailbox>(new SqliteAgentMailbox(mailboxConnectionString));
-
         services.AddSingleton(sp =>
         {
             var chatClient = sp.GetRequiredService<IChatClient>();
@@ -155,13 +154,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgentRegistry>(sp => sp.GetRequiredService<AgentRegistry>());
         services.AddSingleton<IAgentHandoff, InProcessAgentHandoff>();
 
+        services.AddA2AServer(agentName);
+        services.AddKeyedSingleton<AIAgent>(agentName, (sp, _) => sp.GetRequiredService<AIAgent>());
+
         services.AddSingleton<AgentRegistryToolProvider>();
-        services.AddSingleton<AgentMailboxToolProvider>();
         services.AddSingleton<HandoffToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<AgentRegistryToolProvider>().GetTools());
-        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            sp.GetRequiredService<AgentMailboxToolProvider>().GetTools());
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<HandoffToolProvider>().GetTools());
 
@@ -176,6 +175,12 @@ public static class ServiceCollectionExtensions
         {
             ResponseWriter = WriteHealthResponse,
         });
+        return app;
+    }
+
+    public static WebApplication MapA2AEndpoints(this WebApplication app, string agentName = "AiAgentCanvas", string path = "/a2a")
+    {
+        app.MapA2AHttpJson(agentName, path);
         return app;
     }
 

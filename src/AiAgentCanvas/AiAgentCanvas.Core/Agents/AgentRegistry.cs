@@ -1,4 +1,7 @@
+#pragma warning disable MEAI001
+
 using System.Collections.Concurrent;
+using A2A;
 using AiAgentCanvas.Abstractions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -9,6 +12,7 @@ namespace AiAgentCanvas.Core.Agents;
 public sealed class AgentRegistry : IAgentRegistry
 {
     private readonly ConcurrentDictionary<string, AIAgent> _agents = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, AgentCard> _agentCards = new(StringComparer.OrdinalIgnoreCase);
     private readonly IChatClient _chatClient;
     private readonly Func<IEnumerable<AITool>> _toolsFactory;
     private readonly Func<IEnumerable<AIContextProvider>> _contextProvidersFactory;
@@ -39,6 +43,7 @@ public sealed class AgentRegistry : IAgentRegistry
     public void RegisterDefault(AIAgent agent)
     {
         _agents["default"] = agent;
+        RegisterAgentCard(agent.Name ?? "default", agent.Description ?? "Default system agent");
     }
 
     public void SetDefaultAgentFactory(Func<AIAgent> factory)
@@ -57,6 +62,7 @@ public sealed class AgentRegistry : IAgentRegistry
             {
                 var defaultAgent = factory();
                 _agents["default"] = defaultAgent;
+                RegisterAgentCard(defaultAgent.Name ?? "default", defaultAgent.Description ?? "Default system agent");
                 _defaultAgentFactory = null;
                 return defaultAgent;
             }
@@ -68,12 +74,14 @@ public sealed class AgentRegistry : IAgentRegistry
 
         var agent = BuildAgentForPersona(persona);
         _agents[name] = agent;
+        RegisterAgentCard(name, persona.Description);
         return agent;
     }
 
     public void Invalidate(string name)
     {
         _agents.TryRemove(name, out _);
+        _agentCards.TryRemove(name, out _);
     }
 
     public IReadOnlyList<string> ListAvailableAgents()
@@ -89,6 +97,32 @@ public sealed class AgentRegistry : IAgentRegistry
             return new AgentPersonaInfo { Name = "default", Description = "Default system agent", Instructions = "(system prompt)" };
 
         return _personaLookup(name);
+    }
+
+    public AgentCard? GetAgentCard(string name)
+    {
+        _agentCards.TryGetValue(name, out var card);
+        return card;
+    }
+
+    public IReadOnlyList<AgentCard> GetAllAgentCards()
+    {
+        foreach (var persona in _personaListAll())
+        {
+            if (!_agentCards.ContainsKey(persona.Name))
+                RegisterAgentCard(persona.Name, persona.Description);
+        }
+        return _agentCards.Values.ToList();
+    }
+
+    private void RegisterAgentCard(string name, string description)
+    {
+        _agentCards.TryAdd(name, new AgentCard
+        {
+            Name = name,
+            Description = description,
+            Version = "1.0",
+        });
     }
 
     private AIAgent BuildAgentForPersona(AgentPersonaInfo persona)
