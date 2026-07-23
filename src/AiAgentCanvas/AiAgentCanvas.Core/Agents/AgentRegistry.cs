@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using A2A;
 using AiAgentCanvas.Abstractions;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.A2A;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +22,7 @@ public sealed class AgentRegistry : IAgentRegistry
     private readonly IReadOnlyDictionary<string, IAgentToolsSeed> _toolSeeds;
     private readonly ILoggerFactory _loggerFactory;
     private Func<AIAgent>? _defaultAgentFactory;
+    private readonly IHttpClientFactory? _httpClientFactory;
 
     public AgentRegistry(
         IChatClient chatClient,
@@ -29,7 +31,8 @@ public sealed class AgentRegistry : IAgentRegistry
         Func<string, AgentPersonaInfo?> personaLookup,
         Func<IEnumerable<AgentPersonaInfo>> personaListAll,
         IReadOnlyDictionary<string, IAgentToolsSeed> toolSeeds,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _chatClient = chatClient;
         _toolsFactory = toolsFactory;
@@ -38,6 +41,7 @@ public sealed class AgentRegistry : IAgentRegistry
         _personaListAll = personaListAll;
         _toolSeeds = toolSeeds;
         _loggerFactory = loggerFactory;
+        _httpClientFactory = httpClientFactory;
     }
 
     public void RegisterDefault(AIAgent agent)
@@ -49,6 +53,22 @@ public sealed class AgentRegistry : IAgentRegistry
     public void SetDefaultAgentFactory(Func<AIAgent> factory)
     {
         _defaultAgentFactory = factory;
+    }
+
+    public void RegisterRemote(string name, string a2aUrl, string? description = null)
+    {
+        var card = new AgentCard
+        {
+            Name = name,
+            Description = description ?? $"Remote A2A agent at {a2aUrl}",
+            Version = "1.0",
+        };
+
+        var httpClient = _httpClientFactory?.CreateClient(name) ?? new HttpClient();
+        httpClient.BaseAddress = new Uri(a2aUrl);
+        var agent = card.AsAIAgent(httpClient, loggerFactory: _loggerFactory);
+        _agents[name] = agent;
+        _agentCards[name] = card;
     }
 
     public AIAgent? Resolve(string name)

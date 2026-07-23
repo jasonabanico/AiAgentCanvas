@@ -145,8 +145,9 @@ public static class ServiceCollectionExtensions
             var personaListAll = personaListAllFactory(sp);
             var toolSeeds = sp.GetServices<IAgentToolsSeed>().ToDictionary(s => s.AgentName, StringComparer.OrdinalIgnoreCase);
 
+            var httpClientFactory = sp.GetService<IHttpClientFactory>();
             var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
-                personaLookup, personaListAll, toolSeeds, loggerFactory);
+                personaLookup, personaListAll, toolSeeds, loggerFactory, httpClientFactory);
 
             registry.SetDefaultAgentFactory(() => sp.GetRequiredService<AIAgent>());
             return registry;

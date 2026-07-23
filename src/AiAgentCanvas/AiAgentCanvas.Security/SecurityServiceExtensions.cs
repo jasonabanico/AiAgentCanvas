@@ -1,8 +1,12 @@
+#pragma warning disable MEAI001
+
 using AiAgentCanvas.Abstractions;
 using AgentGovernance;
 using AgentGovernance.Mcp;
 using AgentGovernance.Policy;
+using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Purview;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -89,6 +93,30 @@ public static class SecurityServiceExtensions
                     """{"error":"Rate limit exceeded. Try again later."}""", ct);
             };
         });
+
+        return services;
+    }
+
+    public static IServiceCollection AddAiAgentCanvasPurview(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var purviewSection = configuration.GetSection("Purview");
+        if (!purviewSection.Exists() || string.IsNullOrEmpty(purviewSection["AppName"]))
+            return services;
+
+        var settings = new PurviewSettings(purviewSection["AppName"]!)
+        {
+            AppVersion = purviewSection["AppVersion"],
+            TenantId = purviewSection["TenantId"],
+        };
+
+        var credential = new DefaultAzureCredential();
+
+        services.AddSingleton(settings);
+        services.AddSingleton(sp =>
+            PurviewExtensions.PurviewAgentMiddleware(credential, settings,
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger("AiAgentCanvas.Purview")));
 
         return services;
     }

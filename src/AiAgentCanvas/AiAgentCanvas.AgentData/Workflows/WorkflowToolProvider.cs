@@ -30,6 +30,10 @@ public sealed class WorkflowToolProvider
                 "Read the full definition of a workflow"),
             AIFunctionFactory.Create(RunWorkflow, "run_workflow",
                 "Execute a saved workflow"),
+            AIFunctionFactory.Create(RunSequentialWorkflow, "run_sequential_workflow",
+                "Execute a sequential MAF workflow graph where agents run one after another"),
+            AIFunctionFactory.Create(RunConcurrentWorkflow, "run_concurrent_workflow",
+                "Execute a concurrent MAF workflow graph where agents run in parallel"),
             AIFunctionFactory.Create(DeleteWorkflow, "delete_workflow",
                 "Delete a workflow definition"),
         ];
@@ -92,6 +96,26 @@ public sealed class WorkflowToolProvider
         [Description("Optional input to pass to the workflow")] string? input = null)
     {
         return await _executor.ExecuteAsync(name, input, ct);
+    }
+
+    [Description("Execute a sequential MAF workflow graph where agents run one after another, passing output forward")]
+    private async Task<string> RunSequentialWorkflow(
+        [Description("Comma-separated agent names to run in sequence")] string agentNames,
+        [Description("Input message for the workflow")] string input,
+        CancellationToken ct)
+    {
+        var names = agentNames.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return await _executor.ExecuteSequentialAsync(names, input, ct);
+    }
+
+    [Description("Execute a concurrent MAF workflow graph where agents run in parallel on the same input")]
+    private async Task<string> RunConcurrentWorkflow(
+        [Description("Comma-separated agent names to run concurrently")] string agentNames,
+        [Description("Input message for the workflow")] string input,
+        CancellationToken ct)
+    {
+        var names = agentNames.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return await _executor.ExecuteConcurrentAsync(names, input, ct);
     }
 
     [Description("Delete a workflow definition")]

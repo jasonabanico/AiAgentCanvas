@@ -9,6 +9,7 @@ using AiAgentCanvas.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.AgentData;
 
@@ -87,7 +88,12 @@ public static class AgentDataServiceExtensions
             SharedDirs(sharedRootDirectory, "workflows"));
         services.AddSingleton(store);
         services.AddSingleton<WorkflowExecutor>();
+        services.AddSingleton(sp => new DeclarativeWorkflowExecutor(
+            Path.Combine(rootDirectory, "agent", "declarative-workflows"),
+            sp,
+            sp.GetRequiredService<ILogger<DeclarativeWorkflowExecutor>>()));
         services.AddSingleton<WorkflowToolProvider>();
+        services.AddSingleton<DeclarativeWorkflowToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
         {
             foreach (var seed in sp.GetServices<IWorkflowSeed>())
@@ -97,6 +103,8 @@ public static class AgentDataServiceExtensions
             }
             return sp.GetRequiredService<WorkflowToolProvider>().GetTools();
         });
+        services.AddSingleton<IReadOnlyList<AITool>>(sp =>
+            sp.GetRequiredService<DeclarativeWorkflowToolProvider>().GetTools());
         return services;
     }
 

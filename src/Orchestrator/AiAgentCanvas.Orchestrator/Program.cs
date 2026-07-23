@@ -1,3 +1,5 @@
+#pragma warning disable MEAI001
+
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.AgentData;
 using AiAgentCanvas.AgentData.Personas;
@@ -10,11 +12,14 @@ using AiAgentCanvas.Skills;
 using AiAgentCanvas.SystemTools;
 using HelloWorldAgent;
 using MCP.HelloWorldData;
+using Microsoft.Agents.AI.DevUI;
 using VectorStore.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
+builder.Services.AddAiAgentCanvasPurview(builder.Configuration);
+builder.Services.AddDevUI();
 
 builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 {
@@ -84,6 +89,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAiAgentCanvas();
 app.MapA2AEndpoints();
+app.MapDevUI();
 app.MapNotificationEndpoints();
 app.MapFallbackToFile("index.html");
 
