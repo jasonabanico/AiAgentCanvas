@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Text.Json;
-using AiAgentCanvas.Core.Services;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -36,7 +34,7 @@ public static class AgUiEndpoint
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to resolve AIAgent — check AI configuration in appsettings.json");
+            logger.LogError(ex, "Failed to resolve AIAgent");
             context.Response.StatusCode = 503;
             await context.Response.WriteAsJsonAsync(new
             {
@@ -87,45 +85,17 @@ public static class AgUiEndpoint
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
             cts.CancelAfter(idleTimeout);
 
-            logger.LogInformation("Creating agent session. ThreadId={ThreadId}", threadId);
             var session = await agent.CreateSessionAsync(cts.Token);
             session.StateBag.SetValue("conversationId", threadId);
 
-            logger.LogInformation("Starting agent streaming. ThreadId={ThreadId}, Messages={Messages}", threadId, string.Join("; ", chatMessages.Select(m => $"{m.Role}: {m.Text?[..Math.Min(m.Text.Length, 50)]}")));
-            var sw = Stopwatch.StartNew();
-
-            var broker = sp.GetService<ToolStatusBroker>();
-            var channel = broker?.Start();
-            var writeLock = new SemaphoreSlim(1, 1);
-
-            var drainTask = channel is not null
-                ? DrainToolStatusAsync(context, channel, writeLock, cts, idleTimeout)
-                : Task.CompletedTask;
-
-            try
+            await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
             {
-                await foreach (var update in agent.RunStreamingAsync(chatMessages, session, cancellationToken: cts.Token))
+                cts.CancelAfter(idleTimeout);
+                if (update.Text is { Length: > 0 } text)
                 {
-                    cts.CancelAfter(idleTimeout);
-                    if (update.Text is { Length: > 0 } text)
-                    {
-                        await writeLock.WaitAsync(cts.Token);
-                        try { await WriteEvent(context, "text.message.content", new { messageId, delta = text }); }
-                        finally { writeLock.Release(); }
-                    }
+                    await WriteEvent(context, "text.message.content", new { messageId, delta = text });
                 }
             }
-            finally
-            {
-                if (channel is not null)
-                {
-                    channel.Writer.TryComplete();
-                }
-                broker?.Stop();
-                await drainTask;
-            }
-
-            logger.LogInformation("Streaming complete. ThreadId={ThreadId}, RunId={RunId}, ElapsedMs={ElapsedMs}", threadId, runId, sw.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
         {
@@ -171,33 +141,6 @@ public static class AgUiEndpoint
             }
         }
         return chatMessages;
-    }
-
-    private static async Task DrainToolStatusAsync(
-        HttpContext context,
-        System.Threading.Channels.Channel<ToolStatusEvent> channel,
-        SemaphoreSlim writeLock,
-        CancellationTokenSource cts,
-        TimeSpan idleTimeout)
-    {
-        try
-        {
-            await foreach (var status in channel.Reader.ReadAllAsync(cts.Token))
-            {
-                cts.CancelAfter(idleTimeout);
-                await writeLock.WaitAsync(cts.Token);
-                try
-                {
-                    await WriteEvent(context, "tool.status", new
-                    {
-                        toolName = status.ToolName,
-                        isComplete = status.IsComplete,
-                    });
-                }
-                finally { writeLock.Release(); }
-            }
-        }
-        catch (OperationCanceledException) { }
     }
 
     private static async Task WriteEvent(HttpContext context, string eventType, object data)

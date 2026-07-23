@@ -8,8 +8,6 @@ using AiAgentCanvas.Scheduler;
 using AiAgentCanvas.Security;
 using AiAgentCanvas.Skills;
 using AiAgentCanvas.SystemTools;
-using Hangfire;
-using Hangfire.Storage.SQLite;
 using HelloWorldAgent;
 using MCP.HelloWorldData;
 using VectorStore.Sqlite;
@@ -41,7 +39,6 @@ builder.Services.AddAiAgentCanvasWorkflows();
 builder.Services.AddAiAgentCanvasEntities();
 builder.Services.AddAiAgentCanvasUserProfiles();
 builder.Services.AddAiAgentCanvasGuardrails();
-builder.Services.AddAiAgentCanvasGoals();
 builder.Services.AddAiAgentCanvasSkillRegistry();
 builder.Services.AddAiAgentCanvasSkillAuthoring();
 
@@ -79,13 +76,6 @@ if (!string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentNa
     builder.Services.AddAiAgentCanvasRag();
 }
 
-builder.Services.AddHangfire(config => config
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UseSQLiteStorage("hangfire.db"));
-
-builder.Services.AddHangfireServer();
-
 var app = builder.Build();
 
 app.UseAiAgentCanvasSecurity();
@@ -93,7 +83,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAiAgentCanvas();
 app.MapNotificationEndpoints();
-app.UseHangfireDashboard("/hangfire");
 app.MapFallbackToFile("index.html");
 
 app.Run();

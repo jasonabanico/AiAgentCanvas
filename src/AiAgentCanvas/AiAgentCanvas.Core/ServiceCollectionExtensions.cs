@@ -1,4 +1,5 @@
-using System.Diagnostics;
+#pragma warning disable MAAI001
+
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Agents;
 using AiAgentCanvas.Core.Configuration;
@@ -43,34 +44,19 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
         services.AddSingleton(sp =>
-            new DynamicToolContextProvider(sp.GetRequiredService<DynamicToolRegistry>()));
-
-        services.AddSingleton<ToolStatusBroker>();
-
-        services.AddSingleton(sp =>
-            new PlanningMiddleware(
-                sp.GetRequiredService<IChatClient>(),
-                sp.GetRequiredService<DynamicToolRegistry>(),
-                sp.GetServices<IReadOnlyList<AITool>>(),
-                sp.GetRequiredService<ILoggerFactory>()));
-
-        services.AddSingleton(sp =>
         {
             var chatClient = sp.GetRequiredService<IChatClient>();
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var chatHistoryProvider = sp.GetService<ChatHistoryProvider>();
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
             var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
             var governanceWrapper = sp.GetService<IToolGovernanceWrapper>();
-            var toolStatusBroker = sp.GetRequiredService<ToolStatusBroker>();
             var tools = rawTools.Select(t =>
             {
                 if (t is not AIFunction fn) return t;
                 if (governanceWrapper is not null) fn = governanceWrapper.Wrap(fn);
-                fn = new StatusEmittingFunction(fn, toolStatusBroker);
                 return (AITool)fn;
             }).ToList();
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
             toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));
@@ -89,31 +75,23 @@ public static class ServiceCollectionExtensions
                 ? tools.Where(t => defaultSeed.ToolNames.Contains(t.Name)).ToList()
                 : tools;
 
-            var agentOptions = new ChatClientAgentOptions
+            AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
             {
                 Name = options.AgentName,
-                Description = options.AgentDescription,
-                ChatOptions = new ChatOptions { Tools = defaultTools },
-                ChatHistoryProvider = chatHistoryProvider,
+                ChatOptions = new ChatOptions
+                {
+                    Instructions = defaultPrompt,
+                    Tools = defaultTools,
+                },
                 AIContextProviders = contextProviders.Count > 0 ? contextProviders : null,
-            };
-
-            var agent = new ChatClientAgent(chatClient, agentOptions, loggerFactory, sp);
-
-            var planningMiddleware = sp.GetRequiredService<PlanningMiddleware>();
-            var builder = agent.AsBuilder();
-            builder.Use(async (messages, session, runOptions, nextAsync, ct) =>
-                await planningMiddleware.InvokeAsync(messages, session, runOptions, nextAsync, ct));
-            builder.Use(async (messages, session, runOptions, nextAsync, ct) =>
-            {
-                var logger = loggerFactory.CreateLogger("AiAgentCanvas.Middleware");
-                var sw = Stopwatch.StartNew();
-                logger.LogInformation("Agent invoked. Messages={Count}", messages.Count());
-                await nextAsync(messages, session, runOptions, ct);
-                logger.LogInformation("Agent completed in {ElapsedMs}ms", sw.ElapsedMilliseconds);
+                MaxContextWindowTokens = 128_000,
+                MaxOutputTokens = 16_384,
+                DisableWebSearch = true,
+                DisableFileMemory = true,
+                DisableAgentSkillsProvider = true,
             });
 
-            return (AIAgent)builder.Build(sp);
+            return agent;
         });
 
         services.AddSingleton<AIHealthCheck>();

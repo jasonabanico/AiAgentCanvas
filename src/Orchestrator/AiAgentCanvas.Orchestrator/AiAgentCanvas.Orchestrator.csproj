@@ -20,11 +20,6 @@
     <ProjectReference Include="..\..\Agents\Agent.HelloWorld\Agent.HelloWorld.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
-    <PackageReference Include="Hangfire.Core" Version="1.8.23" />
-    <PackageReference Include="Hangfire.Storage.SQLite" Version="0.4.3" />
-  </ItemGroup>
 
   <Target Name="BuildFrontend" BeforeTargets="Build" Condition="!Exists('wwwroot\index.html')">
     <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
