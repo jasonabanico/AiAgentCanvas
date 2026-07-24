@@ -25,6 +25,7 @@ using Agent.FinancialAnalyst;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using DataConnection.MarketData;
 using DataConnection.VectorStore.Sqlite;
+using DataConnection.VectorSearch.Databricks;
 using Microsoft.Agents.AI.DevUI;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +61,16 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 
 builder.Services.AddFinancialAnalystAgent();
 builder.Services.AddMarketDataTools();
+
+// Databricks Vector Search RAG tool (additive; SQLite stays the default vector store).
+// Registered only when configured, so the agent never sees a tool pointing at nothing.
+var databricksVectorSearch = new DatabricksVectorSearchOptions();
+builder.Configuration.GetSection(DatabricksVectorSearchOptions.SectionName).Bind(databricksVectorSearch);
+if (databricksVectorSearch.IsConfigured)
+{
+    builder.Services.AddDatabricksVectorSearchTool(builder.Configuration);
+}
+
 builder.Services.AddAiAgentCanvasSystemTools(options =>
 {
     options.AllowedCommands = ["dotnet", "git", "npm", "node"];

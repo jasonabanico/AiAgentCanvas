@@ -38,6 +38,7 @@
     <ProjectReference Include="..\..\DataConnections\DataConnection.MarketData\DataConnection.MarketData.csproj" />
     <ProjectReference Include="..\..\DataConnections\AiAgentCanvas.Storage.Sqlite\AiAgentCanvas.Storage.Sqlite.csproj" />
     <ProjectReference Include="..\..\DataConnections\DataConnection.VectorStore.Sqlite\DataConnection.VectorStore.Sqlite.csproj" />
+    <ProjectReference Include="..\..\DataConnections\DataConnection.VectorSearch.Databricks\DataConnection.VectorSearch.Databricks.csproj" />
 
     <!-- Providers -->
     <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.AzureAIFoundry\AiAgentCanvas.Providers.AzureAIFoundry.csproj" />
