@@ -23,6 +23,4 @@ public sealed class FeatureFlags
     public bool ComputerUse { get; set; } = true;
     public bool InterAgentCommunication { get; set; } = true;
     public bool Rag { get; set; } = true;
-    public bool MarketData { get; set; } = true;
-    public bool FinancialAnalyst { get; set; } = true;
 }

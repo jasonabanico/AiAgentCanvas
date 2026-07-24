@@ -22,9 +22,7 @@ using AiAgentCanvas.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
 using AiAgentCanvas.Security;
-using Agent.FinancialAnalyst;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
-using DataConnection.MarketData;
 using DataConnection.VectorStore.Sqlite;
 using DataConnection.VectorSearch.Databricks;
 using Microsoft.Agents.AI.DevUI;
@@ -60,8 +58,7 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
     options.AgentDescription = "A multi-tool AI assistant with market data, scheduling, skills, and MCP integration.";
 });
 
-if (features.FinancialAnalyst) builder.Services.AddFinancialAnalystAgent();
-if (features.MarketData) builder.Services.AddMarketDataTools();
+builder.Services.AddServiceModules(builder.Configuration);
 
 var databricksVectorSearch = new DatabricksVectorSearchOptions();
 builder.Configuration.GetSection(DatabricksVectorSearchOptions.SectionName).Bind(databricksVectorSearch);

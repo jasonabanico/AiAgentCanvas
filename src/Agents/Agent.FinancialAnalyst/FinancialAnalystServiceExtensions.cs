@@ -1,11 +1,14 @@
 using AiAgentCanvas.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agent.FinancialAnalyst;
 
-public static class FinancialAnalystServiceExtensions
+public sealed class FinancialAnalystModule : IServiceModule
 {
-    public static IServiceCollection AddFinancialAnalystAgent(this IServiceCollection services)
+    public string SectionName => "Agents:FinancialAnalyst";
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IPersonaSeed>(new PersonaSeed(
             name: "financial-analyst",
@@ -165,7 +168,5 @@ public static class FinancialAnalystServiceExtensions
         services.AddSingleton<IAgentToolsSeed>(new AgentToolsSeed(
             agentName: "financial-analyst",
             toolNames: ["stock_quote", "stock_history", "edgar_company_facts"]));
-
-        return services;
     }
 }

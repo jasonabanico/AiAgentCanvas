@@ -1,13 +1,16 @@
 using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 
 namespace DataConnection.MarketData;
 
-public static class MarketDataServiceExtensions
+public sealed class MarketDataModule : IServiceModule
 {
-    public static IServiceCollection AddMarketDataTools(this IServiceCollection services)
+    public string SectionName => "DataConnections:MarketData";
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpClient("SEC", client =>
             {
@@ -29,7 +32,5 @@ public static class MarketDataServiceExtensions
         services.AddSingleton(new ToolStateMapping("stock_quote", ToolStateBehavior.Snapshot));
         services.AddSingleton(new ToolStateMapping("stock_history", ToolStateBehavior.Snapshot));
         services.AddSingleton(new ToolStateMapping("edgar_company_facts", ToolStateBehavior.Snapshot));
-
-        return services;
     }
 }
