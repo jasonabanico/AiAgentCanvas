@@ -54,6 +54,10 @@ public static class ServiceCollectionExtensions
                 pipeline = new CostAwareModelRouter(pipeline, routerOptions, routerLogger);
             }
 
+            var auditClient = sp.GetService<IAuditingChatClientFactory>();
+            if (auditClient is not null)
+                pipeline = auditClient.Wrap(pipeline);
+
             var reflectiveOptions = sp.GetService<ReflectiveOptions>();
             if (reflectiveOptions is not null)
             {

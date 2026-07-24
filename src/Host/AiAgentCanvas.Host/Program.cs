@@ -11,6 +11,7 @@ using AiAgentCanvas.Capabilities.Notifications;
 using AiAgentCanvas.Capabilities.Rag;
 using AiAgentCanvas.Capabilities.Scheduling;
 using AiAgentCanvas.Capabilities.Skills;
+using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Orchestration;
@@ -32,7 +33,19 @@ if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionS
         o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]);
 }
 
-builder.Services.AddAzureAIFoundry(builder.Configuration);
+// LLM provider selection. Both providers register Microsoft.Extensions.AI.IChatClient,
+// so everything downstream (agents, workflows, tools, context providers) is provider-agnostic.
+// Set "Provider" to "Databricks" or "AzureAIFoundry" in appsettings.json (default: AzureAIFoundry).
+var llmProvider = builder.Configuration["Provider"] ?? "AzureAIFoundry";
+if (string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddDatabricks(builder.Configuration);
+}
+else
+{
+    builder.Services.AddAzureAIFoundry(builder.Configuration);
+}
+
 builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
 builder.Services.AddAiAgentCanvasPurview(builder.Configuration);
 builder.Services.AddDevUI();
@@ -64,6 +77,7 @@ builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasSkillRegistry();
 builder.Services.AddAiAgentCanvasSkillAuthoring();
 builder.Services.AddAiAgentCanvasEpisodicMemory();
+builder.Services.AddAiAgentCanvasAuditLog();
 
 builder.Services.AddAiAgentCanvasInterAgentCommunication(
     personaLookupFactory: sp =>
@@ -94,7 +108,20 @@ builder.Services.AddAiAgentCanvasInterAgentCommunication(
 
 builder.Services.AddSqliteChatHistory();
 
-if (!string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentName"]))
+// Embeddings + RAG, wired to whichever provider is active. The vector store and RAG
+// pipeline are provider-agnostic; only the embedding generator differs.
+var databricksEmbeddings = string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase)
+    && !string.IsNullOrEmpty(builder.Configuration["Databricks:EmbeddingModelName"]);
+var azureEmbeddings = !string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase)
+    && !string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentName"]);
+
+if (databricksEmbeddings)
+{
+    builder.Services.AddDatabricksEmbeddings();
+    builder.Services.AddSqliteVectorStore(builder.Configuration);
+    builder.Services.AddAiAgentCanvasRag();
+}
+else if (azureEmbeddings)
 {
     builder.Services.AddAzureAIFoundryEmbeddings();
     builder.Services.AddSqliteVectorStore(builder.Configuration);
