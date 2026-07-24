@@ -13,6 +13,7 @@ using AiAgentCanvas.Capabilities.Scheduling;
 using AiAgentCanvas.Capabilities.Skills;
 using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
+using AiAgentCanvas.Capabilities.ComputerUse;
 using AiAgentCanvas.Capabilities.EventTriggers;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Orchestration;
@@ -80,6 +81,7 @@ builder.Services.AddAiAgentCanvasSkillAuthoring();
 builder.Services.AddAiAgentCanvasEpisodicMemory();
 builder.Services.AddAiAgentCanvasAuditLog();
 builder.Services.AddAiAgentCanvasEventTriggers();
+builder.Services.AddAiAgentCanvasComputerUse();
 
 builder.Services.AddAiAgentCanvasInterAgentCommunication(
     personaLookupFactory: sp =>
