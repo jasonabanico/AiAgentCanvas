@@ -75,6 +75,20 @@ public static class ServiceCollectionExtensions
                 ? tools.Where(t => defaultSeed.ToolNames.Contains(t.Name)).ToList()
                 : tools;
 
+            var registry = sp.GetService<AgentRegistry>();
+            List<AIAgent>? backgroundAgents = null;
+            if (registry is not null)
+            {
+                backgroundAgents = registry.ListAvailableAgents()
+                    .Where(n => !n.Equals("default", StringComparison.OrdinalIgnoreCase))
+                    .Select(n => registry.Resolve(n))
+                    .Where(a => a is not null)
+                    .ToList()!;
+                if (backgroundAgents.Count > 0)
+                    toolLogger.LogInformation("Registered {Count} background agents: {Names}",
+                        backgroundAgents.Count, string.Join(", ", backgroundAgents.Select(a => a.Name)));
+            }
+
             AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
             {
                 Name = options.AgentName,
@@ -91,6 +105,11 @@ public static class ServiceCollectionExtensions
                 DisableAgentSkillsProvider = true,
                 FileAccessStore = new FileSystemAgentFileStore(
                     Path.Combine(Directory.GetCurrentDirectory(), "agent-workspace")),
+                BackgroundAgents = backgroundAgents is { Count: > 0 } ? backgroundAgents : null,
+                ToolApprovalAgentOptions = new ToolApprovalAgentOptions
+                {
+                    AutoApprovalRules = [FileAccessProvider.ReadOnlyToolsAutoApprovalRule],
+                },
             });
 
             return agent;
