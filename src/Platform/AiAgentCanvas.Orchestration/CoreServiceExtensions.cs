@@ -43,7 +43,9 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(sp =>
         {
-            var chatClient = sp.GetRequiredService<IChatClient>();
+            var rawChatClient = sp.GetRequiredService<IChatClient>();
+            var dedupeLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<ToolDeduplicatingChatClient>();
+            var chatClient = new ToolDeduplicatingChatClient(rawChatClient, dedupeLogger);
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
             var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();

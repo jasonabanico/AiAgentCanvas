@@ -1,10 +1,16 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Orchestration.Services;
 
 internal sealed class ToolDeduplicatingChatClient : DelegatingChatClient
 {
-    public ToolDeduplicatingChatClient(IChatClient inner) : base(inner) { }
+    private readonly ILogger? _logger;
+
+    public ToolDeduplicatingChatClient(IChatClient inner, ILogger? logger = null) : base(inner)
+    {
+        _logger = logger;
+    }
 
     public override Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -22,7 +28,7 @@ internal sealed class ToolDeduplicatingChatClient : DelegatingChatClient
         return base.GetStreamingResponseAsync(messages, DeduplicateTools(options), cancellationToken);
     }
 
-    private static ChatOptions? DeduplicateTools(ChatOptions? options)
+    private ChatOptions? DeduplicateTools(ChatOptions? options)
     {
         if (options?.Tools is not { Count: > 0 })
             return options;
@@ -35,10 +41,20 @@ internal sealed class ToolDeduplicatingChatClient : DelegatingChatClient
                 unique.Add(tool);
         }
 
-        if (unique.Count == options.Tools.Count)
-            return options;
+        if (unique.Count != options.Tools.Count)
+        {
+            _logger?.LogWarning("Deduplicated tools: {OriginalCount} -> {UniqueCount}. Duplicates: {Duplicates}",
+                options.Tools.Count, unique.Count,
+                string.Join(", ", options.Tools.Select(t => t.Name)
+                    .GroupBy(n => n).Where(g => g.Count() > 1)
+                    .Select(g => $"{g.Key}(x{g.Count()})")));
+            options.Tools = unique;
+        }
+        else
+        {
+            _logger?.LogDebug("Tool count for API call: {ToolCount}", unique.Count);
+        }
 
-        options.Tools = unique;
         return options;
     }
 }
