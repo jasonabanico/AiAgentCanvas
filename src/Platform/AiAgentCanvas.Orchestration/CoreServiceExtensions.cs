@@ -89,6 +89,8 @@ public static class ServiceCollectionExtensions
                 DisableWebSearch = true,
                 DisableFileMemory = true,
                 DisableAgentSkillsProvider = true,
+                FileAccessStore = new FileSystemAgentFileStore(
+                    Path.Combine(Directory.GetCurrentDirectory(), "agent-workspace")),
             });
 
             return agent;

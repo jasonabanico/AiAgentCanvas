@@ -17,11 +17,18 @@ using AiAgentCanvas.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Security;
 using Agent.FinancialAnalyst;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using DataConnection.MarketData;
 using DataConnection.VectorStore.Sqlite;
 using Microsoft.Agents.AI.DevUI;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
+{
+    builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
+        o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]);
+}
 
 builder.Services.AddAzureAIFoundry(builder.Configuration);
 builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);

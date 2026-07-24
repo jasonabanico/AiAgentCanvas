@@ -17,6 +17,10 @@ skills.db*
 chathistory.db*
 vectorstore.db*
 
+## Agent runtime data
+agent-workspace/
+agent-file-memory/
+
 ## Node / Next.js
 node_modules/
 frontend/.next/
