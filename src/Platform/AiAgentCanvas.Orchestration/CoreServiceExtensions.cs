@@ -54,6 +54,13 @@ public static class ServiceCollectionExtensions
                 pipeline = new CostAwareModelRouter(pipeline, routerOptions, routerLogger);
             }
 
+            var reflectiveOptions = sp.GetService<ReflectiveOptions>();
+            if (reflectiveOptions is not null)
+            {
+                var reflectiveLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<ReflectiveChatClient>();
+                pipeline = new ReflectiveChatClient(pipeline, reflectiveOptions, reflectiveLogger);
+            }
+
             var chatClient = pipeline;
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
