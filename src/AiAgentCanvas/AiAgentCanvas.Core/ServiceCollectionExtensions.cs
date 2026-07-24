@@ -3,7 +3,6 @@
 
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Agents;
-using AiAgentCanvas.Core.Endpoints;
 using AiAgentCanvas.Core.Providers;
 using AiAgentCanvas.Core.Services;
 using AiAgentCanvas.Core.Skills;
@@ -13,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -94,6 +94,8 @@ public static class ServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<AIHealthCheck>());
         services.AddHealthChecks().AddCheck<AIHealthCheck>("ai-agent-pipeline");
 
+        services.AddAGUIServer();
+
         services.AddCors(cors =>
         {
             cors.AddDefaultPolicy(policy =>
@@ -156,10 +158,10 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static WebApplication UseAiAgentCanvas(this WebApplication app)
+    public static WebApplication UseAiAgentCanvas(this WebApplication app, string agentName = "AiAgentCanvas", string aguiPattern = "/api/copilotkit")
     {
         app.UseCors();
-        app.MapAgUiEndpoints();
+        app.MapAGUIServer(agentName, aguiPattern);
         app.MapHealthChecks("/api/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             ResponseWriter = WriteHealthResponse,

@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>..\..\..\frontend</SpaRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Core\AiAgentCanvas.Core.csproj" />
+    <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.AzureAIFoundry\AiAgentCanvas.Providers.AzureAIFoundry.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.AgentData\AiAgentCanvas.AgentData.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Scheduler\AiAgentCanvas.Scheduler.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Skills\AiAgentCanvas.Skills.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Notifications\AiAgentCanvas.Notifications.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
+    <ProjectReference Include="..\..\AiAgentCanvas\AiAgentCanvas.SystemTools\AiAgentCanvas.SystemTools.csproj" />
+    <ProjectReference Include="..\..\DataConnections\MCP.HelloWorldData\MCP.HelloWorldData.csproj" />
+    <ProjectReference Include="..\..\DataConnections\VectorStore.Sqlite\VectorStore.Sqlite.csproj" />
+    <ProjectReference Include="..\..\Agents\Agent.HelloWorld\Agent.HelloWorld.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI.DevUI" Version="1.15.0-preview.260722.1" />
+  </ItemGroup>
+
+  <Target Name="RemoveDevUIConflictingAssets" BeforeTargets="ResolveStaticWebAssetsInputs">
+    <ItemGroup>
+      <StaticWebAsset Remove="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Microsoft.Agents.AI.DevUI' And '%(RelativePath)' == 'index.html'" />
+    </ItemGroup>
+  </Target>
+
+
+  <Target Name="BuildFrontend" BeforeTargets="Build" Condition="!Exists('wwwroot\index.html')">
+    <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <ItemGroup>
+      <FrontendFiles Include="$(SpaRoot)\out\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendFiles)" DestinationFolder="wwwroot\%(RecursiveDir)" />
+  </Target>
+
+  <Target Name="RebuildFrontend" BeforeTargets="Build" Condition="'$(RebuildSpa)' == 'true'">
+    <RemoveDir Directories="wwwroot" />
+    <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <ItemGroup>
+      <FrontendFiles Include="$(SpaRoot)\out\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendFiles)" DestinationFolder="wwwroot\%(RecursiveDir)" />
+  </Target>
+
+</Project>
