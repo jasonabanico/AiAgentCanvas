@@ -1,20 +1,25 @@
 #pragma warning disable MEAI001
 
 using AiAgentCanvas.Abstractions;
-using AiAgentCanvas.AgentData;
+using AiAgentCanvas.AgentData.Context;
+using AiAgentCanvas.AgentData.Entities;
+using AiAgentCanvas.AgentData.Guardrails;
 using AiAgentCanvas.AgentData.Personas;
-using AiAgentCanvas.Core;
-using AiAgentCanvas.Core.Agents;
-using AiAgentCanvas.Notifications;
+using AiAgentCanvas.AgentData.Profiles;
+using AiAgentCanvas.AgentData.Workflows;
+using AiAgentCanvas.Capabilities.Notifications;
+using AiAgentCanvas.Capabilities.Rag;
+using AiAgentCanvas.Capabilities.Scheduling;
+using AiAgentCanvas.Capabilities.Skills;
+using AiAgentCanvas.Capabilities.SystemTools;
+using AiAgentCanvas.Orchestration;
+using AiAgentCanvas.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
-using AiAgentCanvas.Scheduler;
 using AiAgentCanvas.Security;
-using AiAgentCanvas.Skills;
-using AiAgentCanvas.SystemTools;
-using HelloWorldAgent;
-using MCP.HelloWorldData;
+using Agent.FinancialAnalyst;
+using DataConnection.MarketData;
+using DataConnection.VectorStore.Sqlite;
 using Microsoft.Agents.AI.DevUI;
-using VectorStore.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,7 +34,7 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
     options.AgentDescription = "A multi-tool AI assistant with market data, scheduling, skills, and MCP integration.";
 });
 
-builder.Services.AddHelloWorldAgent();
+builder.Services.AddFinancialAnalystAgent();
 builder.Services.AddMarketDataTools();
 builder.Services.AddAiAgentCanvasSystemTools(options =>
 {
@@ -37,6 +42,7 @@ builder.Services.AddAiAgentCanvasSystemTools(options =>
     options.ScriptTimeoutSeconds = 30;
 });
 builder.Services.AddAiAgentCanvasNotifications();
+builder.Services.AddSqliteScheduledTaskStore();
 builder.Services.AddAiAgentCanvasScheduler();
 builder.Services.AddAiAgentCanvasSkills();
 builder.Services.AddAiAgentCanvasMcp();

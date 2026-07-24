@@ -1,0 +1,21 @@
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+
+namespace AiAgentCanvas.Orchestration.Skills;
+
+internal sealed class DynamicToolContextProvider : AIContextProvider
+{
+    private readonly DynamicToolRegistry _registry;
+
+    public DynamicToolContextProvider(DynamicToolRegistry registry) => _registry = registry;
+
+    protected override ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken)
+    {
+        var dynamicTools = _registry.GetAllTools();
+        if (dynamicTools.Count > 0)
+        {
+            context.AIContext.Tools = dynamicTools;
+        }
+        return new ValueTask<AIContext>(context.AIContext);
+    }
+}
