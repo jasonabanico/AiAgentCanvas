@@ -3,27 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Agent Canvas - Multi-Agent Enterprise Copilot Platform</title>
+  <title>AI Agent Canvas - Documentation</title>
   <link rel="stylesheet" href="website/styles.css">
 </head>
 <body class="home-layout">
   <header class="site-header">
     <a href="index.html" class="logo"><span>AI Agent Canvas</span></a>
     <nav>
-      <a href="website/ai-agents/what-are-ai-agents.html">AI Agents</a>
-      <a href="website/use-cases/index.html">Use Cases</a>
-      <a href="website/user-guide/getting-started.html">User Guide</a>
-      <a href="website/developer-guide/architecture-overview.html">Developer Guide</a>
+      <a href="website/guide/introduction.html">Guide</a>
+      <a href="website/appendix/user-guide.html">Appendix</a>
+      <a href="website/reference/agui-protocol.html">Reference</a>
     </nav>
   </header>
   <div class="page-layout">
     <main class="main-content">
       <section class="hero">
         <h1>AI Agent Canvas</h1>
-        <p>Build intelligent multi-agent enterprise copilots with .NET and CopilotKit. Orchestrate specialized AI agents that reason, plan, and act through a shared tool registry.</p>
+        <p>Build intelligent AI agents with .NET 9 and Microsoft Agent Framework. From a single standalone agent to a coordinated multi-agent ecosystem.</p>
         <div class="hero-actions">
-          <a href="website/user-guide/getting-started.html" class="btn btn-secondary">Get Started</a>
-          <a href="website/developer-guide/architecture-overview.html" class="btn btn-secondary">Developer Guide</a>
+          <a href="website/guide/introduction.html" class="btn btn-secondary">Read the Guide</a>
+          <a href="website/appendix/user-guide.html" class="btn btn-secondary">Get Started</a>
           <a href="guides/AI-Agent-Canvas-Guide.pdf" class="btn btn-secondary">Download PDF</a>
         </div>
       </section>
@@ -31,40 +30,40 @@
       <section class="features">
         <div class="feature-card">
           <h3>Multi-Agent Architecture</h3>
-          <p>Compose specialized agents that collaborate through a shared tool registry. Each agent owns its reasoning domain while the platform handles orchestration, context injection, and streaming.</p>
+          <p>In-process handoff, background delegation, and A2A protocol. Multiple agents coordinate through a shared registry with tool governance.</p>
         </div>
         <div class="feature-card">
           <h3>Model Context Protocol</h3>
-          <p>Connect to any data source through standardized MCP integrations. Agents access external systems through tools without importing SDKs or making HTTP calls directly.</p>
+          <p>Connect to any data source through standardized MCP integrations. Runtime tool discovery with governance enforcement.</p>
         </div>
         <div class="feature-card">
           <h3>Enterprise Security</h3>
-          <p>OWASP LLM Top 10 coverage via Microsoft Agent Governance Toolkit. Prompt injection detection, tool-call filtering, audit logging, and rate limiting built in.</p>
+          <p>Microsoft Agent Governance Toolkit for prompt injection detection, policy-based tool filtering, audit logging, and rate limiting.</p>
         </div>
         <div class="feature-card">
           <h3>Extensible by Design</h3>
-          <p>Add custom agents, tools, and MCP connections without touching the platform. Pure separation between the engine and your business logic.</p>
+          <p>Add custom agents, tools, and MCP connections without touching the platform. Six seed interfaces define everything your agent needs.</p>
         </div>
       </section>
 
-      <h2 style="text-align:center; border:none; margin-bottom:1.5rem;">Explore the Documentation</h2>
+      <h2 style="text-align:center; border:none; margin-bottom:1.5rem;">Documentation</h2>
 
       <section class="sections-grid">
-        <a href="website/ai-agents/what-are-ai-agents.html" class="section-card">
-          <h3>AI Agents</h3>
-          <p>Understand the concepts behind AI agents, the Microsoft Agent Framework, MCP, context providers, and the AG-UI streaming protocol.</p>
+        <a href="website/guide/introduction.html" class="section-card">
+          <h3>Guide (Sections 1-10)</h3>
+          <p>What AI Agent Canvas is, how to build agents, context domains, MCP/RAG, multi-agent setup, architecture, and behavior patterns.</p>
         </a>
-        <a href="website/use-cases/index.html" class="section-card">
-          <h3>Use Cases</h3>
-          <p>See how AI Agent Canvas applies to financial services, healthcare, legal, e-commerce, and IT operations scenarios.</p>
+        <a href="website/appendix/user-guide.html" class="section-card">
+          <h3>Appendix: User Guide</h3>
+          <p>Getting started, configuration reference, chat interface, and natural language commands for managing agent data.</p>
         </a>
-        <a href="website/user-guide/getting-started.html" class="section-card">
-          <h3>User Guide</h3>
-          <p>Install, configure, and use every feature: chat, personas, skills, workflows, scheduling, and security settings.</p>
+        <a href="website/reference/agui-protocol.html" class="section-card">
+          <h3>Reference</h3>
+          <p>AG-UI protocol details, security and governance internals, context providers, seed interfaces, and RAG pipeline.</p>
         </a>
-        <a href="website/developer-guide/architecture-overview.html" class="section-card">
-          <h3>Developer Guide</h3>
-          <p>Deep-dive into the architecture, each project, and how to extend the system with custom agents and MCP connections.</p>
+        <a href="guides/AI-Agent-Canvas-Guide.pdf" class="section-card">
+          <h3>PDF Guide</h3>
+          <p>Complete 55-page reference guide covering all sections, appendix, and reference material.</p>
         </a>
       </section>
 
@@ -76,7 +75,7 @@
     </main>
   </div>
   <footer class="site-footer">
-    AI Agent Canvas &mdash; Multi-Agent Enterprise Copilot Platform
+    AI Agent Canvas
   </footer>
 </body>
 </html>

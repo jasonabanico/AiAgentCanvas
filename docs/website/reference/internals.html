@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Internals - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Reference: Platform Internals</h1>
+      <h2>Context Provider Chain</h2>
+      <p>Context providers extend <code>AIContextProvider</code> (from <code>Microsoft.Agents.AI</code>) and run in DI registration order. Each provider&#x27;s <code>ProvideAIContextAsync</code> method appends content to <code>AIContext.Instructions</code>, building up the system prompt that the agent receives.</p>
+      <table>
+        <thead><tr>
+          <th>Order</th>
+          <th>Provider</th>
+          <th>Source</th>
+          <th>What It Injects</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>1</td>
+          <td><code>GovernanceContextProvider</code></td>
+          <td>AiAgentCanvas.Security</td>
+          <td>Scans existing instructions for prompt injection; emits audit events if detected (does not modify instructions)</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><code>PersonaContextProvider</code></td>
+          <td>AiAgentCanvas.AgentData.Personas</td>
+          <td>Active persona&#x27;s instructions, or the default system prompt if no persona is active</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><code>PersistentContextProvider</code></td>
+          <td>AiAgentCanvas.AgentData.Context</td>
+          <td>All saved context entries (facts, notes, preferences)</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><code>EntityContextProvider</code></td>
+          <td>AiAgentCanvas.AgentData.Entities</td>
+          <td>Entity index listing all known entities and their types</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><code>UserProfileContextProvider</code></td>
+          <td>AiAgentCanvas.AgentData.Profiles</td>
+          <td>Active user profile context (role, timezone, preferences)</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><code>GuardrailContextProvider</code></td>
+          <td>AiAgentCanvas.AgentData.Guardrails</td>
+          <td>All enabled guardrail rules</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><code>DynamicToolContextProvider</code></td>
+          <td>AiAgentCanvas.Orchestration.Skills</td>
+          <td>Injects dynamically registered tools into <code>AIContext.Tools</code> (the only provider that modifies tools rather than instructions)</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><code>RagContextProvider</code></td>
+          <td>AiAgentCanvas.Capabilities.Rag</td>
+          <td>Retrieves relevant document chunks via hybrid search and appends them as numbered citations (only active when RAG is configured)</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The registration order follows the order of <code>AddAiAgentCanvas*()</code> calls in <code>Program.cs</code>: Security first, then Personas, Context, Entities, Profiles, Guardrails, Skills, and finally RAG.</p>
+      <hr>
+      <h2>MarkdownFile Utility</h2>
+      <p><code>MarkdownFile</code> (<code>AiAgentCanvas.Abstractions</code> namespace) is a utility for reading and writing markdown files with YAML frontmatter. All agent data domains use it for persistence.</p>
+      <h3>Methods</h3>
+      <table>
+        <thead><tr>
+          <th>Method</th>
+          <th>Signature</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Parse</code></td>
+          <td><code>static MarkdownFile? Parse(string filePath)</code></td>
+          <td>Reads a file from disk and parses its frontmatter and body. Returns <code>null</code> if the file does not contain valid frontmatter delimiters (<code>---</code>).</td>
+        </tr>
+        <tr>
+          <td><code>ParseContent</code></td>
+          <td><code>static MarkdownFile? ParseContent(string content, string filePath)</code></td>
+          <td>Parses frontmatter and body from a string. Returns <code>null</code> if the content does not start with <code>---</code> or lacks a closing delimiter.</td>
+        </tr>
+        <tr>
+          <td><code>Write</code></td>
+          <td><code>static void Write(string filePath, Dictionary&lt;string, string&gt; frontmatter, string body)</code></td>
+          <td>Creates the parent directory if needed, serializes frontmatter as <code>key: value</code> lines between <code>---</code> delimiters, appends the body, and writes UTF-8.</td>
+        </tr>
+        <tr>
+          <td><code>LoadAll</code></td>
+          <td><code>static List&lt;MarkdownFile&gt; LoadAll(string directory, string pattern = &quot;*.md&quot;)</code></td>
+          <td>Returns all parseable markdown files from a directory.</td>
+        </tr>
+        <tr>
+          <td><code>SanitizeFileName</code></td>
+          <td><code>static string SanitizeFileName(string name)</code></td>
+          <td>Lowercases the name and replaces spaces and underscores with hyphens.</td>
+        </tr>
+        <tr>
+          <td><code>Get</code></td>
+          <td><code>string Get(string key, string fallback = &quot;&quot;)</code></td>
+          <td>Looks up a frontmatter key; returns <code>fallback</code> if missing.</td>
+        </tr>
+        <tr>
+          <td><code>GetBool</code></td>
+          <td><code>bool GetBool(string key, bool fallback = false)</code></td>
+          <td>Looks up a frontmatter key and parses it as a boolean.</td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Properties</h3>
+      <table>
+        <thead><tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Frontmatter</code></td>
+          <td><code>Dictionary&lt;string, string&gt;</code></td>
+          <td>Parsed key-value pairs from the YAML frontmatter block</td>
+        </tr>
+        <tr>
+          <td><code>Body</code></td>
+          <td><code>string</code></td>
+          <td>Everything after the closing <code>---</code> delimiter</td>
+        </tr>
+        <tr>
+          <td><code>FilePath</code></td>
+          <td><code>string</code></td>
+          <td>The file path this instance was parsed from</td>
+        </tr>
+        </tbody>
+      </table>
+      <hr>
+      <h2>Tool Design Guidelines</h2>
+      <p>Follow these rules when building tools for AI Agent Canvas:</p>
+      <ul>
+        <li><strong>Use descriptive names matching the domain.</strong> Tool names should read naturally: <code>stock_quote</code>, <code>list_personas</code>, <code>run_workflow</code>. Avoid generic names like <code>execute</code> or <code>process</code>.</li>
+      </ul>
+      <ul>
+        <li><strong>Write clear <code>[Description]</code> attributes.</strong> The description is included in the model&#x27;s prompt. Be specific about what the tool does, what it returns, and when to use it.</li>
+      </ul>
+      <ul>
+        <li><strong>Return structured JSON.</strong> Tools should return JSON-serializable objects. The AG-UI protocol and state panel depend on structured output.</li>
+      </ul>
+      <ul>
+        <li><strong>Handle errors gracefully.</strong> Return error information as part of the result rather than throwing exceptions. The model can interpret and relay error messages to the user.</li>
+      </ul>
+      <ul>
+        <li><strong>Keep tools focused.</strong> Each tool should do one job. Prefer two small tools over one tool with a <code>mode</code> parameter.</li>
+      </ul>
+      <ul>
+        <li><strong>Accept <code>CancellationToken</code>.</strong> Pass the token through to all async operations. This allows the system to cancel work when the user disconnects.</li>
+      </ul>
+      <ul>
+        <li><strong>Document parameters with <code>[Description]</code>.</strong> Every parameter should have a description attribute so the model knows what values to pass.</li>
+      </ul>
+      <hr>
+      <h2>Seed Interface Reference</h2>
+      <p>Seeds provide default data for each agent domain. They are resolved from DI at startup. If the corresponding file does not already exist on disk, the seed data is persisted. Seeds never overwrite files that a user has manually edited.</p>
+      <table>
+        <thead><tr>
+          <th>Interface</th>
+          <th>Concrete Type</th>
+          <th>Properties</th>
+          <th>Persistence Path</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>IPersonaSeed</code></td>
+          <td><code>PersonaSeed</code></td>
+          <td><code>Name</code>, <code>Description</code>, <code>Instructions</code></td>
+          <td><code>./agent-data/orchestrator/agent/personas/</code></td>
+        </tr>
+        <tr>
+          <td><code>IContextSeed</code></td>
+          <td><code>ContextSeed</code></td>
+          <td><code>Topic</code>, <code>Type</code>, <code>Tags</code>, <code>Content</code></td>
+          <td><code>./agent-data/orchestrator/agent/context/</code></td>
+        </tr>
+        <tr>
+          <td><code>IWorkflowSeed</code></td>
+          <td><code>WorkflowSeed</code></td>
+          <td><code>Name</code>, <code>Description</code>, <code>Tags</code>, <code>Content</code></td>
+          <td><code>./agent-data/orchestrator/agent/workflows/</code></td>
+        </tr>
+        <tr>
+          <td><code>IEntitySeed</code></td>
+          <td><code>EntitySeed</code></td>
+          <td><code>Name</code>, <code>Type</code>, <code>Tags</code>, <code>Content</code></td>
+          <td><code>./agent-data/orchestrator/agent/entities/</code></td>
+        </tr>
+        <tr>
+          <td><code>IGuardrailSeed</code></td>
+          <td><code>GuardrailSeed</code></td>
+          <td><code>Name</code>, <code>Severity</code>, <code>Enabled</code>, <code>Rule</code></td>
+          <td><code>./agent-data/orchestrator/agent/guardrails/</code></td>
+        </tr>
+        <tr>
+          <td><code>ISkillSeed</code></td>
+          <td><code>SkillSeed</code></td>
+          <td><code>Name</code>, <code>Description</code>, <code>PromptTemplate</code></td>
+          <td>(via SkillRegistry)</td>
+        </tr>
+        <tr>
+          <td><code>IUserProfileSeed</code></td>
+          <td><code>UserProfileSeed</code></td>
+          <td><code>Name</code>, <code>Role</code>, <code>Timezone</code>, <code>Content</code></td>
+          <td><code>./agent-data/orchestrator/agent/profiles/</code></td>
+        </tr>
+        <tr>
+          <td><code>IMcpConnectionSeed</code></td>
+          <td><code>McpConnectionSeed</code></td>
+          <td><code>Name</code>, <code>Endpoint</code>, <code>Transport</code></td>
+          <td>(via MCP connection manager)</td>
+        </tr>
+        <tr>
+          <td><code>IAgentToolsSeed</code></td>
+          <td><code>AgentToolsSeed</code></td>
+          <td><code>AgentName</code>, <code>ToolNames</code> (list)</td>
+          <td>(in-memory tool assignment)</td>
+        </tr>
+        <tr>
+          <td><code>IGoalSeed</code></td>
+          <td><code>GoalSeed</code></td>
+          <td><code>Name</code>, <code>Description</code>, <code>Priority</code>, <code>AcceptanceCriteria</code>, <code>AssignedAgent</code>, <code>Content</code></td>
+          <td><code>./agent-data/orchestrator/agent/goals/</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Each domain also supports user-created data that persists under the <code>user/</code> subtree (e.g., <code>./agent-data/orchestrator/user/personas/</code>) and shared data under <code>./agent-data/shared/</code>.</p>
+      <h3>Seed Behavior</h3>
+      <ul>
+        <li>At startup, the DI container resolves all registered <code>ISeed</code> implementations for each domain.</li>
+        <li>For each seed, the store checks if a file with the sanitized name already exists.</li>
+        <li>If the file does not exist, the seed data is written using <code>MarkdownFile.Write()</code>.</li>
+        <li>If the file exists, the seed is skipped -- manual edits are preserved.</li>
+      </ul>
+      <hr>
+      <h2>RAG Pipeline Internals</h2>
+      <p>The RAG (Retrieval-Augmented Generation) pipeline is conditionally enabled when <code>AIFoundry:EmbeddingDeploymentName</code> is configured. It adds relevant document context to the agent&#x27;s system prompt before each response.</p>
+      <h3>DocumentChunker</h3>
+      <p>The <code>DocumentChunker</code> class splits text into overlapping chunks for ingestion.</p>
+      <table>
+        <thead><tr>
+          <th>Parameter</th>
+          <th>Default</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>ChunkSize</code></td>
+          <td>512</td>
+          <td>Maximum characters per chunk</td>
+        </tr>
+        <tr>
+          <td><code>ChunkOverlap</code></td>
+          <td>64</td>
+          <td>Characters of overlap carried from the previous chunk</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The chunking algorithm:</p>
+      <ul>
+        <li>Split text by double-newline (paragraph boundaries).</li>
+        <li>Accumulate paragraphs into a buffer until <code>ChunkSize</code> would be exceeded.</li>
+        <li>Flush the buffer as a <code>DocumentChunk</code>, carrying the last <code>ChunkOverlap</code> characters forward.</li>
+        <li>If a single paragraph exceeds <code>ChunkSize</code>, split it further by sentence endings (<code>. </code>, <code>! </code>, <code>? </code>).</li>
+        <li>Discard chunks shorter than 20 characters.</li>
+      </ul>
+      <h3>Hybrid Search</h3>
+      <p>Hybrid search combines vector similarity with keyword matching. The weights are configurable via <code>RagSearchOptions</code>:</p>
+      <table>
+        <thead><tr>
+          <th>Component</th>
+          <th>Weight</th>
+          <th>Method</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Vector search</td>
+          <td>0.7 (default)</td>
+          <td>Cosine similarity against stored embeddings</td>
+        </tr>
+        <tr>
+          <td>Keyword search</td>
+          <td>0.3 (default)</td>
+          <td>SQLite FTS5 BM25 ranking</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The <code>IHybridSearchable</code> interface:</p>
+      <pre><code class="language-csharp">
+public interface IHybridSearchable
+{
+    IAsyncEnumerable&lt;(DocumentRecord Record, double? Score)&gt; HybridSearchAsync(
+        ReadOnlyMemory&lt;float&gt; queryEmbedding,
+        int top,
+        RagSearchOptions? options = null,
+        CancellationToken ct = default);
+}
+</code></pre>
+      <p><code>RagSearchOptions</code> fields: <code>SourceFilter</code>, <code>TagFilter</code>, <code>KeywordQuery</code>, <code>KeywordWeight</code> (default 0.3f), <code>VectorWeight</code> (default 0.7f).</p>
+      <p>The final score for each document is: <code>(VectorWeight * vectorScore) + (KeywordWeight * keywordScore)</code>.</p>
+      <h3>FTS5 Schema</h3>
+      <p>The SQLite FTS5 virtual table is created alongside the main documents table:</p>
+      <pre><code class="language-sql">
+CREATE VIRTUAL TABLE IF NOT EXISTS [{collection}_fts]
+USING fts5(id UNINDEXED, text, content=[{collection}], content_rowid=rowid)
+</code></pre>
+      <ul>
+        <li><code>id</code> is stored but not indexed (marked <code>UNINDEXED</code>).</li>
+        <li><code>text</code> is the searchable column.</li>
+        <li>The FTS table is a content-sync table that mirrors the main documents table.</li>
+      </ul>
+      <p>Keyword scores are normalized as <code>1.0 / (1.0 + |rank|)</code> where <code>rank</code> is the FTS5 BM25 score.</p>
+      <h3>LLM Reranking</h3>
+      <p>After hybrid search retrieves the top candidates, an LLM reranker narrows the results:</p>
+      <ul>
+        <li>Retrieve <code>retrieveK</code> candidates (default: 10) via hybrid search.</li>
+        <li>Truncate each candidate&#x27;s text to 300 characters.</li>
+        <li>Send a prompt to the LLM asking it to return a JSON array of chunk indices ranked by relevance (e.g., <code>[2, 0, 4, 1, 3]</code>).</li>
+        <li>Parse the JSON array, deduplicate indices, and take the top <code>topK</code> (default: 3).</li>
+        <li>On any parse or LLM error, fall back to the original ordering truncated to <code>topK</code>.</li>
+      </ul>
+      <p>LLM reranking parameters: <code>Temperature = 0</code>, <code>MaxOutputTokens = 100</code>.</p>
+      <h3>DocumentRecord</h3>
+      <pre><code class="language-csharp">
+public sealed class DocumentRecord
+{
+    [VectorStoreKey]
+    public string Id { get; set; }
+
+    [VectorStoreData]
+    public string Text { get; set; }
+
+    [VectorStoreData]
+    public string? Source { get; set; }
+
+    [VectorStoreData]
+    public string? Tags { get; set; }
+
+    [VectorStoreData]
+    public string? MetadataJson { get; set; }
+
+    [VectorStoreVector(1536, DistanceFunction = CosineSimilarity)]
+    public ReadOnlyMemory&lt;float&gt; Embedding { get; set; }
+}
+</code></pre>
+      <p>The embedding dimension is 1536 (compatible with OpenAI text-embedding-ada-002 and similar models). The <code>VectorStoreVector</code> attribute specifies cosine similarity as the distance function.</p>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security and Governance - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Reference: Security and Governance</h1>
+      <h2>Governance Kernel</h2>
+      <p>The <code>GovernanceKernel</code> (from the <code>Microsoft.AgentGovernance</code> NuGet package) is the central governance object. It is constructed from <code>GovernanceOptions</code> and exposes three components:</p>
+      <ul>
+        <li><strong>PolicyEngine</strong> -- evaluates tool calls against the governance policy rules.</li>
+        <li><strong>AuditEmitter</strong> -- emits structured audit events for policy checks, violations, and blocked calls.</li>
+        <li><strong>InjectionDetector</strong> -- scans system instructions for prompt injection patterns.</li>
+      </ul>
+      <h3>Registration</h3>
+      <p>Call <code>AddAiAgentCanvasSecurity()</code> in <code>Program.cs</code> before any other AI Agent Canvas service registration:</p>
+      <pre><code class="language-csharp">
+builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
+</code></pre>
+      <p>This registers the following components as singletons:</p>
+      <table>
+        <thead><tr>
+          <th>Component</th>
+          <th>Purpose</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>GovernanceKernel</code></td>
+          <td>Central governance object</td>
+        </tr>
+        <tr>
+          <td><code>PolicyEngine</code></td>
+          <td>Policy evaluation (extracted from kernel)</td>
+        </tr>
+        <tr>
+          <td><code>AuditEmitter</code></td>
+          <td>Audit event emission (extracted from kernel)</td>
+        </tr>
+        <tr>
+          <td><code>GovernanceContextProvider</code></td>
+          <td>Scans system instructions for prompt injection</td>
+        </tr>
+        <tr>
+          <td><code>GovernedMcpGateway</code></td>
+          <td>Evaluates tool calls against MCP gateway rules</td>
+        </tr>
+        <tr>
+          <td><code>GovernanceToolWrapper</code></td>
+          <td>Wraps all <code>AIFunction</code> instances with governance checks</td>
+        </tr>
+        <tr>
+          <td>Rate limiter</td>
+          <td>Fixed-window rate limiter (ASP.NET built-in)</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>On the middleware side, <code>UseAiAgentCanvasSecurity()</code> enables the rate limiter, applies security headers, and subscribes to governance audit events for logging.</p>
+      <hr>
+      <h2>Tool-Call Governance Pipeline</h2>
+      <p>Every tool call passes through a five-step governance pipeline:</p>
+      <pre><code>
+1. Tool call received
+       |
+2. Build McpGatewayRequest (agentId, toolName, payload)
+       |
+3. Evaluate against policy rules via GovernedMcpGateway
+       |
+4. Decision: Allow / Block / Audit
+       |
+5. Execute the tool (if allowed) or return a JSON error (if blocked)
+</code></pre>
+      <h3>GovernedAIFunction</h3>
+      <p><code>GovernedAIFunction</code> extends <code>DelegatingAIFunction</code> (from <code>Microsoft.Extensions.AI</code>) and intercepts every tool call. It:</p>
+      <ul>
+        <li>Serializes the call arguments to JSON.</li>
+        <li>Calls <code>GovernedMcpGateway.Evaluate()</code> to get an allow/block decision.</li>
+        <li>Emits an audit event via <code>AuditEmitter</code> (either <code>PolicyCheck</code> or <code>ToolCallBlocked</code>).</li>
+        <li>If blocked, returns a JSON error string: <code>{&quot;error&quot;: &quot;Tool &#x27;X&#x27; was blocked by governance policy.&quot;, &quot;status&quot;: &quot;...&quot;}</code>.</li>
+        <li>If allowed, delegates to the inner function via <code>base.InvokeCoreAsync()</code>.</li>
+      </ul>
+      <h3>GovernanceToolWrapper</h3>
+      <p><code>GovernanceToolWrapper</code> implements <code>IToolGovernanceWrapper</code>. At startup, the orchestration layer calls <code>Wrap()</code> on every registered <code>AIFunction</code>, replacing the original with a <code>GovernedAIFunction</code>. This ensures governance applies to all tools without requiring each tool to implement its own checks.</p>
+      <hr>
+      <h2>Policy Format</h2>
+      <p>Governance policies are defined in YAML. The policy file path is set via <code>Security:PolicyPath</code> in configuration (default: <code>governance-policy.yaml</code>).</p>
+      <h3>Structure</h3>
+      <pre><code class="language-yaml">
+name: AiAgentCanvas-default
+description: Default governance policy for AiAgentCanvas
+
+rules:
+  - name: block-dangerous-tools
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        in: [run_script]
+    reason: &quot;Shell execution requires explicit approval&quot;
+
+  - name: restrict-file-write-paths
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        equals: write_file
+      path:
+        matches: &quot;^(/etc|/var|C:\\\\Windows|C:\\\\Program Files)&quot;
+    reason: &quot;Writing to system directories is blocked&quot;
+
+  - name: block-private-mcp-endpoints
+    scope: tool_call
+    action: deny
+    condition:
+      tool_name:
+        equals: connect_mcp_server
+      endpoint:
+        matches: &quot;(localhost|127\\.0\\.0\\.1|169\\.254\\.169\\.254|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)&quot;
+    reason: &quot;MCP connections to private/internal addresses are blocked (SSRF protection)&quot;
+
+  - name: allow-all-other
+    scope: tool_call
+    action: allow
+    condition: {}
+</code></pre>
+      <h3>Rule Fields</h3>
+      <table>
+        <thead><tr>
+          <th>Field</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>name</code></td>
+          <td>Unique identifier for the rule</td>
+        </tr>
+        <tr>
+          <td><code>scope</code></td>
+          <td>What the rule applies to (currently <code>tool_call</code>)</td>
+        </tr>
+        <tr>
+          <td><code>action</code></td>
+          <td><code>allow</code>, <code>deny</code>, or <code>audit</code></td>
+        </tr>
+        <tr>
+          <td><code>condition</code></td>
+          <td>Match criteria using operators (see below)</td>
+        </tr>
+        <tr>
+          <td><code>reason</code></td>
+          <td>Human-readable explanation shown when the rule fires</td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Condition Operators</h3>
+      <table>
+        <thead><tr>
+          <th>Operator</th>
+          <th>Description</th>
+          <th>Example</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>equals</code></td>
+          <td>Exact string match</td>
+          <td><code>tool_name: { equals: write_file }</code></td>
+        </tr>
+        <tr>
+          <td><code>in</code></td>
+          <td>Matches any value in a list</td>
+          <td><code>tool_name: { in: [run_script, exec] }</code></td>
+        </tr>
+        <tr>
+          <td><code>matches</code></td>
+          <td>Regular expression match</td>
+          <td><code>path: { matches: &quot;^/etc&quot; }</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Conflict Strategy</h3>
+      <p>When multiple rules match a tool call, <code>ConflictResolutionStrategy.DenyOverrides</code> applies: any matching <code>deny</code> rule wins regardless of <code>allow</code> rules. This is the default and recommended setting.</p>
+      <hr>
+      <h2>Rate Limiting</h2>
+      <p>Rate limiting uses ASP.NET&#x27;s built-in fixed-window rate limiter with a policy named <code>&quot;agent&quot;</code>.</p>
+      <table>
+        <thead><tr>
+          <th>Parameter</th>
+          <th>Value</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Window</td>
+          <td>1 minute</td>
+        </tr>
+        <tr>
+          <td>Permit limit</td>
+          <td>Configurable via <code>Security:RateLimitPerMinute</code> (default: 30)</td>
+        </tr>
+        <tr>
+          <td>Queue limit</td>
+          <td>0 (no queuing; excess requests are rejected immediately)</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>When the limit is exceeded, the server returns HTTP 429 with a JSON body:</p>
+      <pre><code class="language-json">
+{
+  &quot;error&quot;: &quot;Rate limit exceeded. Try again later.&quot;,
+  &quot;retryAfterSeconds&quot;: 60
+}
+</code></pre>
+      <hr>
+      <h2>Security Headers</h2>
+      <p>Three security headers are applied to every HTTP response via inline middleware in <code>UseAiAgentCanvasSecurity()</code>:</p>
+      <table>
+        <thead><tr>
+          <th>Header</th>
+          <th>Value</th>
+          <th>Purpose</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>X-Content-Type-Options</code></td>
+          <td><code>nosniff</code></td>
+          <td>Prevents MIME-type sniffing</td>
+        </tr>
+        <tr>
+          <td><code>X-Frame-Options</code></td>
+          <td><code>DENY</code></td>
+          <td>Prevents the page from being embedded in frames</td>
+        </tr>
+        <tr>
+          <td><code>Referrer-Policy</code></td>
+          <td><code>strict-origin-when-cross-origin</code></td>
+          <td>Limits referrer information sent to other origins</td>
+        </tr>
+        </tbody>
+      </table>
+      <hr>
+      <h2>Production Checklist</h2>
+      <p>Before deploying to production, verify each item:</p>
+      <ul>
+        <li><strong>Set real API keys</strong> -- replace placeholder values in <code>AIFoundry:Endpoint</code> and <code>AIFoundry:Key</code> with production credentials, or enable <code>UseAzureCredential</code> for managed identity.</li>
+        <li><strong>Configure governance policies</strong> -- review and customize <code>governance-policy.yaml</code> for your security requirements. Add deny rules for any tools that should not run in production.</li>
+        <li><strong>Enable rate limiting</strong> -- set <code>Security:RateLimitPerMinute</code> to an appropriate value for your expected load.</li>
+        <li><strong>Review tool allowlists</strong> -- audit the system tools configuration (<code>AllowedCommands</code>) and remove any commands not needed in production.</li>
+        <li><strong>Configure HTTPS</strong> -- ensure the application runs behind HTTPS termination (reverse proxy or Kestrel HTTPS configuration).</li>
+        <li><strong>Set logging level</strong> -- change <code>Logging:LogLevel:Default</code> to <code>Warning</code> or <code>Error</code> to reduce log volume and avoid logging sensitive data.</li>
+        <li><strong>Remove DevUI in production</strong> -- the <code>AddDevUI()</code> and <code>MapDevUI()</code> calls should be wrapped in an environment check so the development UI is not exposed in production.</li>
+        <li><strong>Review MCP connection security</strong> -- the default policy blocks MCP connections to private/internal addresses. Verify this rule is active and add additional endpoint restrictions as needed.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

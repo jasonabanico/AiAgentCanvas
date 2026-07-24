@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Guide - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Appendix A: User Guide</h1>
+      <h2>Getting Started</h2>
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>.NET 9 SDK</li>
+        <li>Node.js 20+</li>
+        <li>Azure AI Foundry account (or any Azure OpenAI endpoint)</li>
+      </ul>
+      <h3>Setup Steps</h3>
+      <ul>
+        <li>Clone the repository.</li>
+        <li>Build the backend:</li>
+      </ul>
+      <pre><code class="language-bash">
+   dotnet build
+</code></pre>
+      <ul>
+        <li>Configure <code>src/Host/AiAgentCanvas.Host/appsettings.Development.json</code> with your Azure AI Foundry credentials:</li>
+      </ul>
+      <pre><code class="language-json">
+   {
+     &quot;AIFoundry&quot;: {
+       &quot;Endpoint&quot;: &quot;https://YOUR-RESOURCE.openai.azure.com&quot;,
+       &quot;Key&quot;: &quot;your-api-key&quot;,
+       &quot;DeploymentName&quot;: &quot;gpt-4o&quot;,
+       &quot;UseAzureCredential&quot;: false
+     }
+   }
+</code></pre>
+      <ul>
+        <li>Run the backend:</li>
+      </ul>
+      <pre><code class="language-bash">
+   dotnet run --project src/Host/AiAgentCanvas.Host
+</code></pre>
+      <ul>
+        <li>In a separate terminal, start the frontend:</li>
+      </ul>
+      <pre><code class="language-bash">
+   cd frontend
+   npm install
+   npm run dev
+</code></pre>
+      <ul>
+        <li>Open <code>http://localhost:3000</code> in your browser.</li>
+      </ul>
+      <h3>Five Things to Try First</h3>
+      <ul>
+        <li><strong>Ask a question</strong> -- type any question in the chat box and watch the streaming response.</li>
+        <li><strong>Create a persona</strong> -- say &quot;create a persona called Research Assistant that specializes in summarizing articles.&quot;</li>
+        <li><strong>Run a skill</strong> -- say &quot;create a skill called Summarize that takes a URL and returns a summary,&quot; then &quot;run skill Summarize.&quot;</li>
+        <li><strong>Check a stock quote</strong> -- say &quot;get me a stock quote for MSFT&quot; to exercise the market data tools.</li>
+        <li><strong>Create a workflow</strong> -- say &quot;create a workflow called Morning Briefing that checks stocks then summarizes news.&quot;</li>
+      </ul>
+      <hr>
+      <h2>Configuration Reference</h2>
+      <h3>appsettings.json Structure</h3>
+      <p>The base configuration file lives at <code>src/Host/AiAgentCanvas.Host/appsettings.json</code>.</p>
+      <table>
+        <thead><tr>
+          <th>Section</th>
+          <th>Key</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>Endpoint</code></td>
+          <td>string</td>
+          <td>Azure OpenAI endpoint URL</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>Key</code></td>
+          <td>string</td>
+          <td>API key (leave blank if using Azure credential)</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>DeploymentName</code></td>
+          <td>string</td>
+          <td>Chat model deployment name (e.g., <code>gpt-4o</code>)</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>EmbeddingDeploymentName</code></td>
+          <td>string</td>
+          <td>Embedding model deployment; enables RAG when set</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>UseAzureCredential</code></td>
+          <td>bool</td>
+          <td>Use <code>DefaultAzureCredential</code> instead of API key</td>
+        </tr>
+        <tr>
+          <td><code>Security</code></td>
+          <td><code>PolicyPath</code></td>
+          <td>string</td>
+          <td>Path to the governance policy YAML file</td>
+        </tr>
+        <tr>
+          <td><code>Security</code></td>
+          <td><code>RateLimitPerMinute</code></td>
+          <td>int</td>
+          <td>Maximum tool calls per minute (default: 30)</td>
+        </tr>
+        <tr>
+          <td><code>VectorStore</code></td>
+          <td><code>ConnectionString</code></td>
+          <td>string</td>
+          <td>SQLite connection string for the RAG vector store</td>
+        </tr>
+        <tr>
+          <td><code>ApplicationInsights</code></td>
+          <td><code>ConnectionString</code></td>
+          <td>string</td>
+          <td>Azure Monitor connection string for telemetry</td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Environment-Specific Overrides</h3>
+      <p>ASP.NET Core loads configuration in layers. Place environment-specific values in:</p>
+      <ul>
+        <li><code>appsettings.Development.json</code> -- local development settings (API keys, local endpoints).</li>
+        <li><code>appsettings.Production.json</code> -- production settings (real keys, production endpoints).</li>
+      </ul>
+      <p>The environment-specific file merges on top of the base <code>appsettings.json</code>.</p>
+      <h3>Environment Variable Overrides</h3>
+      <p>Any configuration key can be overridden via environment variables using the double-underscore separator:</p>
+      <pre><code>
+AIFoundry__Key=your-key-here
+AIFoundry__Endpoint=https://prod.openai.azure.com
+Security__RateLimitPerMinute=60
+</code></pre>
+      <h3>Frontend Configuration</h3>
+      <p>The frontend reads its backend URL from <code>frontend/.env.local</code>:</p>
+      <pre><code>
+NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+</code></pre>
+      <p>Change this to point at your deployed backend in production.</p>
+      <hr>
+      <h2>Using the Chat Interface</h2>
+      <h3>UI Elements</h3>
+      <ul>
+        <li><strong>Streaming responses</strong> -- text appears token by token as the model generates it.</li>
+        <li><strong>Tool call indicators</strong> -- a status bar shows which tools are running and when they complete.</li>
+        <li><strong>State panel</strong> -- displays structured data returned by tools (stock quotes, task lists, entity data).</li>
+        <li><strong>Reasoning blocks</strong> -- shows chain-of-thought when the model reasons through a problem, then fades after 5 seconds.</li>
+        <li><strong>Interrupt approve/deny buttons</strong> -- when the agent requests approval for a sensitive action, buttons appear to approve or deny.</li>
+        <li><strong>Health status banner</strong> -- displays connection and service health at the top of the page.</li>
+        <li><strong>Notifications</strong> -- server-sent events (SSE) push real-time updates for scheduled tasks, workflow completions, and errors.</li>
+      </ul>
+      <h3>Troubleshooting</h3>
+      <table>
+        <thead><tr>
+          <th>Problem</th>
+          <th>Likely Cause</th>
+          <th>Solution</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>No response after sending a message</td>
+          <td>Backend is not running or frontend cannot reach it</td>
+          <td>Verify the backend is running on port 5000 and <code>NEXT_PUBLIC_BACKEND_URL</code> in <code>.env.local</code> is correct</td>
+        </tr>
+        <tr>
+          <td>Response starts then times out</td>
+          <td>Model deployment is overloaded or the API key has expired</td>
+          <td>Check the backend console for HTTP 429 or 401 errors; verify <code>AIFoundry:Key</code> and <code>AIFoundry:Endpoint</code></td>
+        </tr>
+        <tr>
+          <td>Tool call shows &quot;blocked by governance policy&quot;</td>
+          <td>Governance policy denied the tool call</td>
+          <td>Review <code>governance-policy.yaml</code> for deny rules matching the tool; adjust the policy or use a different approach</td>
+        </tr>
+        <tr>
+          <td>State panel stays blank</td>
+          <td>The tool does not have a <code>ToolStateMapping</code> registered</td>
+          <td>Only tools with a registered <code>ToolStateMapping</code> emit state events; check if the tool is mapped in its service extensions</td>
+        </tr>
+        <tr>
+          <td>Health check failed banner appears</td>
+          <td>Backend health endpoint returned an error</td>
+          <td>Check backend logs for startup failures; verify database connectivity and API key validity</td>
+        </tr>
+        </tbody>
+      </table>
+      <hr>
+      <h2>Managing Agent Data</h2>
+      <p>All agent data is managed through natural language commands in the chat. Each domain supports create, read, update, and delete operations.</p>
+      <h3>Personas</h3>
+      <ul>
+        <li>&quot;Create a persona called <strong>Technical Writer</strong> that writes clear, concise documentation.&quot;</li>
+        <li>&quot;Switch to the <strong>Technical Writer</strong> persona.&quot;</li>
+        <li>&quot;List all personas.&quot;</li>
+        <li>&quot;Delete the <strong>Technical Writer</strong> persona.&quot;</li>
+      </ul>
+      <h3>Context</h3>
+      <ul>
+        <li>&quot;Save a fact: our fiscal year starts in July.&quot;</li>
+        <li>&quot;List all context entries.&quot;</li>
+        <li>&quot;Delete the context entry about fiscal year.&quot;</li>
+      </ul>
+      <h3>Entities</h3>
+      <ul>
+        <li>&quot;Save an entity for <strong>Acme Corp</strong> -- they are a partner company based in Seattle.&quot;</li>
+        <li>&quot;Search entities for <strong>Acme</strong>.&quot;</li>
+        <li>&quot;List all entities.&quot;</li>
+        <li>&quot;Delete the entity <strong>Acme Corp</strong>.&quot;</li>
+      </ul>
+      <h3>Guardrails</h3>
+      <ul>
+        <li>&quot;Create a guardrail called <strong>No PII</strong> with severity high: never include personal identifiable information in responses.&quot;</li>
+        <li>&quot;Toggle the <strong>No PII</strong> guardrail off.&quot;</li>
+        <li>&quot;List all guardrails.&quot;</li>
+      </ul>
+      <h3>User Profiles</h3>
+      <ul>
+        <li>&quot;Create a profile called <strong>Developer</strong> with role engineer, timezone US/Pacific.&quot;</li>
+        <li>&quot;Switch to the <strong>Developer</strong> profile.&quot;</li>
+        <li>&quot;List all profiles.&quot;</li>
+      </ul>
+      <h3>Workflows</h3>
+      <ul>
+        <li>&quot;Create a workflow called <strong>Daily Report</strong> that summarizes open tasks then drafts a status email.&quot;</li>
+        <li>&quot;Run the <strong>Daily Report</strong> workflow.&quot;</li>
+        <li>&quot;List all workflows.&quot;</li>
+        <li>&quot;Delete the <strong>Daily Report</strong> workflow.&quot;</li>
+      </ul>
+      <h3>Skills</h3>
+      <ul>
+        <li>&quot;Create a skill called <strong>Translate</strong> that translates text to a given language.&quot;</li>
+        <li>&quot;Run the <strong>Translate</strong> skill with target language French.&quot;</li>
+        <li>&quot;List all skills.&quot;</li>
+      </ul>
+      <h3>Scheduling</h3>
+      <ul>
+        <li>&quot;Schedule a task to run the <strong>Daily Report</strong> workflow every weekday at 9am.&quot;</li>
+        <li>&quot;List all scheduled tasks.&quot;</li>
+        <li>&quot;Cancel the <strong>Daily Report</strong> scheduled task.&quot;</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

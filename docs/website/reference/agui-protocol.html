@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AG-UI Protocol - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Reference: AG-UI Protocol</h1>
+      <p>The AG-UI (Agent-User Interface) protocol defines how the frontend communicates with the agent backend. AI Agent Canvas implements this protocol using server-sent events (SSE) over a single HTTP POST endpoint.</p>
+      <h2>Endpoint</h2>
+      <pre><code>
+POST /api/copilotkit
+Content-Type: application/json
+</code></pre>
+      <p>The endpoint is mapped in <code>CoreServiceExtensions.UseAiAgentCanvas()</code> via <code>MapAGUIServer()</code> from the <code>Microsoft.Agents.AI.Hosting.AGUI.AspNetCore</code> package.</p>
+      <h2>Request Format</h2>
+      <pre><code class="language-json">
+{
+  &quot;threadId&quot;: &quot;thread_abc123&quot;,
+  &quot;runId&quot;: &quot;run_xyz789&quot;,
+  &quot;messages&quot;: [
+    {
+      &quot;role&quot;: &quot;user&quot;,
+      &quot;content&quot;: &quot;What is the stock price of MSFT?&quot;
+    }
+  ]
+}
+</code></pre>
+      <ul>
+        <li><code>threadId</code> -- identifies the conversation thread. Reuse across messages to maintain history.</li>
+        <li><code>runId</code> -- unique identifier for this specific run.</li>
+        <li><code>messages</code> -- array of message objects with <code>role</code> and <code>content</code>.</li>
+      </ul>
+      <h2>Response Format</h2>
+      <p>The response is an SSE stream:</p>
+      <pre><code>
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+</code></pre>
+      <p>Each event is a JSON object on a <code>data:</code> line, with a <code>type</code> field indicating the event type.</p>
+      <h2>Event Types</h2>
+      <h3>Text Streaming</h3>
+      <p>Text messages are streamed in three phases:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;TEXT_MESSAGE_START&quot;, &quot;messageId&quot;: &quot;msg_001&quot;}
+
+data: {&quot;type&quot;: &quot;TEXT_MESSAGE_CONTENT&quot;, &quot;messageId&quot;: &quot;msg_001&quot;, &quot;delta&quot;: &quot;The current&quot;}
+
+data: {&quot;type&quot;: &quot;TEXT_MESSAGE_CONTENT&quot;, &quot;messageId&quot;: &quot;msg_001&quot;, &quot;delta&quot;: &quot; stock price of MSFT is $425.30.&quot;}
+
+data: {&quot;type&quot;: &quot;TEXT_MESSAGE_END&quot;, &quot;messageId&quot;: &quot;msg_001&quot;}
+</code></pre>
+      <h3>Tool Execution Lifecycle</h3>
+      <p>Tool calls are bracketed by start and end events:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;TOOL_CALL_START&quot;, &quot;toolCallId&quot;: &quot;tc_001&quot;, &quot;toolName&quot;: &quot;stock_quote&quot;, &quot;args&quot;: &quot;{\&quot;symbol\&quot;: \&quot;MSFT\&quot;}&quot;}
+
+data: {&quot;type&quot;: &quot;TOOL_CALL_END&quot;, &quot;toolCallId&quot;: &quot;tc_001&quot;, &quot;result&quot;: &quot;{\&quot;symbol\&quot;: \&quot;MSFT\&quot;, \&quot;price\&quot;: 425.30}&quot;}
+</code></pre>
+      <h3>State Updates</h3>
+      <p>State events push structured data to the frontend state panel. Two behaviors exist:</p>
+      <p><strong>Snapshot</strong> replaces the entire state panel content:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;STATE_SNAPSHOT&quot;, &quot;snapshot&quot;: {&quot;symbol&quot;: &quot;MSFT&quot;, &quot;price&quot;: 425.30, &quot;change&quot;: &quot;+1.2%&quot;}}
+</code></pre>
+      <p><strong>Delta</strong> appends to or merges with the existing state panel content:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;STATE_DELTA&quot;, &quot;delta&quot;: {&quot;latestAlert&quot;: &quot;Price crossed $425 threshold&quot;}}
+</code></pre>
+      <h3>Agent Step Tracking</h3>
+      <p>Steps track higher-level phases of agent execution:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;STEP_STARTED&quot;, &quot;stepName&quot;: &quot;Analyzing market data&quot;}
+
+data: {&quot;type&quot;: &quot;STEP_FINISHED&quot;, &quot;stepName&quot;: &quot;Analyzing market data&quot;}
+</code></pre>
+      <h3>Chain-of-Thought Reasoning</h3>
+      <p>Reasoning messages expose the model&#x27;s thought process:</p>
+      <pre><code>
+data: {&quot;type&quot;: &quot;REASONING_START&quot;}
+
+data: {&quot;type&quot;: &quot;REASONING_MESSAGE_CONTENT&quot;, &quot;delta&quot;: &quot;I need to look up the current price...&quot;}
+
+data: {&quot;type&quot;: &quot;REASONING_END&quot;}
+</code></pre>
+      <p>The frontend displays reasoning blocks temporarily and clears them after 5 seconds.</p>
+      <h3>Run Lifecycle</h3>
+      <pre><code>
+data: {&quot;type&quot;: &quot;RUN_STARTED&quot;, &quot;runId&quot;: &quot;run_xyz789&quot;}
+
+data: {&quot;type&quot;: &quot;RUN_FINISHED&quot;, &quot;runId&quot;: &quot;run_xyz789&quot;, &quot;outcome&quot;: &quot;completed&quot;}
+</code></pre>
+      <p>When <code>outcome</code> is <code>&quot;interrupt&quot;</code>, the frontend shows approve/deny buttons for the user to continue or cancel the interrupted action.</p>
+      <h3>Error Reporting</h3>
+      <pre><code>
+data: {&quot;type&quot;: &quot;RUN_ERROR&quot;, &quot;runId&quot;: &quot;run_xyz789&quot;, &quot;error&quot;: &quot;Rate limit exceeded. Retry after 60 seconds.&quot;}
+</code></pre>
+      <h2>Why SSE over WebSockets</h2>
+      <p>The AG-UI protocol uses server-sent events rather than WebSockets for several reasons:</p>
+      <ul>
+        <li><strong>Unidirectional fit</strong> -- the agent streams output to the client; the client sends new requests as separate HTTP POSTs. This matches the SSE model naturally.</li>
+        <li><strong>HTTP compatibility</strong> -- SSE runs over standard HTTP, so it works with existing load balancers, reverse proxies, and CDNs without special configuration.</li>
+        <li><strong>Auto-reconnection</strong> -- the browser&#x27;s <code>EventSource</code> API reconnects automatically on connection loss. The frontend fetch-based SSE reader handles this as well.</li>
+        <li><strong>Simpler infrastructure</strong> -- no WebSocket upgrade handshake, no connection state to manage on the server, no sticky sessions required.</li>
+        <li><strong>Firewall friendly</strong> -- SSE uses standard HTTP ports and protocols, avoiding firewall rules that block WebSocket upgrades.</li>
+      </ul>
+      <h2>Cancellation</h2>
+      <p>The backend respects <code>HttpContext.RequestAborted</code> as a <code>CancellationToken</code>. When the client disconnects (navigates away, closes the tab, or explicitly aborts the fetch), the token fires and the agent stops processing. This prevents wasted compute on abandoned requests.</p>
+      <h2>ToolStateMapping</h2>
+      <p>The <code>ToolStateMapping</code> record and <code>ToolStateBehavior</code> enum control how tool results appear in the state panel:</p>
+      <pre><code class="language-csharp">
+public enum ToolStateBehavior
+{
+    Snapshot,   // Replaces the entire state panel
+    Delta,      // Appends to existing state
+}
+
+public sealed record ToolStateMapping(string ToolName, ToolStateBehavior Behavior);
+</code></pre>
+      <p>Tool state mappings are registered in each capability&#x27;s service extensions. When the AG-UI stream encounters a result from a mapped tool, <code>AGUIStreamOptions.MapResult</code> routes it through either <code>ToStateSnapshot</code> or <code>ToStateDelta</code>, which emit the corresponding SSE event.</p>
+      <p><strong>Registered mappings:</strong></p>
+      <table>
+        <thead><tr>
+          <th>Tool Name</th>
+          <th>Behavior</th>
+          <th>Source</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>list_workflows</code></td>
+          <td>Snapshot</td>
+          <td>WorkflowServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>run_workflow</code></td>
+          <td>Delta</td>
+          <td>WorkflowServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>run_sequential_workflow</code></td>
+          <td>Delta</td>
+          <td>WorkflowServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>run_concurrent_workflow</code></td>
+          <td>Delta</td>
+          <td>WorkflowServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>list_scheduled_tasks</code></td>
+          <td>Snapshot</td>
+          <td>SchedulerServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>stock_quote</code></td>
+          <td>Snapshot</td>
+          <td>MarketDataServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>stock_history</code></td>
+          <td>Snapshot</td>
+          <td>MarketDataServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>edgar_company_facts</code></td>
+          <td>Snapshot</td>
+          <td>MarketDataServiceExtensions</td>
+        </tr>
+        <tr>
+          <td><code>list_available_agents</code></td>
+          <td>Snapshot</td>
+          <td>OrchestrationServiceExtensions</td>
+        </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

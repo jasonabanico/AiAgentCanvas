@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Domains - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>6. Context Domains</h1>
+      <p>Context domains are the agent&#x27;s knowledge system. Each domain stores a specific type of information as markdown files with YAML frontmatter. The platform injects this data into the system prompt before every LLM request, so the agent always has access to its configuration, policies, and accumulated knowledge. The agent can also manage domain data at runtime through built-in tools.</p>
+      <h2>The Three-Class Pattern</h2>
+      <p>Every domain follows the same structure:</p>
+      <ul>
+        <li><strong>Store</strong> -- reads and writes markdown files from layered directories. Handles CRUD operations and file parsing via the <code>MarkdownFile</code> utility.</li>
+        <li><strong>Tool provider</strong> -- exposes the store&#x27;s operations as <code>AITool</code> instances so the LLM can create, read, update, and delete domain data through conversation.</li>
+        <li><strong>Context provider</strong> -- an <code>AIContextProvider</code> that reads domain data from the store and injects it into the system prompt before each LLM call.</li>
+      </ul>
+      <p>This pattern means data flows in both directions: the platform injects domain data *into* the LLM&#x27;s context, and the LLM can modify domain data *through* tool calls. A user can say &quot;add a guardrail that prevents sharing internal pricing&quot; and the agent will create a guardrail file that takes effect on the next request.</p>
+      <h2>The Six Domains</h2>
+      <table>
+        <thead><tr>
+          <th>Domain</th>
+          <th>What It Stores</th>
+          <th>System Prompt Injection</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><strong>Personas</strong></td>
+          <td>Agent identities with name, description, and behavioral instructions</td>
+          <td>Active persona&#x27;s instructions appended directly to the system prompt</td>
+        </tr>
+        <tr>
+          <td><strong>Context</strong></td>
+          <td>Typed knowledge entries: fact, reference, decision, or feedback</td>
+          <td>All entries grouped by type under a <code>## Persistent Context</code> section</td>
+        </tr>
+        <tr>
+          <td><strong>Entities</strong></td>
+          <td>Structured records describing people, companies, projects, or other domain objects</td>
+          <td>Entity index injected under <code>## Known Entities</code></td>
+        </tr>
+        <tr>
+          <td><strong>Guardrails</strong></td>
+          <td>Policy rules with severity levels (critical, warning, info) and an enabled flag</td>
+          <td>Active rules injected under <code>## Guardrails &amp; Policies</code></td>
+        </tr>
+        <tr>
+          <td><strong>Profiles</strong></td>
+          <td>User-specific settings: role, timezone, and freeform preferences</td>
+          <td>Active profile injected under <code>## Active User Profile</code></td>
+        </tr>
+        <tr>
+          <td><strong>Workflows</strong></td>
+          <td>Multi-step process definitions with descriptions and tags</td>
+          <td>Not injected into the system prompt; executed on demand when the user or agent triggers them</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Each domain stores its data as markdown files with YAML frontmatter. For example, a guardrail file looks like:</p>
+      <pre><code class="language-markdown">
+---
+name: investment-disclaimer
+severity: high
+enabled: true
+---
+
+Never provide specific buy, sell, or hold recommendations.
+Always include a disclaimer that the analysis is informational only
+and not investment advice.
+</code></pre>
+      <h2>Data Storage Structure</h2>
+      <p>Agent data lives under a common <code>agent-data/</code> root. Each agent gets its own subdirectory, with a <code>shared/</code> directory for cross-agent data. Within each subdirectory, <code>agent/</code> holds system-written files (seeds and tool-created content) and <code>user/</code> holds hand-written files that the system reads but never overwrites.</p>
+      <pre><code>
+agent-data/
+├── orchestrator/
+│   ├── agent/                  # System writes here (seeds + tool-created content)
+│   │   ├── personas/
+│   │   ├── context/
+│   │   ├── workflows/
+│   │   ├── entities/
+│   │   ├── profiles/
+│   │   └── guardrails/
+│   └── user/                   # Hand-written files (read-only to system)
+│       ├── personas/
+│       ├── context/
+│       ├── workflows/
+│       ├── entities/
+│       ├── profiles/
+│       └── guardrails/
+└── shared/                     # Accessible to all agents
+    ├── agent/
+    │   ├── personas/
+    │   ├── context/
+    │   └── ...
+    └── user/
+        ├── personas/
+        ├── context/
+        └── ...
+</code></pre>
+      <p>The <code>agent/</code> directory is where seed data lands on first startup and where tool-created content is saved. The <code>user/</code> directory is a no-code alternative to implementing seed interfaces: drop a properly formatted markdown file into the right subdirectory and the platform picks it up automatically.</p>
+      <h2>Layered Reading</h2>
+      <p>Each store reads from multiple directories and merges the results. When the platform calls <code>ListAll()</code> on a domain store, it collects files from:</p>
+      <ul>
+        <li>The agent&#x27;s own <code>agent/</code> directory (system-written)</li>
+        <li>The agent&#x27;s own <code>user/</code> directory (hand-written)</li>
+        <li>The <code>shared/agent/</code> directory (shared system-written)</li>
+        <li>The <code>shared/user/</code> directory (shared hand-written)</li>
+      </ul>
+      <p>All files are merged into a single list. If two files have the same name, the agent-level file takes precedence over the shared-level file. This layering lets you define shared defaults (company-wide guardrails, common entity schemas) that individual agents can override with their own versions.</p>
+      <p>The context provider then reads this merged list and formats it into the appropriate system prompt section. The LLM sees user-provided, system-created, and shared data together, without needing to know where each piece came from.</p>
+      <h2>How Domains Interact</h2>
+      <p>Domains are independent but complementary. A typical agent configuration might include:</p>
+      <ul>
+        <li>A <strong>persona</strong> that defines the agent&#x27;s role and references specific tools</li>
+        <li><strong>Guardrails</strong> that constrain the persona&#x27;s behavior (e.g., &quot;never share internal pricing&quot;)</li>
+        <li><strong>Context</strong> entries that provide background knowledge the persona needs</li>
+        <li><strong>Entities</strong> that define the domain objects the agent works with</li>
+        <li>A <strong>profile</strong> that captures the user&#x27;s preferences and role</li>
+        <li><strong>Workflows</strong> that define reusable multi-step processes the agent can execute</li>
+      </ul>
+      <p>All of these are injected into the system prompt together, giving the LLM a complete picture of who it is, what it knows, what rules it must follow, and what structured processes it can run.</p>
+    </main>
+  </div>
+</body>
+</html>

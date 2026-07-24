@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building an Agent - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>5. Building an Agent</h1>
+      <p>An agent in AI Agent Canvas is a thin set of seed classes that declare what the agent *is* and what it *knows*. You write six pieces of custom code. The platform handles everything else: runtime execution, streaming, context injection, tool routing, governance, telemetry, and more.</p>
+      <h2>What You Implement</h2>
+      <h3>1. A Persona Seed</h3>
+      <p>The persona defines the agent&#x27;s identity, role, and behavioral instructions. It implements <code>IPersonaSeed</code> using the <code>PersonaSeed</code> class, which takes a name, description, and freeform instructions string.</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;financial-analyst&quot;,
+    description: &quot;A financial analyst that uses market data tools to research stocks and companies&quot;,
+    instructions: &quot;&quot;&quot;
+        You are a financial analyst assistant.
+
+        You have access to these tools:
+        - stock_quote: Get current price and daily change for a ticker from Yahoo Finance
+        - stock_history: Get historical price data with configurable range (5d, 1mo, 3mo, 6mo, 1y, 5y)
+        - edgar_company_facts: Fetch SEC EDGAR financial data including revenue, net income, assets, and EPS
+
+        When analyzing a stock:
+        1. Start with stock_quote for the current price and daily movement
+        2. Use stock_history to show recent trends
+        3. Use edgar_company_facts for fundamental data (revenue, earnings, balance sheet)
+        4. Synthesize the data into a clear summary with specific numbers
+
+        Always cite the data source (Yahoo Finance or SEC EDGAR) and note that this is informational,
+        not investment advice.
+        &quot;&quot;&quot;));
+</code></pre>
+      <p>The interface is minimal:</p>
+      <pre><code class="language-csharp">
+public interface IPersonaSeed
+{
+    string Name { get; }
+    string Description { get; }
+    string Instructions { get; }
+}
+</code></pre>
+      <p>On first startup, the persona is saved to <code>agent-data/orchestrator/agent/personas/financial-analyst.md</code>. If that file already exists, the seed is skipped -- manual edits are preserved.</p>
+      <h3>2. Tool Providers</h3>
+      <p>Tools are registered in a separate data connection project, not in the agent itself. This separation means multiple agents can share the same tools without duplication.</p>
+      <p>A tool provider is a class that returns <code>IReadOnlyList&lt;AITool&gt;</code> using <code>AIFunctionFactory.Create</code>. Each method uses <code>[Description]</code> attributes so the LLM understands what the tool does and what each parameter means.</p>
+      <pre><code class="language-csharp">
+public sealed class MarketDataToolProvider
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger&lt;MarketDataToolProvider&gt; _logger;
+
+    public MarketDataToolProvider(IHttpClientFactory httpClientFactory, ILogger&lt;MarketDataToolProvider&gt; logger)
+    {
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+    }
+
+    public IReadOnlyList&lt;AITool&gt; GetTools()
+    {
+        return
+        [
+            AIFunctionFactory.Create(EdgarCompanyFactsAsync, &quot;edgar_company_facts&quot;,
+                &quot;Fetch SEC EDGAR financial data for a company by ticker symbol&quot;),
+            AIFunctionFactory.Create(StockQuoteAsync, &quot;stock_quote&quot;,
+                &quot;Get current stock price and daily change from Yahoo Finance&quot;),
+            AIFunctionFactory.Create(StockHistoryAsync, &quot;stock_history&quot;,
+                &quot;Get historical price data from Yahoo Finance&quot;),
+        ];
+    }
+
+    [Description(&quot;Fetch SEC EDGAR financial data for a company by ticker symbol&quot;)]
+    private async Task&lt;string&gt; EdgarCompanyFactsAsync(
+        [Description(&quot;Stock ticker symbol (e.g. AAPL, MSFT)&quot;)] string ticker,
+        CancellationToken ct)
+    {
+        // Implementation: call SEC EDGAR API, parse response, return JSON summary
+    }
+
+    [Description(&quot;Get current stock price and daily change from Yahoo Finance&quot;)]
+    private async Task&lt;string&gt; StockQuoteAsync(
+        [Description(&quot;Stock ticker symbol&quot;)] string ticker,
+        CancellationToken ct)
+    {
+        // Implementation: call Yahoo Finance API
+    }
+
+    [Description(&quot;Get historical price data from Yahoo Finance&quot;)]
+    private async Task&lt;string&gt; StockHistoryAsync(
+        [Description(&quot;Stock ticker symbol&quot;)] string ticker,
+        [Description(&quot;Time range: 5d, 1mo, 3mo, 6mo, 1y, 5y&quot;)] string range,
+        CancellationToken ct)
+    {
+        // Implementation: call Yahoo Finance historical data API
+    }
+}
+</code></pre>
+      <p>The tool provider is registered in DI as <code>IReadOnlyList&lt;AITool&gt;</code>:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;MarketDataToolProvider&gt;();
+services.AddSingleton&lt;IReadOnlyList&lt;AITool&gt;&gt;(sp =&gt;
+    sp.GetRequiredService&lt;MarketDataToolProvider&gt;().GetTools());
+</code></pre>
+      <h3>3. An Agent Tools Seed</h3>
+      <p>The agent tools seed declares which tools the agent depends on by name. This creates an explicit binding between the agent and its tools that the platform validates at startup. If a declared tool is not registered, the platform logs a warning.</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+    agentName: &quot;financial-analyst&quot;,
+    toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
+</code></pre>
+      <p>The interface:</p>
+      <pre><code class="language-csharp">
+public interface IAgentToolsSeed
+{
+    string AgentName { get; }
+    IReadOnlyList&lt;string&gt; ToolNames { get; }
+}
+</code></pre>
+      <p>This is a declaration, not a restriction. The platform uses it for startup validation and tool routing. The agent can still use platform-provided tools (context management, file operations, etc.) that are registered globally.</p>
+      <h3>4. Context Seeds (Optional)</h3>
+      <p>Beyond the persona, you can seed additional context domains. Each domain has its own seed interface, but they all follow the same pattern: implement the interface, register it as a singleton, and the platform persists it on first startup.</p>
+      <p><strong>Guardrail seed</strong> -- policy rules the LLM must follow:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IGuardrailSeed&gt;(new GuardrailSeed(
+    name: &quot;investment-disclaimer&quot;,
+    severity: &quot;high&quot;,
+    enabled: true,
+    rule: &quot;&quot;&quot;
+        Never provide specific buy, sell, or hold recommendations.
+        Always include a disclaimer that the analysis is informational only
+        and not investment advice.
+        Do not predict future stock prices or guarantee returns.
+        &quot;&quot;&quot;));
+</code></pre>
+      <p><strong>Context seed</strong> -- background knowledge injected into the system prompt:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IContextSeed&gt;(new ContextSeed(
+    topic: &quot;financial-analysis-methodology&quot;,
+    tags: &quot;finance,methodology&quot;,
+    type: &quot;fact&quot;,
+    content: &quot;&quot;&quot;
+        ## Financial Analysis Reference
+        - **P/E Ratio**: Price / Earnings per Share. Compare within sector.
+        - **Revenue Growth**: Year-over-year revenue change.
+        - **EPS**: Earnings per Share. Primary driver of stock valuation.
+        &quot;&quot;&quot;));
+</code></pre>
+      <p>The full set of optional seed interfaces:</p>
+      <table>
+        <thead><tr>
+          <th>Interface</th>
+          <th>Purpose</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>IGuardrailSeed</code></td>
+          <td>Behavioral constraints with severity levels</td>
+        </tr>
+        <tr>
+          <td><code>IContextSeed</code></td>
+          <td>Typed knowledge (fact, reference, decision, feedback)</td>
+        </tr>
+        <tr>
+          <td><code>IWorkflowSeed</code></td>
+          <td>Multi-step workflow definitions</td>
+        </tr>
+        <tr>
+          <td><code>IEntitySeed</code></td>
+          <td>Domain entity schemas</td>
+        </tr>
+        <tr>
+          <td><code>ISkillSeed</code></td>
+          <td>Reusable prompt templates</td>
+        </tr>
+        <tr>
+          <td><code>IUserProfileSeed</code></td>
+          <td>User role, timezone, and preferences</td>
+        </tr>
+        <tr>
+          <td><code>IMcpConnectionSeed</code></td>
+          <td>MCP servers to auto-connect at startup</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>You can register multiple seeds of each type. Each one becomes a markdown file in the agent&#x27;s data directory.</p>
+      <h3>5. DI Registration</h3>
+      <p>All seeds and tool registrations go into a single extension method. This is the agent&#x27;s entire public API -- one method that wires everything into the service collection.</p>
+      <pre><code class="language-csharp">
+using AiAgentCanvas.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Agent.FinancialAnalyst;
+
+public static class FinancialAnalystServiceExtensions
+{
+    public static IServiceCollection AddFinancialAnalystAgent(this IServiceCollection services)
+    {
+        // Persona
+        services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+            name: &quot;financial-analyst&quot;,
+            description: &quot;A financial analyst that uses market data tools&quot;,
+            instructions: &quot;...&quot;));
+
+        // Context, guardrails, workflows, entities, skills, profile...
+        services.AddSingleton&lt;IContextSeed&gt;(new ContextSeed(...));
+        services.AddSingleton&lt;IGuardrailSeed&gt;(new GuardrailSeed(...));
+        services.AddSingleton&lt;IWorkflowSeed&gt;(new WorkflowSeed(...));
+        services.AddSingleton&lt;IEntitySeed&gt;(new EntitySeed(...));
+        services.AddSingleton&lt;ISkillSeed&gt;(new SkillSeed(...));
+        services.AddSingleton&lt;IUserProfileSeed&gt;(new UserProfileSeed(...));
+
+        // Tool binding
+        services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+            agentName: &quot;financial-analyst&quot;,
+            toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
+
+        return services;
+    }
+}
+</code></pre>
+      <p>The agent project only needs two dependencies: <code>AiAgentCanvas.Abstractions</code> (for the seed interfaces) and <code>Microsoft.Extensions.DependencyInjection.Abstractions</code> (for <code>IServiceCollection</code>). No AI framework references needed -- the agent does not own tools or the LLM client.</p>
+      <h3>6. Composition Root</h3>
+      <p>One line in <code>Program.cs</code> activates the agent:</p>
+      <pre><code class="language-csharp">
+builder.Services.AddFinancialAnalystAgent();
+</code></pre>
+      <p>That&#x27;s it. The platform resolves all <code>IPersonaSeed</code>, <code>IContextSeed</code>, and other seed services at startup, persists them to disk, and makes them available to the runtime agent.</p>
+      <h2>What the Platform Provides</h2>
+      <p>Everything outside those six pieces is handled by the platform:</p>
+      <ul>
+        <li><strong>HarnessAgent runtime</strong> -- the MAF SDK&#x27;s <code>AsHarnessAgent</code> creates the agent with system prompt assembly, tool routing, and conversation management</li>
+        <li><strong>AG-UI streaming</strong> -- real-time streaming of agent responses to the frontend via the Agent-User Interaction protocol</li>
+        <li><strong>Context injection</strong> -- <code>AIContextProvider</code> implementations inject personas, guardrails, entities, profiles, and context into the system prompt before every LLM call</li>
+        <li><strong>Tool deduplication</strong> -- multiple registrations of the same tool are deduplicated automatically</li>
+        <li><strong>Governance wrapping</strong> -- <code>GovernedAIFunction</code> and <code>GovernedMcpGateway</code> evaluate every tool call against active guardrails and policies</li>
+        <li><strong>File workspace</strong> -- <code>FileSystemAgentFileStore</code> gives the agent sandboxed file read/write access</li>
+        <li><strong>Background agents</strong> -- long-running tasks execute in background agent threads</li>
+        <li><strong>Tool approval</strong> -- <code>ToolApprovalAgentOptions</code> with configurable auto-approval rules</li>
+        <li><strong>Telemetry</strong> -- OpenTelemetry tracing and structured logging across the full request pipeline</li>
+        <li><strong>Health checks</strong> -- readiness and liveness probes for orchestrator health</li>
+        <li><strong>A2A protocol</strong> -- Agent-to-Agent communication for multi-agent scenarios</li>
+        <li><strong>Sessions and history</strong> -- conversation persistence and session management</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agents - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>2. What Is an AI Agent</h1>
+      <p>An AI agent is software that uses an LLM to reason about a goal, decide what actions to take, execute them through tools, and iterate until the goal is met. Unlike a chatbot that generates text in response to prompts, an agent acts on your behalf -- it reads data, calls APIs, modifies systems, and makes decisions across multiple steps.</p>
+      <h2>The Agent Loop</h2>
+      <p>Every agent interaction follows the same cycle:</p>
+      <pre><code>
+User message
+    -&gt; Context injection (persona, memory, guardrails, domain knowledge)
+    -&gt; LLM reasoning (understand the goal, plan next steps)
+    -&gt; Tool calls (execute actions via functions, APIs, or external systems)
+    -&gt; Tool results (observe outcomes)
+    -&gt; LLM reasoning (evaluate results, decide if done or continue)
+    -&gt; Response (deliver the final answer or ask for clarification)
+</code></pre>
+      <p>This loop repeats as many times as needed. A simple question might take one pass. A complex task -- researching a topic, pulling data from three systems, formatting a report -- might take ten. The agent decides when it has enough information to respond.</p>
+      <p>In code, this loop is managed by the agent runtime. Here is a simplified version of what happens on each turn:</p>
+      <pre><code class="language-csharp">
+// The runtime assembles context and runs the loop
+var systemPrompt = contextManager.BuildSystemPrompt(agent, user, conversation);
+var messages = new List&lt;ChatMessage&gt; { new SystemChatMessage(systemPrompt) };
+messages.AddRange(conversation.History);
+messages.Add(new UserChatMessage(userInput));
+
+// The FunctionInvokingChatClient handles the tool-call loop automatically
+var response = await chatClient.GetResponseAsync(messages, options);
+</code></pre>
+      <p>The <code>FunctionInvokingChatClient</code> from Microsoft.Extensions.AI intercepts tool-call responses from the LLM, executes the corresponding functions, feeds results back, and lets the LLM continue reasoning -- all within a single call.</p>
+      <h2>What Makes Agents Different from LLM Wrappers</h2>
+      <p>A thin LLM wrapper sends a prompt and returns the response. An agent goes further:</p>
+      <ul>
+        <li><strong>Tool use</strong> -- agents call functions to interact with external systems. They don&#x27;t just describe what should happen; they do it. A wrapper tells you the API call to make. An agent makes the call.</li>
+        <li><strong>Context awareness</strong> -- agents maintain state across turns: who the user is, what entities are in play, what happened earlier in the conversation, and what domain knowledge applies. Each turn builds on the last.</li>
+        <li><strong>Multi-step reasoning</strong> -- agents break complex goals into steps, execute them in sequence, and adapt based on intermediate results. If step 3 fails, the agent reasons about why and tries a different approach.</li>
+        <li><strong>Persistence</strong> -- agents remember across sessions. Entity memory, user preferences, and conversation history survive restarts. The agent picks up where it left off.</li>
+      </ul>
+      <h2>Use Cases</h2>
+      <table>
+        <thead><tr>
+          <th>Domain</th>
+          <th>What the Agent Does</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><strong>Financial services</strong></td>
+          <td>Monitors portfolio risk, flags compliance violations, and generates regulatory reports from transaction data.</td>
+        </tr>
+        <tr>
+          <td><strong>IT operations</strong></td>
+          <td>Triages incidents from monitoring alerts, correlates logs across systems, and executes runbook steps to resolve issues.</td>
+        </tr>
+        <tr>
+          <td><strong>Customer support</strong></td>
+          <td>Resolves tickets by looking up account data, applying business rules, and taking actions like issuing refunds or updating records.</td>
+        </tr>
+        <tr>
+          <td><strong>Legal and compliance</strong></td>
+          <td>Reviews contracts against policy checklists, extracts key clauses, and flags deviations for human review.</td>
+        </tr>
+        <tr>
+          <td><strong>Healthcare</strong></td>
+          <td>Summarizes patient records, cross-references symptoms with clinical guidelines, and prepares pre-visit briefs for clinicians.</td>
+        </tr>
+        <tr>
+          <td><strong>Software engineering</strong></td>
+          <td>Reviews pull requests, generates test cases from specifications, and investigates build failures by reading logs and code.</td>
+        </tr>
+        <tr>
+          <td><strong>E-commerce</strong></td>
+          <td>Manages product catalog updates, processes return requests end-to-end, and generates pricing recommendations from sales data.</td>
+        </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

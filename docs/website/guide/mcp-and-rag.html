@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP and RAG - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>7. Expanding with MCP and RAG</h1>
+      <p>Agents start with the tools and knowledge you seed at build time. MCP and RAG extend the agent at runtime -- MCP connects external tools and services without writing code, and RAG enriches every response with relevant documents from a vector store.</p>
+      <h2>Model Context Protocol (MCP)</h2>
+      <h3>What MCP Does</h3>
+      <p>MCP is an open standard for connecting AI agents to external tools and data sources at runtime. Instead of writing a tool provider class and redeploying, you point the agent at an MCP server endpoint and it discovers the available tools automatically. The tools appear alongside built-in tools and the LLM can call them like any other function.</p>
+      <h3>Connecting via Agent Tools</h3>
+      <p>The agent exposes three MCP management tools through the <code>McpConnectionManager</code>:</p>
+      <pre><code>
+connect_mcp_server(name, endpoint, transport)   -- connect and discover tools
+disconnect_mcp_server(name)                     -- disconnect and remove tools
+list_mcp_connections()                          -- list active connections
+</code></pre>
+      <p>A user can connect to an MCP server through conversation:</p>
+      <blockquote><p>&quot;Connect to the GitHub MCP server at https://mcp.github.com/sse&quot;</p></blockquote>
+      <p>The agent calls <code>connect_mcp_server</code> with the name, endpoint, and transport type. From that point on, the GitHub server&#x27;s tools are available in the conversation.</p>
+      <h3>How Connection Works</h3>
+      <p>The <code>McpConnectionManager</code> handles the full connection lifecycle:</p>
+      <ul>
+        <li>The LLM calls <code>connect_mcp_server</code> with a name, endpoint URL, and transport type</li>
+        <li>The manager creates a transport client based on the specified type (stdio, SSE, or streamable HTTP)</li>
+        <li>It connects via <code>McpClient.CreateAsync()</code> and calls <code>ListToolsAsync()</code> to discover the server&#x27;s tools</li>
+        <li>Discovered tools are registered into the <code>DynamicToolRegistry</code> under the key <code>mcp:{name}</code></li>
+        <li>The <code>DynamicToolContextProvider</code> picks up the new tools on the next LLM invocation</li>
+      </ul>
+      <pre><code class="language-csharp">
+private async Task&lt;string&gt; ConnectMcpServer(string name, string endpoint,
+    string transport, CancellationToken ct)
+{
+    IClientTransport clientTransport = transport.ToLowerInvariant() switch
+    {
+        &quot;http&quot; or &quot;sse&quot; =&gt; new HttpClientTransport(
+            new HttpClientTransportOptions { Endpoint = new Uri(endpoint) }),
+        _ =&gt; throw new ArgumentException($&quot;Unsupported transport: {transport}&quot;),
+    };
+
+    var client = await McpClient.CreateAsync(clientTransport, cancellationToken: ct);
+    var mcpTools = await client.ListToolsAsync(cancellationToken: ct);
+
+    // Register discovered tools into the dynamic tool registry
+    _dynamicToolRegistry.Register($&quot;mcp:{name}&quot;, mcpTools);
+
+    return $&quot;Connected to &#x27;{name}&#x27; -- {mcpTools.Count} tools discovered.&quot;;
+}
+</code></pre>
+      <p>Once connected, MCP tools appear alongside built-in tools with no distinction from the LLM&#x27;s perspective. The agent can call them, and they show up in tool listings.</p>
+      <h3>Governance</h3>
+      <p>Every MCP tool call passes through the <code>GovernedMcpGateway</code> before execution. The gateway evaluates the call against the agent&#x27;s active guardrails and policies:</p>
+      <pre><code class="language-csharp">
+public McpGatewayDecision Evaluate(string agentId, string toolName, string? payload = null)
+{
+    var request = new McpGatewayRequest
+    {
+        AgentId = agentId,
+        ToolName = toolName,
+        Payload = payload ?? &quot;&quot;,
+    };
+
+    var decision = _gateway.ProcessRequest(request);
+
+    if (!decision.Allowed)
+    {
+        _logger.LogWarning(
+            &quot;[GOVERNANCE:MCP] Blocked tool={Tool} agent={Agent} status={Status}&quot;,
+            toolName, agentId, decision.Status);
+    }
+
+    return decision;
+}
+</code></pre>
+      <p>This means an MCP tool that violates a guardrail is blocked the same way a built-in tool would be. The governance layer does not distinguish between tool sources.</p>
+      <h3>Building an MCP Connection Seed</h3>
+      <p>To auto-connect to an MCP server at startup (instead of requiring the user to connect manually), implement <code>IMcpConnectionSeed</code>:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IMcpConnectionSeed&gt;(new McpConnectionSeed(
+    name: &quot;company-data&quot;,
+    endpoint: &quot;https://mcp.internal.example.com/sse&quot;,
+    transport: &quot;sse&quot;));
+</code></pre>
+      <p>The interface:</p>
+      <pre><code class="language-csharp">
+public interface IMcpConnectionSeed
+{
+    string Name { get; }
+    string Endpoint { get; }
+    string Transport { get; }  // &quot;sse&quot;, &quot;http&quot;, or &quot;stdio&quot;
+}
+</code></pre>
+      <p>When the platform starts, it resolves all <code>IMcpConnectionSeed</code> services and connects to each one automatically. The agent is ready to use those tools from the first request, with no user intervention.</p>
+      <h2>Retrieval-Augmented Generation (RAG)</h2>
+      <h3>What RAG Does</h3>
+      <p>RAG retrieves relevant document chunks at query time and injects them into the agent&#x27;s context. Instead of fine-tuning a model on your documents or cramming everything into the system prompt, RAG searches a vector store for the chunks most relevant to the user&#x27;s current question and includes only those. The agent gets grounded, up-to-date information with source citations.</p>
+      <h3>The Pipeline</h3>
+      <p>Documents flow through an ingestion pipeline that prepares them for search, and queries flow through a retrieval pipeline that finds and ranks the best matches:</p>
+      <pre><code>
+Ingestion                              Retrieval
+=========                              =========
+
+Raw Document                           User Message
+    |                                      |
+    v                                      v
+DocumentChunker                        Embed Query
+(recursive paragraph/sentence split)   (IEmbeddingGenerator)
+    |                                      |
+    v                                      v
+Embed Each Chunk                       Hybrid Search
+(IEmbeddingGenerator)                  (vector cosine + FTS5 keyword)
+    |                                      |
+    v                                      v
+Store in SQLite                        LLM Reranking
+(vector BLOB + FTS5 index)             (top-10 candidates -&gt; top-3)
+                                           |
+                                           v
+                                       Citation Formatting
+                                       ([1] source: X, score: 0.82)
+                                           |
+                                           v
+                                       Inject into Agent Context
+</code></pre>
+      <h3>Chunking</h3>
+      <p>The <code>DocumentChunker</code> recursively splits documents into chunks suitable for embedding. It follows a semantic hierarchy rather than using fixed-size character windows:</p>
+      <ul>
+        <li><strong>Split by paragraphs</strong> (double newlines)</li>
+        <li>If a paragraph exceeds <code>ChunkSize</code>, <strong>split by sentences</strong> (period, exclamation, or question mark followed by space or newline)</li>
+        <li>Apply <strong>overlap</strong> between consecutive chunks for context continuity</li>
+        <li>Discard chunks under 20 characters</li>
+      </ul>
+      <pre><code class="language-csharp">
+public sealed class DocumentChunker
+{
+    public int ChunkSize { get; init; } = 512;
+    public int ChunkOverlap { get; init; } = 64;
+
+    public List&lt;DocumentChunk&gt; Chunk(string text, string? source = null)
+    {
+        // 1. Split by paragraphs
+        // 2. If paragraph &gt; ChunkSize, split by sentences
+        // 3. Apply overlap between consecutive chunks
+        // 4. Filter out chunks &lt; 20 chars
+    }
+}
+</code></pre>
+      <table>
+        <thead><tr>
+          <th>Property</th>
+          <th>Default</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>ChunkSize</code></td>
+          <td>512</td>
+          <td>Maximum characters per chunk</td>
+        </tr>
+        <tr>
+          <td><code>ChunkOverlap</code></td>
+          <td>64</td>
+          <td>Characters of overlap between consecutive chunks</td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Embedding</h3>
+      <p>Each chunk is embedded into a vector using Azure AI Foundry&#x27;s embedding model. The platform uses <code>IEmbeddingGenerator</code> from Microsoft.Extensions.AI, so the embedding provider is swappable via DI. The same embedding model is used for both document ingestion and query-time embedding to ensure consistent vector space alignment.</p>
+      <h3>Storage</h3>
+      <p>Chunks are stored as <code>DocumentRecord</code> entries in a SQLite database with two indexing strategies:</p>
+      <ul>
+        <li><strong>Vector BLOB</strong> -- the embedding vector stored as a binary blob for cosine similarity search</li>
+        <li><strong>FTS5 full-text index</strong> -- the chunk text indexed with SQLite&#x27;s FTS5 extension for keyword/BM25 search</li>
+      </ul>
+      <p>This dual storage enables hybrid search without requiring a separate search engine.</p>
+      <h3>Hybrid Search</h3>
+      <p>The retrieval pipeline combines two search signals:</p>
+      <ul>
+        <li><strong>Vector search</strong> (cosine similarity) -- captures semantic meaning. A query about &quot;company revenue&quot; matches chunks discussing &quot;annual income&quot; or &quot;top-line growth&quot; even without exact keyword overlap.</li>
+        <li><strong>Keyword search</strong> (SQLite FTS5 / BM25) -- captures exact term matches. Important for proper nouns, ticker symbols, product names, and technical terms that semantic search alone might miss.</li>
+      </ul>
+      <p>The scores from both signals are combined to produce a unified ranking. This hybrid approach consistently outperforms either signal alone.</p>
+      <h3>LLM Reranking</h3>
+      <p>After hybrid search returns the top candidates (typically 10), the platform sends them to the LLM for relevance reranking. The LLM evaluates each candidate against the original query and assigns a relevance score. Only the top-K survivors (typically 3) are kept for injection.</p>
+      <p>This step is expensive (it costs an additional LLM call) but significantly improves precision. The initial retrieval stage optimizes for recall -- casting a wide net -- while reranking optimizes for precision -- keeping only the truly relevant chunks.</p>
+      <h3>Context Injection</h3>
+      <p>Surviving chunks are formatted with citation numbers and injected into the agent&#x27;s context:</p>
+      <pre><code>
+[1] source: quarterly-report-q3.pdf, score: 0.92
+Revenue grew 15% year-over-year to $2.1B, driven primarily by cloud services...
+
+[2] source: earnings-call-transcript.pdf, score: 0.87
+The CEO noted that enterprise customer count increased by 23% in Q3...
+</code></pre>
+      <p>The agent can reference these citations in its response, giving users a clear trail back to the source documents.</p>
+      <h3>Enabling RAG</h3>
+      <p>RAG is opt-in and requires an embedding model deployment. Set the deployment name in configuration:</p>
+      <pre><code class="language-json">
+{
+  &quot;AIFoundry&quot;: {
+    &quot;EmbeddingDeploymentName&quot;: &quot;text-embedding-ada-002&quot;
+  }
+}
+</code></pre>
+      <p>When this value is set, the platform auto-registers all RAG components at startup:</p>
+      <ul>
+        <li><code>DocumentChunker</code> for splitting documents</li>
+        <li><code>IEmbeddingGenerator</code> configured against the Azure AI Foundry embedding deployment</li>
+        <li>SQLite vector store with FTS5 indexing</li>
+        <li>Hybrid search and reranking pipeline</li>
+        <li>RAG context provider that injects retrieved chunks before each LLM call</li>
+      </ul>
+      <p>When the value is not set, RAG components are not registered and the agent operates without document retrieval. No code changes needed either way -- the presence of the configuration key is the only switch.</p>
+    </main>
+  </div>
+</body>
+</html>

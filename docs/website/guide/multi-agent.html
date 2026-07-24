@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent Setup - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>8. Multi-Agent Setup</h1>
+      <p>AI Agent Canvas supports three topologies for running multiple agents. Each offers different trade-offs between simplicity, isolation, and scalability. You can combine them -- use in-process handoff and background delegation within a single host, then connect hosts with A2A when you need independent deployment.</p>
+      <h2>Option 1: In-Process Handoff</h2>
+      <p>All agents run in the same .NET process. The main agent delegates to a specialist by calling the <code>handoff_to_agent</code> tool. The specialist runs to completion and returns its response directly.</p>
+      <p>Under the hood, the flow is:</p>
+      <ul>
+        <li><code>HandoffToolProvider</code> exposes the <code>handoff_to_agent</code> tool to the LLM</li>
+        <li><code>InProcessAgentHandoff</code> receives the call with the target agent name and context</li>
+        <li><code>AgentRegistry.Resolve</code> finds or builds the target agent (loading its persona and scoped tools)</li>
+        <li>The target agent runs as a <code>ChatClientAgent</code> with its own persona instructions</li>
+        <li>The response flows back to the calling agent as a tool result</li>
+      </ul>
+      <p><strong>When to use:</strong> Multiple specialists without deployment complexity. Shared LLM endpoint. Low latency between agents. All agents owned by the same team.</p>
+      <h3>Setup</h3>
+      <p>Register a persona seed and tool seed for each specialist agent. The <code>AgentRegistry</code> builds agents on demand from these seeds.</p>
+      <pre><code class="language-csharp">
+public static IServiceCollection AddFinancialAnalyst(this IServiceCollection services)
+{
+    // Persona seed defines the agent&#x27;s identity and instructions
+    services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+        name: &quot;financial-analyst&quot;,
+        description: &quot;A financial analyst that uses market data tools to research stocks and generate reports.&quot;,
+        instructions: &quot;You are a financial analyst assistant. Use the available market data tools to research stocks, analyze trends, and generate investment reports.&quot;));
+
+    // Tool seed restricts which tools this agent can see
+    services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+        agentName: &quot;financial-analyst&quot;,
+        toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
+
+    return services;
+}
+</code></pre>
+      <p>The handoff tool is registered automatically by <code>HandoffToolProvider</code>. Any persona in the registry is available as a handoff target:</p>
+      <pre><code class="language-csharp">
+// HandoffToolProvider exposes this to the LLM
+[Description(&quot;Delegate a task to another agent and get the result back.&quot;)]
+private async Task&lt;string&gt; HandoffToAgent(string targetAgent, string context)
+{
+    var result = await _handoff.HandoffAsync(targetAgent, context);
+    return JsonSerializer.Serialize(result);
+}
+</code></pre>
+      <p>When the LLM decides to delegate, it calls <code>handoff_to_agent</code> with the target name and a context message. The specialist runs in the same process, and the result comes back as a tool response.</p>
+      <h2>Option 2: Background Delegation</h2>
+      <p>The main agent spawns parallel tasks on background agents. This is asynchronous -- the agent can start multiple tasks, continue working on other things, and collect results when they finish.</p>
+      <p>Background delegation exposes five tools to the LLM:</p>
+      <table>
+        <thead><tr>
+          <th>Tool</th>
+          <th>Purpose</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>background_agents_start_task</code></td>
+          <td>Start a task on a named background agent</td>
+        </tr>
+        <tr>
+          <td><code>background_agents_wait_for_first_completion</code></td>
+          <td>Block until the first background task finishes</td>
+        </tr>
+        <tr>
+          <td><code>background_agents_get_task_results</code></td>
+          <td>Get the result of a specific completed task</td>
+        </tr>
+        <tr>
+          <td><code>background_agents_get_all_tasks</code></td>
+          <td>List all background tasks and their status</td>
+        </tr>
+        <tr>
+          <td><code>background_agents_continue_task</code></td>
+          <td>Send a follow-up message to a running task</td>
+        </tr>
+        </tbody>
+      </table>
+      <p><strong>When to use:</strong> Independent parallel tasks (research multiple topics simultaneously). Synthesizing results from multiple specialists. Tasks where the LLM decides at runtime which agents to involve.</p>
+      <h3>Setup</h3>
+      <p>Background delegation is automatic. Any persona registered in <code>AgentRegistry</code> is available as a background agent. The platform resolves all non-default agents and passes them to the <code>HarnessAgent</code>:</p>
+      <pre><code class="language-csharp">
+var backgroundAgents = registry.ListAvailableAgents()
+    .Where(n =&gt; !n.Equals(&quot;default&quot;, StringComparison.OrdinalIgnoreCase))
+    .Select(n =&gt; registry.Resolve(n))
+    .Where(a =&gt; a is not null)
+    .ToList()!;
+
+AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
+{
+    Name = options.AgentName,
+    BackgroundAgents = backgroundAgents is { Count: &gt; 0 } ? backgroundAgents : null,
+    // ...
+});
+</code></pre>
+      <p>No additional configuration needed. Register persona and tool seeds, and the agent becomes available for both handoff and background delegation.</p>
+      <h3>Example: Parallel Research</h3>
+      <p>The LLM might use background delegation like this during a conversation:</p>
+      <pre><code>
+User: Compare the financial health of Apple, Microsoft, and Google.
+
+Agent (internal reasoning):
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze Apple&#x27;s financial health using AAPL data&quot;)
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze Microsoft&#x27;s financial health using MSFT data&quot;)
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze Google&#x27;s financial health using GOOGL data&quot;)
+  -&gt; background_agents_wait_for_first_completion()
+  -&gt; (collects all three results)
+  -&gt; Synthesizes a comparative report
+</code></pre>
+      <h2>Option 3: A2A Protocol</h2>
+      <p>Separate hosts communicating over HTTP. Each host exposes an <code>/a2a</code> endpoint and publishes <code>AgentCard</code> metadata describing its capabilities. Remote agents behave like local ones -- handoff and background tools work transparently.</p>
+      <p><strong>When to use:</strong> Independent deployment and scaling per agent. Different security boundaries. Different teams owning different agents. Third-party agents from external organizations.</p>
+      <h3>Setup</h3>
+      <p>Each host runs its own instance of AI Agent Canvas with its own agents. The host exposes the A2A endpoint:</p>
+      <pre><code class="language-csharp">
+// In Program.cs of the remote agent host
+var app = builder.Build();
+app.UseAiAgentCanvas();
+app.MapA2AEndpoints(agentName: &quot;ComplianceAgent&quot;, path: &quot;/a2a&quot;);
+app.Run();
+</code></pre>
+      <p>The A2A server is registered in DI:</p>
+      <pre><code class="language-csharp">
+services.AddA2AServer(agentName);
+</code></pre>
+      <p>The orchestrator registers remote agents by URL. They join the registry and become available through the same handoff and background tools:</p>
+      <pre><code class="language-csharp">
+// In the orchestrator&#x27;s startup
+var registry = app.Services.GetRequiredService&lt;AgentRegistry&gt;();
+registry.RegisterRemote(
+    name: &quot;compliance-checker&quot;,
+    a2aUrl: &quot;https://compliance-service.internal/a2a&quot;,
+    description: &quot;Reviews documents for regulatory compliance&quot;);
+</code></pre>
+      <p>The <code>RegisterRemote</code> method creates an <code>AgentCard</code>, configures an <code>HttpClient</code> with the remote URL, and builds an agent proxy:</p>
+      <pre><code class="language-csharp">
+public void RegisterRemote(string name, string a2aUrl, string? description = null)
+{
+    var card = new AgentCard
+    {
+        Name = name,
+        Description = description ?? $&quot;Remote A2A agent at {a2aUrl}&quot;,
+        Version = &quot;1.0&quot;
+    };
+    var httpClient = _httpClientFactory?.CreateClient(name) ?? new HttpClient();
+    httpClient.BaseAddress = new Uri(a2aUrl);
+    var agent = card.AsAIAgent(httpClient, loggerFactory: _loggerFactory);
+    _agents[name] = agent;
+}
+</code></pre>
+      <p>After registration, <code>handoff_to_agent(&quot;compliance-checker&quot;, ...)</code> sends the request over HTTP to the remote host. The calling agent does not need to know whether the target is local or remote.</p>
+      <h2>Comparison</h2>
+      <table>
+        <thead><tr>
+          <th></th>
+          <th>In-Process Handoff</th>
+          <th>Background Delegation</th>
+          <th>A2A Protocol</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><strong>Latency</strong></td>
+          <td>Lowest (in-memory)</td>
+          <td>Low (in-memory, async overhead)</td>
+          <td>Higher (HTTP round-trip)</td>
+        </tr>
+        <tr>
+          <td><strong>Isolation</strong></td>
+          <td>None (shared process)</td>
+          <td>None (shared process)</td>
+          <td>Full (separate hosts)</td>
+        </tr>
+        <tr>
+          <td><strong>Parallelism</strong></td>
+          <td>Sequential only</td>
+          <td>Parallel tasks</td>
+          <td>Parallel via separate hosts</td>
+        </tr>
+        <tr>
+          <td><strong>Scaling</strong></td>
+          <td>Single process</td>
+          <td>Single process</td>
+          <td>Independent per host</td>
+        </tr>
+        <tr>
+          <td><strong>Complexity</strong></td>
+          <td>Low</td>
+          <td>Low</td>
+          <td>Moderate (deployment, networking)</td>
+        </tr>
+        <tr>
+          <td><strong>Security boundary</strong></td>
+          <td>Shared</td>
+          <td>Shared</td>
+          <td>Independent (separate auth, policies)</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>Composing Topologies</h2>
+      <p>These options are not mutually exclusive. A practical setup might look like:</p>
+      <ul>
+        <li><strong>In-process + background</strong> for your team&#x27;s agents: a financial analyst, a report generator, and a data researcher all running in one host, using handoff for sequential work and background delegation for parallel tasks.</li>
+        <li><strong>A2A</strong> for other teams&#x27; agents: the compliance team runs their own host with their own deployment schedule and security policies. Your orchestrator connects to it via <code>RegisterRemote</code>.</li>
+      </ul>
+      <p>The agent code does not change between topologies. A persona that works as an in-process handoff target works identically as a remote A2A agent. The difference is in how you register it.</p>
+    </main>
+  </div>
+</body>
+</html>

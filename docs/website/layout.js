@@ -1,65 +1,42 @@
 const NAV_SECTIONS = [
   {
-    title: 'AI Agents',
-    basePath: 'ai-agents',
+    title: 'Guide',
+    basePath: 'guide',
     items: [
-      { title: 'What Are AI Agents', file: 'what-are-ai-agents.html' },
-      { title: 'Microsoft Agent Framework', file: 'microsoft-agent-framework.html' },
-      { title: 'Tools and Skills', file: 'tools-and-skills.html' },
-      { title: 'Model Context Protocol', file: 'model-context-protocol.html' },
-      { title: 'Context Providers', file: 'context-providers.html' },
-      { title: 'AG-UI Protocol', file: 'ag-ui-protocol.html' },
+      { title: '1. Introduction', file: 'introduction.html' },
+      { title: '2. AI Agents', file: 'ai-agents.html' },
+      { title: '3. Features', file: 'features.html' },
+      { title: '4. Libraries', file: 'libraries.html' },
+      { title: '5. Building an Agent', file: 'building-an-agent.html' },
+      { title: '6. Context Domains', file: 'context-domains.html' },
+      { title: '7. MCP and RAG', file: 'mcp-and-rag.html' },
+      { title: '8. Multi-Agent Setup', file: 'multi-agent.html' },
+      { title: '9. Architecture', file: 'architecture.html' },
+      { title: '10. Behavior Patterns', file: 'behavior-patterns.html' },
     ]
   },
   {
-    title: 'Use Cases',
-    basePath: 'use-cases',
+    title: 'Appendix',
+    basePath: 'appendix',
     items: [
-      { title: 'Overview', file: 'index.html' },
-      { title: 'Financial Services', file: 'financial-services.html' },
-      { title: 'Healthcare', file: 'healthcare.html' },
-      { title: 'Legal', file: 'legal.html' },
-      { title: 'E-Commerce', file: 'e-commerce.html' },
-      { title: 'IT Operations', file: 'it-operations.html' },
+      { title: 'User Guide', file: 'user-guide.html' },
     ]
   },
   {
-    title: 'User Guide',
-    basePath: 'user-guide',
+    title: 'Reference',
+    basePath: 'reference',
     items: [
-      { title: 'Getting Started', file: 'getting-started.html' },
-      { title: 'Configuration', file: 'configuration.html' },
-      { title: 'Chat Interface', file: 'chat-interface.html' },
-      { title: 'Personas', file: 'personas.html' },
-      { title: 'Skills & Tools', file: 'skills-and-tools.html' },
-      { title: 'Scheduling', file: 'scheduling.html' },
-      { title: 'Workflows', file: 'workflows.html' },
-      { title: 'Security', file: 'security.html' },
-    ]
-  },
-  {
-    title: 'Developer Guide',
-    basePath: 'developer-guide',
-    items: [
-      { title: 'Architecture Overview', file: 'architecture-overview.html' },
-      { title: 'Project Structure', file: 'project-structure.html' },
-      { title: 'Core Platform', file: 'core-framework.html' },
-      { title: 'Agent Data', file: 'agent-data.html' },
-      { title: 'Skills & MCP', file: 'skills-and-mcp.html' },
-      { title: 'RAG Pipeline', file: 'rag-pipeline.html' },
-      { title: 'Security', file: 'security.html' },
-      { title: 'Custom Agents', file: 'custom-agents.html' },
-      { title: 'Custom MCP Connections', file: 'custom-mcp-connections.html' },
-      { title: 'Behavior Patterns', file: 'behavior-patterns.html' },
+      { title: 'AG-UI Protocol', file: 'agui-protocol.html' },
+      { title: 'Security & Governance', file: 'security.html' },
+      { title: 'Platform Internals', file: 'internals.html' },
     ]
   }
 ];
 
 const TOP_NAV = [
-  { title: 'AI Agents', href: 'ai-agents/what-are-ai-agents.html' },
-  { title: 'Use Cases', href: 'use-cases/index.html' },
-  { title: 'User Guide', href: 'user-guide/getting-started.html' },
-  { title: 'Developer Guide', href: 'developer-guide/architecture-overview.html' },
+  { title: 'Guide', href: 'guide/introduction.html' },
+  { title: 'Appendix', href: 'appendix/user-guide.html' },
+  { title: 'Reference', href: 'reference/agui-protocol.html' },
 ];
 
 function getBasePath() {

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Behavior Patterns - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>10. Agent Behavior Patterns</h1>
+      <p>Agent behavior patterns describe how an agent reasons, decides, and interacts. The platform does not enforce a pattern -- the pattern emerges from how you write the persona instructions, which tools you expose, and how you wire up inter-agent communication. The same platform primitives support all seven patterns.</p>
+      <h2>Overview</h2>
+      <table>
+        <thead><tr>
+          <th>Pattern</th>
+          <th>Key Mechanism</th>
+          <th>When to Use</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Sequential</td>
+          <td>Persona instructions with ordered steps</td>
+          <td>Linear analysis pipelines, ETL, report generation</td>
+        </tr>
+        <tr>
+          <td>Reactive (ReAct)</td>
+          <td>Tool loop (built-in)</td>
+          <td>Open-ended tasks where the agent decides what to do next</td>
+        </tr>
+        <tr>
+          <td>Parallel (Fan-out/Fan-in)</td>
+          <td>Background agents</td>
+          <td>Independent sub-tasks that can run concurrently</td>
+        </tr>
+        <tr>
+          <td>Deliberate (Planning)</td>
+          <td>Workflow definitions</td>
+          <td>Complex multi-step tasks with predefined procedures</td>
+        </tr>
+        <tr>
+          <td>Reflective (Self-Critique)</td>
+          <td>Critic agent or self-review step</td>
+          <td>High-stakes outputs needing quality verification</td>
+        </tr>
+        <tr>
+          <td>Hierarchical (Delegation)</td>
+          <td>Handoff to worker agents</td>
+          <td>Complex problems with clear domain boundaries</td>
+        </tr>
+        <tr>
+          <td>Collaborative (Multi-Agent Debate)</td>
+          <td>Agent messaging</td>
+          <td>Decisions benefiting from diverse viewpoints</td>
+        </tr>
+        </tbody>
+      </table>
+      <hr>
+      <h2>1. Sequential</h2>
+      <p>The agent follows a fixed sequence of steps defined in its persona instructions. Each step runs to completion before the next begins. The LLM does not decide the order -- the instructions dictate it.</p>
+      <p><strong>When to use:</strong> Predictable multi-step workflows where the order is known upfront. Report generation, data extraction pipelines, onboarding checklists.</p>
+      <p><strong>How to implement:</strong> Define the steps in the persona seed&#x27;s instructions. The agent&#x27;s tool loop follows them in order.</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;daily-report-generator&quot;,
+    description: &quot;Generates daily market reports following a fixed procedure.&quot;,
+    instructions: &quot;&quot;&quot;
+    You generate a daily market report. Follow these steps in order:
+
+    1. Use `stock_quote` to get the current price for AAPL, MSFT, and GOOGL
+    2. Use `stock_history` to get the 5-day price history for each
+    3. Use `edgar_company_facts` to get the latest quarterly revenue for each
+    4. Write a summary report with price trends and revenue comparison
+    5. Save the report using `add_context` with key &quot;daily-report-{date}&quot;
+
+    Do not skip steps. Do not reorder steps.
+    &quot;&quot;&quot;));
+</code></pre>
+      <p>The LLM sees these instructions in its system prompt and executes the tool calls in the specified order.</p>
+      <hr>
+      <h2>2. Reactive (ReAct)</h2>
+      <p>The default behavior pattern. The LLM reasons about the current situation, decides which tool to call, observes the result, and repeats until the goal is met. This is the standard reason-act-observe loop that every agent runs by default.</p>
+      <p><strong>When to use:</strong> Most tasks. Any situation where the agent needs to decide at runtime what to do next based on the current state.</p>
+      <p><strong>How to implement:</strong> No special configuration. Every agent uses this pattern by default. The <code>FunctionInvokingChatClient</code> handles the loop automatically:</p>
+      <pre><code class="language-csharp">
+// The reactive loop is built into the agent runtime
+AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
+{
+    Name = &quot;assistant&quot;,
+    ChatOptions = new ChatOptions
+    {
+        Instructions = &quot;You are a helpful assistant.&quot;,
+        Tools = tools,
+    },
+});
+</code></pre>
+      <p>The LLM receives all available tools and decides which to call based on the user&#x27;s request. If the first tool call does not produce a satisfactory result, the LLM reasons about what to try next.</p>
+      <hr>
+      <h2>3. Parallel (Fan-out/Fan-in)</h2>
+      <p>The main agent spawns multiple background tasks on specialist agents, waits for them to complete, and synthesizes the results. Tasks run concurrently.</p>
+      <p><strong>When to use:</strong> Independent sub-tasks that do not depend on each other. Researching multiple topics simultaneously. Gathering data from multiple sources in parallel.</p>
+      <p><strong>How to implement:</strong> Use background agent tools. Any persona in the <code>AgentRegistry</code> is automatically available as a background agent.</p>
+      <pre><code>
+LLM decides to fan out:
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze AAPL financial health&quot;)
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze MSFT financial health&quot;)
+  -&gt; background_agents_start_task(&quot;financial-analyst&quot;, &quot;Analyze GOOGL financial health&quot;)
+  -&gt; background_agents_wait_for_first_completion()
+  -&gt; background_agents_get_all_tasks()  // check which are done
+  -&gt; background_agents_get_task_results(task_id)  // collect each result
+  -&gt; Synthesize comparative report from all three results
+</code></pre>
+      <p>You can also use the workflow executor for structured parallel execution:</p>
+      <pre><code class="language-csharp">
+// Programmatic concurrent execution via MAF workflow builder
+var agents = agentNames
+    .Select(name =&gt; registry.Resolve(name))
+    .Where(a =&gt; a is not null)
+    .ToList();
+
+var workflow = AgentWorkflowBuilder.BuildConcurrent(agents);
+var input = new ChatMessage(ChatRole.User, userInput);
+await using var run = await InProcessExecution.RunAsync(workflow, input, cancellationToken: ct);
+</code></pre>
+      <hr>
+      <h2>4. Deliberate (Planning)</h2>
+      <p>Workflow definitions decompose goals into named steps. Instead of relying on the LLM to figure out the steps at runtime, you define the procedure upfront. The agent follows the workflow, using its tools to execute each step.</p>
+      <p><strong>When to use:</strong> Complex multi-step tasks with well-known procedures. Compliance reviews, deployment checklists, data migration pipelines.</p>
+      <p><strong>How to implement:</strong> Create workflows using the workflow tools or seed them at startup. Three execution modes are available:</p>
+      <p><strong>Simple workflow</strong> -- a markdown-defined procedure the agent follows:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IWorkflowSeed&gt;(new WorkflowSeed(
+    agentName: &quot;compliance-reviewer&quot;,
+    name: &quot;quarterly-review&quot;,
+    content: &quot;&quot;&quot;
+    # Quarterly Compliance Review
+
+    ## Steps
+    1. Pull all transactions from the last quarter
+    2. Flag any transaction over $10,000 without documentation
+    3. Check each flagged transaction against the exceptions list
+    4. Generate a findings report with severity ratings
+    5. Create follow-up tasks for any critical findings
+    &quot;&quot;&quot;));
+</code></pre>
+      <p>The agent calls <code>run_workflow(&quot;quarterly-review&quot;, &quot;Run the Q3 2025 review&quot;)</code> and the executor feeds the workflow steps into the LLM as structured instructions.</p>
+      <p><strong>Sequential workflow</strong> -- chains multiple agents in order, each receiving the previous agent&#x27;s output:</p>
+      <pre><code class="language-csharp">
+var workflow = AgentWorkflowBuilder.BuildSequential(agents);
+await using var run = await InProcessExecution.RunAsync(workflow, inputMessage, cancellationToken: ct);
+</code></pre>
+      <p><strong>Declarative workflow</strong> -- YAML-defined workflow graphs loaded and executed via MAF&#x27;s <code>DeclarativeWorkflowBuilder</code>:</p>
+      <pre><code class="language-csharp">
+var workflow = DeclarativeWorkflowBuilder.Build&lt;ChatMessage&gt;(filePath, options);
+await using var run = await InProcessExecution.RunAsync(workflow, inputMessage, cancellationToken: ct);
+</code></pre>
+      <hr>
+      <h2>5. Reflective (Self-Critique)</h2>
+      <p>The agent reviews its own output before delivering it, or hands off to a dedicated critic agent that evaluates quality. The review step catches errors, improves clarity, and verifies that the output meets requirements.</p>
+      <p><strong>When to use:</strong> High-stakes outputs: legal documents, financial reports, customer-facing content. Any situation where getting it wrong is expensive.</p>
+      <p><strong>How to implement:</strong> Two approaches.</p>
+      <p><strong>Self-review via persona instructions:</strong></p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;report-writer&quot;,
+    description: &quot;Writes reports with built-in quality review.&quot;,
+    instructions: &quot;&quot;&quot;
+    After generating any report:
+    1. Review each claim for accuracy against the source data
+    2. Check that all requested sections are present
+    3. Verify that numbers are consistent across sections
+    4. If you find errors, fix them before delivering the final version
+    5. State what you checked at the end of the report
+    &quot;&quot;&quot;));
+</code></pre>
+      <p><strong>Critic agent via handoff:</strong></p>
+      <pre><code class="language-csharp">
+// Register a critic persona
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;quality-reviewer&quot;,
+    description: &quot;Reviews agent outputs for accuracy and completeness.&quot;,
+    instructions: &quot;&quot;&quot;
+    You are a quality reviewer. When given a document:
+    1. Check all factual claims against available data
+    2. Identify any logical inconsistencies
+    3. Flag missing information
+    4. Return a verdict: PASS, REVISE (with specific feedback), or FAIL (with reasons)
+    &quot;&quot;&quot;));
+
+// The main agent&#x27;s instructions tell it to use the critic
+// &quot;After generating the report, use handoff_to_agent(&#x27;quality-reviewer&#x27;, report) to get a quality review.&quot;
+</code></pre>
+      <hr>
+      <h2>6. Hierarchical (Delegation)</h2>
+      <p>A manager agent decomposes a complex problem into sub-tasks and delegates each to a specialist worker agent via handoff. Workers return results. The manager synthesizes the final output.</p>
+      <p><strong>When to use:</strong> Complex problems with clear domain boundaries. Each sub-domain has its own expertise, tools, and knowledge. The manager orchestrates but does not do the domain-specific work.</p>
+      <p><strong>How to implement:</strong> Register specialist agents with scoped tools. The manager agent&#x27;s persona instructs it to delegate:</p>
+      <pre><code class="language-csharp">
+// Manager agent with broad tool access
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;project-manager&quot;,
+    description: &quot;Orchestrates complex projects by delegating to specialists.&quot;,
+    instructions: &quot;&quot;&quot;
+    You are a project manager. When given a complex request:
+    1. Break it into sub-tasks based on domain expertise
+    2. Delegate each sub-task to the appropriate specialist using handoff_to_agent
+    3. Review each specialist&#x27;s response for quality and completeness
+    4. Synthesize a final response that integrates all results
+    
+    Available specialists:
+    - financial-analyst: market data, stock analysis, financial reports
+    - compliance-reviewer: regulatory checks, policy validation
+    - report-writer: document formatting, narrative writing
+    &quot;&quot;&quot;));
+
+// Each specialist has its own scoped tools
+services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+    agentName: &quot;financial-analyst&quot;,
+    toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
+
+services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+    agentName: &quot;compliance-reviewer&quot;,
+    toolNames: [&quot;list_guardrails&quot;, &quot;read_guardrail&quot;, &quot;read_entity&quot;]));
+</code></pre>
+      <p>The manager calls <code>handoff_to_agent</code> for each sub-task and receives structured results. It then combines them into a coherent final response.</p>
+      <hr>
+      <h2>7. Collaborative (Multi-Agent Debate)</h2>
+      <p>Multiple agents share perspectives on the same problem via messaging. Different personas reason about the same question from different angles. A synthesizer agent collects the perspectives and produces a balanced conclusion.</p>
+      <p><strong>When to use:</strong> Decisions that benefit from diverse viewpoints. Risk assessments, strategy decisions, ethical reviews. Cases where a single perspective might miss important considerations.</p>
+      <p><strong>How to implement:</strong> Use <code>IAgentMessaging</code> for asynchronous inter-agent communication:</p>
+      <pre><code class="language-csharp">
+// Define agents with different perspectives
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;optimist-analyst&quot;,
+    description: &quot;Analyzes opportunities and upside potential.&quot;,
+    instructions: &quot;Analyze the given scenario focusing on opportunities, growth potential, and best-case outcomes. Be specific about what could go right.&quot;));
+
+services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
+    name: &quot;risk-analyst&quot;,
+    description: &quot;Analyzes risks and downside potential.&quot;,
+    instructions: &quot;Analyze the given scenario focusing on risks, threats, and worst-case outcomes. Be specific about what could go wrong.&quot;));
+</code></pre>
+      <p>The orchestrator fans out the question to both analysts (via background delegation or handoff), collects their perspectives, and synthesizes a balanced view:</p>
+      <pre><code>
+Orchestrator:
+  -&gt; background_agents_start_task(&quot;optimist-analyst&quot;, &quot;Evaluate expanding into the European market&quot;)
+  -&gt; background_agents_start_task(&quot;risk-analyst&quot;, &quot;Evaluate expanding into the European market&quot;)
+  -&gt; Wait for both to complete
+  -&gt; Synthesize: &quot;The optimist sees X, Y, Z. The risk analyst flags A, B, C. Balanced recommendation: ...&quot;
+</code></pre>
+      <p>For more structured collaboration, agents can exchange messages directly:</p>
+      <pre><code class="language-csharp">
+public interface IAgentMessaging
+{
+    Task SendAsync(AgentMessage message, CancellationToken cancellationToken = default);
+    Task&lt;AgentMessage?&gt; ReceiveAsync(string agentName, CancellationToken cancellationToken = default);
+    Task&lt;IReadOnlyList&lt;AgentMessage&gt;&gt; ReceiveAllAsync(string agentName, CancellationToken cancellationToken = default);
+}
+</code></pre>
+      <hr>
+      <h2>Tool Scoping</h2>
+      <p><code>IAgentToolsSeed</code> restricts which tools each agent can see. When the <code>AgentRegistry</code> builds an agent from a persona, it filters the global tool set to include only the tools named in that agent&#x27;s seed.</p>
+      <pre><code class="language-csharp">
+// In AgentRegistry.BuildAgentForPersona
+var allTools = _toolsFactory().ToList();
+var tools = _toolSeeds.TryGetValue(persona.Name, out var seed)
+    ? allTools.Where(t =&gt; seed.ToolNames.Contains(t.Name)).ToList()
+    : allTools;
+</code></pre>
+      <p>If no tool seed is registered for an agent, it receives all tools.</p>
+      <p>Benefits of tool scoping:</p>
+      <ul>
+        <li><strong>Focus</strong> -- fewer irrelevant tools means the LLM spends less time reasoning about tools it should not use. A financial analyst does not need to see scheduling tools.</li>
+        <li><strong>Safety</strong> -- limit access to dangerous or sensitive tools. A read-only analyst should not have write tools.</li>
+        <li><strong>Cost</strong> -- fewer tools in the prompt means fewer tokens in tool descriptions, which reduces LLM costs on every turn.</li>
+      </ul>
+      <p>Register a tool seed alongside the persona seed:</p>
+      <pre><code class="language-csharp">
+services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
+    agentName: &quot;financial-analyst&quot;,
+    toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
+</code></pre>
+      <hr>
+      <h2>Choosing a Pattern</h2>
+      <p>Start with Reactive (the default) and add structure only when the task demands it.</p>
+      <pre><code>
+Is it a single-step task?
+  └─ Yes -&gt; Reactive (default tool loop)
+  └─ No
+      ├─ Is the sequence of steps known upfront?
+      │   └─ Yes -&gt; Sequential (persona instructions) or Deliberate (workflow)
+      │   └─ No -&gt; Reactive
+      │
+      ├─ Are there independent sub-tasks?
+      │   └─ Yes -&gt; Parallel (background agents)
+      │
+      ├─ Does it need domain-specific specialists?
+      │   └─ Yes -&gt; Hierarchical (manager delegates to workers)
+      │
+      ├─ Does the output need quality verification?
+      │   └─ Yes -&gt; Reflective (self-review or critic agent)
+      │
+      └─ Would multiple perspectives improve the decision?
+          └─ Yes -&gt; Collaborative (multi-agent debate)
+</code></pre>
+      <p>Patterns compose. A hierarchical system can use parallel fan-out to run workers concurrently. A deliberate workflow can include a reflective step at the end. A collaborative debate can feed into a sequential report-generation pipeline. Start simple and layer patterns as complexity grows.</p>
+    </main>
+  </div>
+</body>
+</html>
