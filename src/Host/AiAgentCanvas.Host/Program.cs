@@ -13,6 +13,7 @@ using AiAgentCanvas.Capabilities.Scheduling;
 using AiAgentCanvas.Capabilities.Skills;
 using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
+using AiAgentCanvas.Capabilities.EventTriggers;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Orchestration;
 using AiAgentCanvas.Storage.Sqlite;
@@ -78,6 +79,7 @@ builder.Services.AddAiAgentCanvasSkillRegistry();
 builder.Services.AddAiAgentCanvasSkillAuthoring();
 builder.Services.AddAiAgentCanvasEpisodicMemory();
 builder.Services.AddAiAgentCanvasAuditLog();
+builder.Services.AddAiAgentCanvasEventTriggers();
 
 builder.Services.AddAiAgentCanvasInterAgentCommunication(
     personaLookupFactory: sp =>
@@ -137,6 +139,7 @@ app.UseAiAgentCanvas();
 app.MapA2AEndpoints();
 app.MapDevUI();
 app.MapNotificationEndpoints();
+app.MapEventTriggerEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
