@@ -66,6 +66,113 @@ The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.js
 | `VectorStore` | `ConnectionString` | string | SQLite connection string for the RAG vector store |
 | `ApplicationInsights` | `ConnectionString` | string | Azure Monitor connection string for telemetry |
 
+### Feature Flags
+
+Every capability in the platform can be individually enabled or disabled via the `Features` section. All flags default to `true`, so existing behavior is preserved when no flags are set. Set a flag to `false` to exclude that capability from the application entirely -- its services, tools, and endpoints will not be registered.
+
+```json
+{
+  "Features": {
+    "SystemTools": true,
+    "Notifications": true,
+    "Scheduling": true,
+    "Skills": true,
+    "Mcp": true,
+    "Personas": true,
+    "Context": true,
+    "Workflows": true,
+    "Entities": true,
+    "UserProfiles": true,
+    "Guardrails": true,
+    "SkillRegistry": true,
+    "SkillAuthoring": true,
+    "EpisodicMemory": true,
+    "AuditLog": true,
+    "EventTriggers": true,
+    "ComputerUse": true,
+    "InterAgentCommunication": true,
+    "Rag": true
+  }
+}
+```
+
+| Flag | Description |
+|------|-------------|
+| `SystemTools` | General-purpose tools available to every agent: shell command execution (with an allow-list), file operations, and system utilities. Governed by the same policy pipeline as custom tools. |
+| `Notifications` | Agent-to-user notification delivery via SSE. Registers the notification store, tool provider, and the `/api/notifications` HTTP endpoints. |
+| `Scheduling` | Cron-based and one-time scheduled agent tasks. Persisted in SQLite and executed by a background service. Enables agents to set reminders, run periodic checks, or defer work. |
+| `Skills` | Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. |
+| `Mcp` | Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools. |
+| `Personas` | Dynamic persona management. Each agent gets an identity, expertise area, tone, and behavioral rules injected into its system prompt. Personas can be created, swapped, or layered at runtime. |
+| `Context` | Persistent domain-specific context (facts, rules, reference material) loaded into the agent's system prompt on every turn. |
+| `Workflows` | Orchestrated multi-step sequences involving tools, decisions, and checkpoints. Supports sequential, concurrent, and declarative (YAML) execution patterns. |
+| `Entities` | Long-term entity memory. Agents remember key entities (people, projects, systems, accounts) across conversations, stored in SQLite and recalled when relevant. |
+| `UserProfiles` | User identity and preferences. The agent knows who it is talking to -- name, role, preferences, and permissions -- and adjusts its responses accordingly. |
+| `Guardrails` | Behavioral boundaries that constrain what the agent will and will not do. Guardrails are injected into the system prompt alongside the persona, enforcing policy at the reasoning level. |
+| `SkillRegistry` | Discovery and listing of all registered skills. Enables agents to browse available skills and invoke them by name. |
+| `SkillAuthoring` | Agents can create and edit skills at runtime through natural language instructions. New skills are persisted and immediately available. |
+| `EpisodicMemory` | Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. |
+| `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
+| `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
+| `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
+| `InterAgentCommunication` | Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents. |
+| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured. |
+
+### Service Modules (Agents and Data Connections)
+
+Agent projects and data-connection projects use the `IServiceModule` interface instead of feature flags. Each module declares a configuration section name and self-registers its services. The host discovers all modules automatically via assembly scanning at startup.
+
+Modules are enabled by default. To disable one, set `Enabled` to `false` in its configuration section:
+
+```json
+{
+  "Agents": {
+    "FinancialAnalyst": {
+      "Enabled": false
+    }
+  },
+  "DataConnections": {
+    "MarketData": {
+      "Enabled": false
+    }
+  }
+}
+```
+
+To create a new module, implement `IServiceModule` in your agent or data-connection project:
+
+```csharp
+public sealed class MyAgentModule : IServiceModule
+{
+    public string SectionName => "Agents:MyAgent";
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        // Register persona seeds, tools, context, etc.
+    }
+}
+```
+
+The host picks it up automatically when the project is referenced -- no changes to `Program.cs` required.
+
+### Provider-Specific Configuration
+
+Provider-specific settings are nested under their provider section. The Databricks Vector Search tool, for example, is configured under `Databricks:VectorSearch` and self-gates based on whether the required settings (workspace URL, token, index name) are present:
+
+```json
+{
+  "Databricks": {
+    "WorkspaceUrl": "https://your-workspace.cloud.databricks.com",
+    "ModelName": "databricks-meta-llama-3-3-70b-instruct",
+    "VectorSearch": {
+      "WorkspaceUrl": "https://your-workspace.cloud.databricks.com",
+      "PersonalAccessToken": "dapi...",
+      "IndexName": "main.default.docs_index"
+    }
+  }
+}
+```
+
 ### Environment-Specific Overrides
 
 ASP.NET Core loads configuration in layers. Place environment-specific values in:

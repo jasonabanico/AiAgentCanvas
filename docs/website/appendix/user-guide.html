@@ -132,6 +132,162 @@
         </tr>
         </tbody>
       </table>
+      <h3>Feature Flags</h3>
+      <p>Every capability in the platform can be individually enabled or disabled via the <code>Features</code> section. All flags default to <code>true</code>, so existing behavior is preserved when no flags are set. Set a flag to <code>false</code> to exclude that capability from the application entirely -- its services, tools, and endpoints will not be registered.</p>
+      <pre><code class="language-json">
+{
+  &quot;Features&quot;: {
+    &quot;SystemTools&quot;: true,
+    &quot;Notifications&quot;: true,
+    &quot;Scheduling&quot;: true,
+    &quot;Skills&quot;: true,
+    &quot;Mcp&quot;: true,
+    &quot;Personas&quot;: true,
+    &quot;Context&quot;: true,
+    &quot;Workflows&quot;: true,
+    &quot;Entities&quot;: true,
+    &quot;UserProfiles&quot;: true,
+    &quot;Guardrails&quot;: true,
+    &quot;SkillRegistry&quot;: true,
+    &quot;SkillAuthoring&quot;: true,
+    &quot;EpisodicMemory&quot;: true,
+    &quot;AuditLog&quot;: true,
+    &quot;EventTriggers&quot;: true,
+    &quot;ComputerUse&quot;: true,
+    &quot;InterAgentCommunication&quot;: true,
+    &quot;Rag&quot;: true
+  }
+}
+</code></pre>
+      <table>
+        <thead><tr>
+          <th>Flag</th>
+          <th>Description</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>SystemTools</code></td>
+          <td>General-purpose tools available to every agent: shell command execution (with an allow-list), file operations, and system utilities. Governed by the same policy pipeline as custom tools.</td>
+        </tr>
+        <tr>
+          <td><code>Notifications</code></td>
+          <td>Agent-to-user notification delivery via SSE. Registers the notification store, tool provider, and the <code>/api/notifications</code> HTTP endpoints.</td>
+        </tr>
+        <tr>
+          <td><code>Scheduling</code></td>
+          <td>Cron-based and one-time scheduled agent tasks. Persisted in SQLite and executed by a background service. Enables agents to set reminders, run periodic checks, or defer work.</td>
+        </tr>
+        <tr>
+          <td><code>Skills</code></td>
+          <td>Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably.</td>
+        </tr>
+        <tr>
+          <td><code>Mcp</code></td>
+          <td>Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools.</td>
+        </tr>
+        <tr>
+          <td><code>Personas</code></td>
+          <td>Dynamic persona management. Each agent gets an identity, expertise area, tone, and behavioral rules injected into its system prompt. Personas can be created, swapped, or layered at runtime.</td>
+        </tr>
+        <tr>
+          <td><code>Context</code></td>
+          <td>Persistent domain-specific context (facts, rules, reference material) loaded into the agent&#x27;s system prompt on every turn.</td>
+        </tr>
+        <tr>
+          <td><code>Workflows</code></td>
+          <td>Orchestrated multi-step sequences involving tools, decisions, and checkpoints. Supports sequential, concurrent, and declarative (YAML) execution patterns.</td>
+        </tr>
+        <tr>
+          <td><code>Entities</code></td>
+          <td>Long-term entity memory. Agents remember key entities (people, projects, systems, accounts) across conversations, stored in SQLite and recalled when relevant.</td>
+        </tr>
+        <tr>
+          <td><code>UserProfiles</code></td>
+          <td>User identity and preferences. The agent knows who it is talking to -- name, role, preferences, and permissions -- and adjusts its responses accordingly.</td>
+        </tr>
+        <tr>
+          <td><code>Guardrails</code></td>
+          <td>Behavioral boundaries that constrain what the agent will and will not do. Guardrails are injected into the system prompt alongside the persona, enforcing policy at the reasoning level.</td>
+        </tr>
+        <tr>
+          <td><code>SkillRegistry</code></td>
+          <td>Discovery and listing of all registered skills. Enables agents to browse available skills and invoke them by name.</td>
+        </tr>
+        <tr>
+          <td><code>SkillAuthoring</code></td>
+          <td>Agents can create and edit skills at runtime through natural language instructions. New skills are persisted and immediately available.</td>
+        </tr>
+        <tr>
+          <td><code>EpisodicMemory</code></td>
+          <td>Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context.</td>
+        </tr>
+        <tr>
+          <td><code>AuditLog</code></td>
+          <td>Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics.</td>
+        </tr>
+        <tr>
+          <td><code>EventTriggers</code></td>
+          <td>Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the <code>/api/triggers</code> HTTP endpoints.</td>
+        </tr>
+        <tr>
+          <td><code>ComputerUse</code></td>
+          <td>Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content.</td>
+        </tr>
+        <tr>
+          <td><code>InterAgentCommunication</code></td>
+          <td>Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents.</td>
+        </tr>
+        <tr>
+          <td><code>Rag</code></td>
+          <td>Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured.</td>
+        </tr>
+        </tbody>
+      </table>
+      <h3>Service Modules (Agents and Data Connections)</h3>
+      <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface instead of feature flags. Each module declares a configuration section name and self-registers its services. The host discovers all modules automatically via assembly scanning at startup.</p>
+      <p>Modules are enabled by default. To disable one, set <code>Enabled</code> to <code>false</code> in its configuration section:</p>
+      <pre><code class="language-json">
+{
+  &quot;Agents&quot;: {
+    &quot;FinancialAnalyst&quot;: {
+      &quot;Enabled&quot;: false
+    }
+  },
+  &quot;DataConnections&quot;: {
+    &quot;MarketData&quot;: {
+      &quot;Enabled&quot;: false
+    }
+  }
+}
+</code></pre>
+      <p>To create a new module, implement <code>IServiceModule</code> in your agent or data-connection project:</p>
+      <pre><code class="language-csharp">
+public sealed class MyAgentModule : IServiceModule
+{
+    public string SectionName =&gt; &quot;Agents:MyAgent&quot;;
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        // Register persona seeds, tools, context, etc.
+    }
+}
+</code></pre>
+      <p>The host picks it up automatically when the project is referenced -- no changes to <code>Program.cs</code> required.</p>
+      <h3>Provider-Specific Configuration</h3>
+      <p>Provider-specific settings are nested under their provider section. The Databricks Vector Search tool, for example, is configured under <code>Databricks:VectorSearch</code> and self-gates based on whether the required settings (workspace URL, token, index name) are present:</p>
+      <pre><code class="language-json">
+{
+  &quot;Databricks&quot;: {
+    &quot;WorkspaceUrl&quot;: &quot;https://your-workspace.cloud.databricks.com&quot;,
+    &quot;ModelName&quot;: &quot;databricks-meta-llama-3-3-70b-instruct&quot;,
+    &quot;VectorSearch&quot;: {
+      &quot;WorkspaceUrl&quot;: &quot;https://your-workspace.cloud.databricks.com&quot;,
+      &quot;PersonalAccessToken&quot;: &quot;dapi...&quot;,
+      &quot;IndexName&quot;: &quot;main.default.docs_index&quot;
+    }
+  }
+}
+</code></pre>
       <h3>Environment-Specific Overrides</h3>
       <p>ASP.NET Core loads configuration in layers. Place environment-specific values in:</p>
       <ul>

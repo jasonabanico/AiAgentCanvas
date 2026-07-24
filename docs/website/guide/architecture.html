@@ -44,7 +44,7 @@
         </tr>
         <tr>
           <td><strong>Agents</strong></td>
-          <td>Custom agent projects. Each registers its persona, tools, and seeds via an extension method. Agent projects reference only Platform.Abstractions.</td>
+          <td>Custom agent projects. Each implements <code>IServiceModule</code> to self-register its persona, tools, and seeds. Agent projects reference only Platform.Abstractions. The host discovers them automatically via assembly scanning.</td>
         </tr>
         <tr>
           <td><strong>Platform</strong></td>
@@ -85,6 +85,14 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.Rag
 │   └── Platform.Abstractions
+├── Capabilities.EpisodicMemory
+│   └── Platform.Abstractions
+├── Capabilities.AuditLog
+│   └── Platform.Abstractions
+├── Capabilities.EventTriggers
+│   └── Platform.Abstractions
+├── Capabilities.ComputerUse
+│   └── Platform.Abstractions
 ├── AgentData.Personas
 │   └── Platform.Abstractions
 ├── AgentData.Context
@@ -104,7 +112,10 @@ Host
 │   └── Platform.Abstractions
 ├── DataConnections.MarketData
 │   └── Platform.Abstractions
-└── Providers.AzureAIFoundry
+├── DataConnections.VectorSearch.Databricks
+│   └── Platform.Abstractions
+├── Providers.AzureAIFoundry
+└── Providers.Databricks
 </code></pre>
       <h2>Projects in Detail</h2>
       <h3>Platform Layer</h3>
@@ -119,7 +130,7 @@ Host
         <tr>
           <td><strong>Platform.Abstractions</strong></td>
           <td>Interfaces and contracts. Every other project references this. No implementations.</td>
-          <td><code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, <code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>, <code>ToolStateMapping</code></td>
+          <td><code>IServiceModule</code>, <code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, <code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>, <code>ToolStateMapping</code></td>
         </tr>
         <tr>
           <td><strong>Platform.Orchestration</strong></td>
@@ -215,6 +226,26 @@ Host
           <td>Vector-based retrieval-augmented generation with citation tracking</td>
           <td><code>RagToolProvider</code>, <code>RagContextProvider</code>, <code>VectorSearchService</code></td>
         </tr>
+        <tr>
+          <td><strong>EpisodicMemory</strong></td>
+          <td>Cross-session memory with relevance decay, search, and context injection</td>
+          <td><code>EpisodicMemoryStore</code>, <code>EpisodicMemoryToolProvider</code>, <code>EpisodicMemoryContextProvider</code>, <code>MemoryDecayService</code></td>
+        </tr>
+        <tr>
+          <td><strong>AuditLog</strong></td>
+          <td>Comprehensive agent activity tracking with sensitive parameter redaction</td>
+          <td><code>AuditLogStore</code>, <code>AuditingChatClient</code>, <code>AuditLogToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>EventTriggers</strong></td>
+          <td>Proactive agent engagement via scheduled, file-watch, and webhook triggers</td>
+          <td><code>TriggerRegistry</code>, <code>EventTriggerService</code>, <code>EventTriggerToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>ComputerUse</strong></td>
+          <td>Browser automation via headless Chromium (Playwright)</td>
+          <td><code>BrowserSession</code>, <code>ComputerUseToolProvider</code></td>
+        </tr>
         </tbody>
       </table>
       <h3>DataConnections and Providers</h3>
@@ -242,6 +273,11 @@ Host
           <td>Stock quotes, price history, and SEC EDGAR company filings</td>
           <td><code>StockQuoteTool</code>, <code>StockHistoryTool</code>, <code>EdgarCompanyFactsTool</code></td>
         </tr>
+        <tr>
+          <td><strong>VectorSearch.Databricks</strong></td>
+          <td>Databricks Vector Search index queries for RAG grounding</td>
+          <td><code>DatabricksVectorSearchToolProvider</code></td>
+        </tr>
         </tbody>
       </table>
       <p><strong>Providers:</strong></p>
@@ -254,6 +290,10 @@ Host
         <tr>
           <td><strong>Providers.AzureAIFoundry</strong></td>
           <td>LLM client configuration for Azure AI Foundry (Azure OpenAI) endpoints</td>
+        </tr>
+        <tr>
+          <td><strong>Providers.Databricks</strong></td>
+          <td>LLM client configuration for Databricks Foundation Model APIs (OpenAI-compatible)</td>
         </tr>
         </tbody>
       </table>
@@ -302,6 +342,28 @@ Frontend                    Host                         LLM
    │&lt;── SSE: state update ──│                            │
    │&lt;── SSE: run complete ──│                            │
 </code></pre>
+      <h2>Feature Flags and Service Modules</h2>
+      <p>The platform uses two mechanisms to control which capabilities are active at runtime.</p>
+      <h3>Feature Flags</h3>
+      <p>Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the <code>Features</code> section of <code>appsettings.json</code>. All flags default to <code>true</code>. When a flag is <code>false</code>, the capability&#x27;s services, tools, and endpoints are not registered. This is evaluated once at startup -- there is no runtime toggle.</p>
+      <pre><code class="language-json">
+{
+  &quot;Features&quot;: {
+    &quot;ComputerUse&quot;: false,
+    &quot;EventTriggers&quot;: false
+  }
+}
+</code></pre>
+      <p>The <code>FeatureFlags</code> class in the Host project binds to this section. <code>Program.cs</code> checks each flag before calling the capability&#x27;s registration method.</p>
+      <h3>Service Modules</h3>
+      <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a <code>ConfigureServices</code> method. The host discovers all implementations via assembly scanning at startup and calls <code>ConfigureServices</code> for each one whose config section does not set <code>Enabled</code> to <code>false</code>.</p>
+      <p>This means adding a new agent project requires no changes to <code>Program.cs</code> -- just implement <code>IServiceModule</code>, reference the project from Host, and it is automatically picked up.</p>
+      <pre><code>
+Agents:FinancialAnalyst:Enabled = true   (default)
+DataConnections:MarketData:Enabled = false  (disabled)
+</code></pre>
+      <h3>Provider-Specific Configuration</h3>
+      <p>Provider-specific settings are nested under their provider section rather than in <code>Features</code>. The Databricks Vector Search tool, for example, lives at <code>Databricks:VectorSearch</code> and self-gates based on whether its required settings are present (no explicit <code>Enabled</code> flag needed).</p>
     </main>
   </div>
 </body>
