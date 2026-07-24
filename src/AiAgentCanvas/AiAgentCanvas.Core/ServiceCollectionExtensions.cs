@@ -3,7 +3,6 @@
 
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Core.Agents;
-using AiAgentCanvas.Core.Configuration;
 using AiAgentCanvas.Core.Endpoints;
 using AiAgentCanvas.Core.Providers;
 using AiAgentCanvas.Core.Services;
@@ -27,10 +26,6 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         Action<AiAgentCanvasOptions>? configure = null)
     {
-        services.Configure<AIFoundryOptions>(configuration.GetSection(AIFoundryOptions.SectionName));
-        services.AddSingleton<AIFoundryClientFactory>();
-        services.AddSingleton<IChatClient>(sp =>
-            new ToolDeduplicatingChatClient(sp.GetRequiredService<AIFoundryClientFactory>().CreateChatClient()));
         services.AddHttpClient();
         services.AddSingleton<IAgentMessaging, InProcessAgentMessaging>();
 
@@ -110,13 +105,6 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddAiAgentCanvasRag(this IServiceCollection services)
     {
-        services.AddEmbeddingGenerator<string, Embedding<float>>(sp =>
-        {
-            var generator = sp.GetRequiredService<AIFoundryClientFactory>().CreateEmbeddingGenerator();
-            return generator ?? throw new InvalidOperationException(
-                "EmbeddingGenerator requires AIFoundry:EmbeddingDeploymentName to be configured in appsettings.json.");
-        });
-
         services.AddSingleton<DocumentChunker>();
         services.AddSingleton<LlmReranker>();
         services.AddSingleton<AIContextProvider>(sp =>

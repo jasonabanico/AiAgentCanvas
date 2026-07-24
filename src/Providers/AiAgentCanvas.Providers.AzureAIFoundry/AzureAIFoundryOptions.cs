@@ -1,6 +1,6 @@
-namespace AiAgentCanvas.Core.Configuration;
+namespace AiAgentCanvas.Providers.AzureAIFoundry;
 
-public sealed class AIFoundryOptions
+public sealed class AzureAIFoundryOptions
 {
     public const string SectionName = "AIFoundry";
 

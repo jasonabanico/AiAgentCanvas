@@ -38,7 +38,7 @@ public static class AgUiEndpoint
             context.Response.StatusCode = 503;
             await context.Response.WriteAsJsonAsync(new
             {
-                error = "AI service is not configured. Update the AIFoundry section in appsettings.json with valid credentials.",
+                error = "AI service is not configured. Check your AI provider configuration in appsettings.json.",
                 details = ex.InnerException?.Message ?? ex.Message
             });
             return;

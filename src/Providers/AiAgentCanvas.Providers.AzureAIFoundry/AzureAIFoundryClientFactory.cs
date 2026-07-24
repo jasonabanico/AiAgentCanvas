@@ -1,4 +1,3 @@
-using AiAgentCanvas.Core.Configuration;
 using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
@@ -7,14 +6,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 
-namespace AiAgentCanvas.Core.Services;
+namespace AiAgentCanvas.Providers.AzureAIFoundry;
 
-public sealed class AIFoundryClientFactory
+public sealed class AzureAIFoundryClientFactory
 {
-    private readonly AIFoundryOptions _options;
-    private readonly ILogger<AIFoundryClientFactory> _logger;
+    private readonly AzureAIFoundryOptions _options;
+    private readonly ILogger<AzureAIFoundryClientFactory> _logger;
 
-    public AIFoundryClientFactory(IOptions<AIFoundryOptions> options, ILogger<AIFoundryClientFactory> logger)
+    public AzureAIFoundryClientFactory(IOptions<AzureAIFoundryOptions> options, ILogger<AzureAIFoundryClientFactory> logger)
     {
         _options = options.Value;
         _logger = logger;

@@ -22,7 +22,7 @@ public sealed class AIHealthCheck : IHostedService, IHealthCheck
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("AI health check: verifying Azure AI endpoint...");
+        _logger.LogInformation("AI health check: verifying AI endpoint...");
 
         try
         {
@@ -39,11 +39,11 @@ public sealed class AIHealthCheck : IHostedService, IHealthCheck
         }
         catch (OperationCanceledException)
         {
-            _logger.LogError("AI health check FAILED: Azure AI endpoint did not respond within 15 seconds. Check AIFoundry:Endpoint and AIFoundry:Key in appsettings.json.");
+            _logger.LogError("AI health check FAILED: AI endpoint did not respond within 15 seconds. Check your AI provider configuration in appsettings.json.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AI health check FAILED: {Message}. Check AIFoundry configuration in appsettings.json.", ex.Message);
+            _logger.LogError(ex, "AI health check FAILED: {Message}. Check your AI provider configuration in appsettings.json.", ex.Message);
         }
     }
 
@@ -74,7 +74,7 @@ public sealed class AIHealthCheck : IHostedService, IHealthCheck
             data["ai_connectivity"] = "fail";
             data["ai_error"] = ex.Message;
             _logger.LogError(ex, "Health: AI connectivity failed");
-            return HealthCheckResult.Unhealthy("Azure AI endpoint is not responding.", ex, data);
+            return HealthCheckResult.Unhealthy("AI endpoint is not responding.", ex, data);
         }
 
         // Check 2: Full agent pipeline (planning middleware, context providers, streaming)
