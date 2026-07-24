@@ -45,7 +45,16 @@ public static class ServiceCollectionExtensions
         {
             var rawChatClient = sp.GetRequiredService<IChatClient>();
             var dedupeLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<ToolDeduplicatingChatClient>();
-            var chatClient = new ToolDeduplicatingChatClient(rawChatClient, dedupeLogger);
+            IChatClient pipeline = new ToolDeduplicatingChatClient(rawChatClient, dedupeLogger);
+
+            var routerOptions = sp.GetService<ModelRouterOptions>();
+            if (routerOptions is not null)
+            {
+                var routerLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<CostAwareModelRouter>();
+                pipeline = new CostAwareModelRouter(pipeline, routerOptions, routerLogger);
+            }
+
+            var chatClient = pipeline;
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
             var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
