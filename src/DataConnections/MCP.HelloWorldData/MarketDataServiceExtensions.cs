@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -24,6 +25,11 @@ public static class MarketDataServiceExtensions
 
         services.AddSingleton<MarketDataToolProvider>();
         services.AddSingleton<IReadOnlyList<AITool>>(sp => sp.GetRequiredService<MarketDataToolProvider>().GetTools());
+
+        services.AddSingleton(new ToolStateMapping("stock_quote", ToolStateBehavior.Snapshot));
+        services.AddSingleton(new ToolStateMapping("stock_history", ToolStateBehavior.Snapshot));
+        services.AddSingleton(new ToolStateMapping("edgar_company_facts", ToolStateBehavior.Snapshot));
+
         return services;
     }
 }

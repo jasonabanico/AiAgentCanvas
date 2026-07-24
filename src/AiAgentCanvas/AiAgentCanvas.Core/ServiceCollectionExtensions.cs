@@ -6,15 +6,21 @@ using AiAgentCanvas.Core.Agents;
 using AiAgentCanvas.Core.Providers;
 using AiAgentCanvas.Core.Services;
 using AiAgentCanvas.Core.Skills;
+using System.Diagnostics;
+using System.Text.Json;
+using AGUI.Abstractions;
+using AGUI.Server;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.VectorData;
 
 namespace AiAgentCanvas.Core;
@@ -95,6 +101,42 @@ public static class ServiceCollectionExtensions
         services.AddHealthChecks().AddCheck<AIHealthCheck>("ai-agent-pipeline");
 
         services.AddAGUIServer();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<SessionIsolationKeyProvider, HttpContextSessionIsolationKeyProvider>();
+        services.AddKeyedSingleton<AgentSessionStore>(options.AgentName,
+            (_, _) => new InMemoryAgentSessionStore());
+
+        services.AddSingleton<IConfigureOptions<AGUIStreamOptions>>(sp =>
+            new ConfigureOptions<AGUIStreamOptions>(streamOpts =>
+            {
+                foreach (var mapping in sp.GetServices<ToolStateMapping>())
+                {
+                    switch (mapping.Behavior)
+                    {
+                        case ToolStateBehavior.Snapshot:
+                            streamOpts.MapResult(mapping.ToolName, ToStateSnapshot);
+                            break;
+                        case ToolStateBehavior.Delta:
+                            streamOpts.MapResult(mapping.ToolName, ToStateDelta);
+                            break;
+                    }
+                }
+
+                streamOpts.MapInterrupt(content =>
+                {
+                    if (content is not InterruptRequestContent interrupt)
+                        return null;
+                    return new AGUIInterrupt
+                    {
+                        Id = interrupt.RequestId,
+                        Reason = interrupt.Reason ?? "Tool requires approval",
+                        Message = interrupt.Message,
+                        ToolCallId = interrupt.ToolCallId,
+                        ResponseSchema = interrupt.ResponseSchema,
+                        Metadata = interrupt.Metadata,
+                    };
+                });
+            }));
 
         services.AddCors(cors =>
         {
@@ -155,6 +197,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<HandoffToolProvider>().GetTools());
 
+        services.AddSingleton(new ToolStateMapping("list_available_agents", ToolStateBehavior.Snapshot));
+
         return services;
     }
 
@@ -173,6 +217,33 @@ public static class ServiceCollectionExtensions
     {
         app.MapA2AHttpJson(agentName, path);
         return app;
+    }
+
+    internal static readonly ActivitySource AguiActivitySource =
+        new(AGUIServerInstrumentation.ActivitySourceName);
+
+    private static IEnumerable<BaseEvent> ToStateSnapshot(FunctionResultContent result)
+    {
+        if (result.Result is not string json || string.IsNullOrEmpty(json))
+            yield break;
+
+        JsonElement element;
+        try { element = JsonSerializer.Deserialize<JsonElement>(json); }
+        catch { yield break; }
+
+        yield return new StateSnapshotEvent { Snapshot = element };
+    }
+
+    private static IEnumerable<BaseEvent> ToStateDelta(FunctionResultContent result)
+    {
+        if (result.Result is not string json || string.IsNullOrEmpty(json))
+            yield break;
+
+        JsonElement element;
+        try { element = JsonSerializer.Deserialize<JsonElement>(json); }
+        catch { yield break; }
+
+        yield return new StateDeltaEvent { Delta = element };
     }
 
     private static async Task WriteHealthResponse(HttpContext context, HealthReport report)

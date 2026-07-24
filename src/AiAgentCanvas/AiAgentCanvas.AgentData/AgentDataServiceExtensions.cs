@@ -105,6 +105,12 @@ public static class AgentDataServiceExtensions
         });
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             sp.GetRequiredService<DeclarativeWorkflowToolProvider>().GetTools());
+
+        services.AddSingleton(new ToolStateMapping("list_workflows", ToolStateBehavior.Snapshot));
+        services.AddSingleton(new ToolStateMapping("run_workflow", ToolStateBehavior.Delta));
+        services.AddSingleton(new ToolStateMapping("run_sequential_workflow", ToolStateBehavior.Delta));
+        services.AddSingleton(new ToolStateMapping("run_concurrent_workflow", ToolStateBehavior.Delta));
+
         return services;
     }
 
