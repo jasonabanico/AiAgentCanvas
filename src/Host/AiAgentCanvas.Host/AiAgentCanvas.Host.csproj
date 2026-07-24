@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Skills\AiAgentCanvas.Capabilities.Skills.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Notifications\AiAgentCanvas.Capabilities.Notifications.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.SystemTools\AiAgentCanvas.Capabilities.SystemTools.csproj" />
+    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.EpisodicMemory\AiAgentCanvas.Capabilities.EpisodicMemory.csproj" />
 
     <!-- AgentData -->
     <ProjectReference Include="..\..\AgentData\AiAgentCanvas.AgentData.Personas\AiAgentCanvas.AgentData.Personas.csproj" />
@@ -37,6 +38,7 @@
 
     <!-- Providers -->
     <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.AzureAIFoundry\AiAgentCanvas.Providers.AzureAIFoundry.csproj" />
+    <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.Databricks\AiAgentCanvas.Providers.Databricks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -11,10 +11,12 @@ using AiAgentCanvas.Capabilities.Notifications;
 using AiAgentCanvas.Capabilities.Rag;
 using AiAgentCanvas.Capabilities.Scheduling;
 using AiAgentCanvas.Capabilities.Skills;
+using AiAgentCanvas.Capabilities.EpisodicMemory;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Orchestration;
 using AiAgentCanvas.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
+using AiAgentCanvas.Providers.Databricks;
 using AiAgentCanvas.Security;
 using Agent.FinancialAnalyst;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
@@ -61,6 +63,7 @@ builder.Services.AddAiAgentCanvasUserProfiles();
 builder.Services.AddAiAgentCanvasGuardrails();
 builder.Services.AddAiAgentCanvasSkillRegistry();
 builder.Services.AddAiAgentCanvasSkillAuthoring();
+builder.Services.AddAiAgentCanvasEpisodicMemory();
 
 builder.Services.AddAiAgentCanvasInterAgentCommunication(
     personaLookupFactory: sp =>
