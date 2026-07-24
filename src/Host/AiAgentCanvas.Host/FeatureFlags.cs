@@ -25,5 +25,4 @@ public sealed class FeatureFlags
     public bool Rag { get; set; } = true;
     public bool MarketData { get; set; } = true;
     public bool FinancialAnalyst { get; set; } = true;
-    public bool DatabricksVectorSearch { get; set; } = true;
 }

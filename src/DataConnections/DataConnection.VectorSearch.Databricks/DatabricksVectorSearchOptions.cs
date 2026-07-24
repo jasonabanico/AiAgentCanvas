@@ -7,7 +7,7 @@ namespace DataConnection.VectorSearch.Databricks;
 /// </summary>
 public sealed class DatabricksVectorSearchOptions
 {
-    public const string SectionName = "DatabricksVectorSearch";
+    public const string SectionName = "Databricks:VectorSearch";
 
     /// <summary>Base workspace URL, e.g. <c>https://dbc-1234abcd-5678.cloud.databricks.com</c>.</summary>
     public string? WorkspaceUrl { get; set; }

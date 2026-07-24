@@ -63,14 +63,11 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 if (features.FinancialAnalyst) builder.Services.AddFinancialAnalystAgent();
 if (features.MarketData) builder.Services.AddMarketDataTools();
 
-if (features.DatabricksVectorSearch)
+var databricksVectorSearch = new DatabricksVectorSearchOptions();
+builder.Configuration.GetSection(DatabricksVectorSearchOptions.SectionName).Bind(databricksVectorSearch);
+if (databricksVectorSearch.IsConfigured)
 {
-    var databricksVectorSearch = new DatabricksVectorSearchOptions();
-    builder.Configuration.GetSection(DatabricksVectorSearchOptions.SectionName).Bind(databricksVectorSearch);
-    if (databricksVectorSearch.IsConfigured)
-    {
-        builder.Services.AddDatabricksVectorSearchTool(builder.Configuration);
-    }
+    builder.Services.AddDatabricksVectorSearchTool(builder.Configuration);
 }
 
 if (features.SystemTools)
