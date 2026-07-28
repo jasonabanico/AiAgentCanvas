@@ -21,10 +21,12 @@ using AiAgentCanvas.Orchestration;
 using AiAgentCanvas.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
+using AiAgentCanvas.Providers.Snowflake;
 using AiAgentCanvas.Security;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using DataConnection.VectorStore.Sqlite;
 using DataConnection.VectorSearch.Databricks;
+using DataConnection.VectorSearch.Snowflake;
 using Microsoft.Agents.AI.DevUI;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +44,10 @@ var llmProvider = builder.Configuration["Provider"] ?? "AzureAIFoundry";
 if (string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddDatabricks(builder.Configuration);
+}
+else if (string.Equals(llmProvider, "Snowflake", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSnowflake(builder.Configuration);
 }
 else
 {
@@ -65,6 +71,13 @@ builder.Configuration.GetSection(DatabricksVectorSearchOptions.SectionName).Bind
 if (databricksVectorSearch.IsConfigured)
 {
     builder.Services.AddDatabricksVectorSearchTool(builder.Configuration);
+}
+
+var snowflakeCortexSearch = new SnowflakeCortexSearchOptions();
+builder.Configuration.GetSection(SnowflakeCortexSearchOptions.SectionName).Bind(snowflakeCortexSearch);
+if (snowflakeCortexSearch.IsConfigured)
+{
+    builder.Services.AddSnowflakeCortexSearchTool(builder.Configuration);
 }
 
 if (features.SystemTools)
@@ -133,9 +146,11 @@ builder.Services.AddSqliteChatHistory();
 
 if (features.Rag)
 {
+    // Snowflake Cortex embeddings are not confirmed OpenAI-/embeddings-compatible, so RAG
+    // embeddings are wired only for Databricks and Azure AI Foundry (explicit provider match).
     var databricksEmbeddings = string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase)
         && !string.IsNullOrEmpty(builder.Configuration["Databricks:EmbeddingModelName"]);
-    var azureEmbeddings = !string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase)
+    var azureEmbeddings = string.Equals(llmProvider, "AzureAIFoundry", StringComparison.OrdinalIgnoreCase)
         && !string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentName"]);
 
     if (databricksEmbeddings)
