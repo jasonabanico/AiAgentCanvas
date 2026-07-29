@@ -2,6 +2,7 @@ using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Orchestration.Skills;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Capabilities.Skills;
 
@@ -37,9 +38,19 @@ public static class SkillsServiceExtensions
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
         {
             var manager = sp.GetRequiredService<McpConnectionManager>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                .CreateLogger("McpStartup");
             foreach (var seed in sp.GetServices<IMcpConnectionSeed>())
             {
-                _ = manager.ConnectAsync(seed.Name, seed.Endpoint, seed.Transport, CancellationToken.None);
+                try
+                {
+                    manager.ConnectAsync(seed, CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to connect to MCP server {Name} at {Endpoint} during startup",
+                        seed.Name, seed.Endpoint);
+                }
             }
             return manager.GetTools();
         });
