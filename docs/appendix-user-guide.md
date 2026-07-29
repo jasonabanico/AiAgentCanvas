@@ -73,50 +73,50 @@ Every capability in the platform can be individually enabled or disabled via the
 ```json
 {
   "Features": {
+    "Personas": true,
+    "Context": true,
+    "Guardrails": true,
+    "UserProfiles": true,
+    "Entities": true,
+    "Skills": true,
+    "SkillRegistry": true,
+    "SkillAuthoring": true,
+    "Workflows": true,
+    "Mcp": true,
     "SystemTools": true,
     "Notifications": true,
     "Scheduling": true,
-    "Skills": true,
-    "Mcp": true,
-    "Personas": true,
-    "Context": true,
-    "Workflows": true,
-    "Entities": true,
-    "UserProfiles": true,
-    "Guardrails": true,
-    "SkillRegistry": true,
-    "SkillAuthoring": true,
+    "Rag": true,
+    "InterAgentCommunication": true,
     "EpisodicMemory": true,
     "AuditLog": true,
     "EventTriggers": true,
-    "ComputerUse": true,
-    "InterAgentCommunication": true,
-    "Rag": true
+    "ComputerUse": true
   }
 }
 ```
 
 | Flag | Description |
 |------|-------------|
+| `Personas` | Dynamic persona management. Each agent gets an identity, expertise area, tone, and behavioral rules injected into its system prompt. Personas can be created, swapped, or layered at runtime. |
+| `Context` | Persistent domain-specific context (facts, rules, reference material) loaded into the agent's system prompt on every turn. |
+| `Guardrails` | Behavioral boundaries that constrain what the agent will and will not do. Guardrails are injected into the system prompt alongside the persona, enforcing policy at the reasoning level. |
+| `UserProfiles` | User identity and preferences. The agent knows who it is talking to -- name, role, preferences, and permissions -- and adjusts its responses accordingly. |
+| `Entities` | Long-term entity memory. Agents remember key entities (people, projects, systems, accounts) across conversations, stored in SQLite and recalled when relevant. |
+| `Skills` | Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. |
+| `SkillRegistry` | Discovery and listing of all registered skills. Enables agents to browse available skills and invoke them by name. |
+| `SkillAuthoring` | Agents can create and edit skills at runtime through natural language instructions. New skills are persisted and immediately available. |
+| `Workflows` | Orchestrated multi-step sequences involving tools, decisions, and checkpoints. Supports sequential, concurrent, and declarative (YAML) execution patterns. |
+| `Mcp` | Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools. |
 | `SystemTools` | General-purpose tools available to every agent: shell command execution (with an allow-list), file operations, and system utilities. Governed by the same policy pipeline as custom tools. |
 | `Notifications` | Agent-to-user notification delivery via SSE. Registers the notification store, tool provider, and the `/api/notifications` HTTP endpoints. |
 | `Scheduling` | Cron-based and one-time scheduled agent tasks. Persisted in SQLite and executed by a background service. Enables agents to set reminders, run periodic checks, or defer work. |
-| `Skills` | Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. |
-| `Mcp` | Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools. |
-| `Personas` | Dynamic persona management. Each agent gets an identity, expertise area, tone, and behavioral rules injected into its system prompt. Personas can be created, swapped, or layered at runtime. |
-| `Context` | Persistent domain-specific context (facts, rules, reference material) loaded into the agent's system prompt on every turn. |
-| `Workflows` | Orchestrated multi-step sequences involving tools, decisions, and checkpoints. Supports sequential, concurrent, and declarative (YAML) execution patterns. |
-| `Entities` | Long-term entity memory. Agents remember key entities (people, projects, systems, accounts) across conversations, stored in SQLite and recalled when relevant. |
-| `UserProfiles` | User identity and preferences. The agent knows who it is talking to -- name, role, preferences, and permissions -- and adjusts its responses accordingly. |
-| `Guardrails` | Behavioral boundaries that constrain what the agent will and will not do. Guardrails are injected into the system prompt alongside the persona, enforcing policy at the reasoning level. |
-| `SkillRegistry` | Discovery and listing of all registered skills. Enables agents to browse available skills and invoke them by name. |
-| `SkillAuthoring` | Agents can create and edit skills at runtime through natural language instructions. New skills are persisted and immediately available. |
+| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured. |
+| `InterAgentCommunication` | Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents. |
 | `EpisodicMemory` | Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. |
 | `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
 | `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
 | `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
-| `InterAgentCommunication` | Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents. |
-| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured. |
 
 ### Service Modules (Agents and Data Connections)
 

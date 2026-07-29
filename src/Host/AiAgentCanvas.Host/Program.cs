@@ -80,6 +80,18 @@ if (snowflakeCortexSearch.IsConfigured)
     builder.Services.AddSnowflakeCortexSearchTool(builder.Configuration);
 }
 
+if (features.Personas) builder.Services.AddAiAgentCanvasPersonas();
+if (features.Context) builder.Services.AddAiAgentCanvasContext();
+if (features.Guardrails) builder.Services.AddAiAgentCanvasGuardrails();
+if (features.UserProfiles) builder.Services.AddAiAgentCanvasUserProfiles();
+if (features.Entities) builder.Services.AddAiAgentCanvasEntities();
+
+if (features.Skills) builder.Services.AddAiAgentCanvasSkills();
+if (features.SkillRegistry) builder.Services.AddAiAgentCanvasSkillRegistry();
+if (features.SkillAuthoring) builder.Services.AddAiAgentCanvasSkillAuthoring();
+if (features.Workflows) builder.Services.AddAiAgentCanvasWorkflows();
+if (features.Mcp) builder.Services.AddAiAgentCanvasMcp();
+
 if (features.SystemTools)
 {
     builder.Services.AddAiAgentCanvasSystemTools(options =>
@@ -95,51 +107,6 @@ if (features.Scheduling)
 {
     builder.Services.AddSqliteScheduledTaskStore();
     builder.Services.AddAiAgentCanvasScheduler();
-}
-
-if (features.Skills) builder.Services.AddAiAgentCanvasSkills();
-if (features.Mcp) builder.Services.AddAiAgentCanvasMcp();
-if (features.Personas) builder.Services.AddAiAgentCanvasPersonas();
-if (features.Context) builder.Services.AddAiAgentCanvasContext();
-if (features.Workflows) builder.Services.AddAiAgentCanvasWorkflows();
-if (features.Entities) builder.Services.AddAiAgentCanvasEntities();
-if (features.UserProfiles) builder.Services.AddAiAgentCanvasUserProfiles();
-if (features.Guardrails) builder.Services.AddAiAgentCanvasGuardrails();
-if (features.SkillRegistry) builder.Services.AddAiAgentCanvasSkillRegistry();
-if (features.SkillAuthoring) builder.Services.AddAiAgentCanvasSkillAuthoring();
-if (features.EpisodicMemory) builder.Services.AddAiAgentCanvasEpisodicMemory();
-if (features.AuditLog) builder.Services.AddAiAgentCanvasAuditLog();
-if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers();
-if (features.ComputerUse) builder.Services.AddAiAgentCanvasComputerUse();
-
-if (features.InterAgentCommunication)
-{
-    builder.Services.AddAiAgentCanvasInterAgentCommunication(
-        personaLookupFactory: sp =>
-        {
-            var store = sp.GetRequiredService<PersonaStore>();
-            return name =>
-            {
-                var p = store.GetPersona(name);
-                return p is null ? null : new AgentPersonaInfo
-                {
-                    Name = p.Name,
-                    Description = p.Description,
-                    Instructions = p.Instructions,
-                };
-            };
-        },
-        personaListAllFactory: sp =>
-        {
-            var store = sp.GetRequiredService<PersonaStore>();
-            return () => store.ListPersonas().Select(p => new AgentPersonaInfo
-            {
-                Name = p.Name,
-                Description = p.Description,
-                Instructions = p.Instructions,
-            });
-        },
-        agentName: "AiAgentCanvas");
 }
 
 builder.Services.AddSqliteChatHistory();
@@ -166,6 +133,46 @@ if (features.Rag)
         builder.Services.AddAiAgentCanvasRag();
     }
 }
+
+if (features.InterAgentCommunication)
+{
+    builder.Services.AddAiAgentCanvasInterAgentCommunication(
+        personaLookupFactory: sp =>
+        {
+            var store = sp.GetService<PersonaStore>();
+            return name =>
+            {
+                if (store is null) return null;
+                var p = store.GetPersona(name);
+                return p is null ? null : new AgentPersonaInfo
+                {
+                    Name = p.Name,
+                    Description = p.Description,
+                    Instructions = p.Instructions,
+                };
+            };
+        },
+        personaListAllFactory: sp =>
+        {
+            var store = sp.GetService<PersonaStore>();
+            return () =>
+            {
+                if (store is null) return Enumerable.Empty<AgentPersonaInfo>();
+                return store.ListPersonas().Select(p => new AgentPersonaInfo
+                {
+                    Name = p.Name,
+                    Description = p.Description,
+                    Instructions = p.Instructions,
+                });
+            };
+        },
+        agentName: "AiAgentCanvas");
+}
+
+if (features.EpisodicMemory) builder.Services.AddAiAgentCanvasEpisodicMemory();
+if (features.AuditLog) builder.Services.AddAiAgentCanvasAuditLog();
+if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers();
+if (features.ComputerUse) builder.Services.AddAiAgentCanvasComputerUse();
 
 var app = builder.Build();
 
