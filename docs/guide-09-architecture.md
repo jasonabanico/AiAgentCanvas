@@ -61,6 +61,8 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.ComputerUse
 │   └── Platform.Abstractions
+├── Capabilities.Evaluation
+│   └── Platform.Abstractions
 ├── AgentData.Personas
 │   └── Platform.Abstractions
 ├── AgentData.Context
@@ -130,6 +132,7 @@ Cross-cutting features that agents use but that are not specific to any single d
 | **AuditLog** | Comprehensive agent activity tracking with sensitive parameter redaction | `AuditLogStore`, `AuditingChatClient`, `AuditLogToolProvider` |
 | **EventTriggers** | Proactive agent engagement via scheduled, file-watch, and webhook triggers | `TriggerRegistry`, `EventTriggerService`, `EventTriggerToolProvider` |
 | **ComputerUse** | Browser automation via headless Chromium (Playwright) | `BrowserSession`, `ComputerUseToolProvider` |
+| **Evaluation** | LLM-as-judge scoring of agent responses against stored eval cases | `EvaluationStore`, `EvaluationRunner`, `EvaluationToolProvider` |
 
 ### DataConnections and Providers
 

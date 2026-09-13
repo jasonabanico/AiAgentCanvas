@@ -91,7 +91,8 @@ Every capability in the platform can be individually enabled via the `Features` 
     "EpisodicMemory": false,
     "AuditLog": false,
     "EventTriggers": false,
-    "ComputerUse": false
+    "ComputerUse": false,
+    "Evaluation": false
   }
 }
 ```
@@ -117,6 +118,7 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
 | `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
 | `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
+| `Evaluation` | Eval cases (a test input plus grading criteria) and results are stored in SQLite. Running a case sends the input to the raw, unwrapped chat client and grades the response with an LLM-as-judge pass -- evaluation never depends on the tool pipeline it's measuring. Agents can add cases, run a single case or a whole category, and pull pass-rate statistics. |
 
 ### Service Modules (Agents and Data Connections)
 

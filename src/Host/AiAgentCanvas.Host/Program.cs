@@ -15,6 +15,7 @@ using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
 using AiAgentCanvas.Capabilities.ComputerUse;
 using AiAgentCanvas.Capabilities.EventTriggers;
+using AiAgentCanvas.Capabilities.Evaluation;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Host;
 using AiAgentCanvas.Orchestration;
@@ -173,6 +174,7 @@ if (features.EpisodicMemory) builder.Services.AddAiAgentCanvasEpisodicMemory();
 if (features.AuditLog) builder.Services.AddAiAgentCanvasAuditLog();
 if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers();
 if (features.ComputerUse) builder.Services.AddAiAgentCanvasComputerUse();
+if (features.Evaluation) builder.Services.AddAiAgentCanvasEvaluation();
 
 var app = builder.Build();
 

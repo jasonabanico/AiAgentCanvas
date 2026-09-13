@@ -92,6 +92,10 @@
           <td>Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements, type text, take screenshots, and extract page content, enabling web-based research and UI testing tasks.</td>
         </tr>
         <tr>
+          <td><strong>Evaluation</strong></td>
+          <td>Eval cases (a test input plus grading criteria) are stored in SQLite. Running a case sends the input to the raw chat client, independent of the tool pipeline, and grades the response with an LLM-as-judge pass, producing a score, pass/fail, and rationale. Agents can add cases, run a single case or a whole category as a regression suite, and pull pass-rate statistics over time.</td>
+        </tr>
+        <tr>
           <td><strong>Cost-aware model routing</strong></td>
           <td>A delegating chat client that scores request complexity and routes simple requests to an economy model while sending complex requests to the primary model. Reduces cost without sacrificing quality on hard tasks.</td>
         </tr>

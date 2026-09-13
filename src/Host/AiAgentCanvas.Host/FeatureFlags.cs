@@ -30,4 +30,5 @@ public sealed class FeatureFlags
     public bool AuditLog { get; set; } = false;
     public bool EventTriggers { get; set; } = false;
     public bool ComputerUse { get; set; } = false;
+    public bool Evaluation { get; set; } = false;
 }

@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.AuditLog\AiAgentCanvas.Capabilities.AuditLog.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.EventTriggers\AiAgentCanvas.Capabilities.EventTriggers.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.ComputerUse\AiAgentCanvas.Capabilities.ComputerUse.csproj" />
+    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Evaluation\AiAgentCanvas.Capabilities.Evaluation.csproj" />
 
     <!-- AgentData -->
     <ProjectReference Include="..\..\AgentData\AiAgentCanvas.AgentData.Personas\AiAgentCanvas.AgentData.Personas.csproj" />

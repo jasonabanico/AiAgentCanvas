@@ -91,6 +91,8 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.ComputerUse
 │   └── Platform.Abstractions
+├── Capabilities.Evaluation
+│   └── Platform.Abstractions
 ├── AgentData.Personas
 │   └── Platform.Abstractions
 ├── AgentData.Context
@@ -247,6 +249,11 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
           <td><strong>ComputerUse</strong></td>
           <td>Browser automation via headless Chromium (Playwright)</td>
           <td><code>BrowserSession</code>, <code>ComputerUseToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>Evaluation</strong></td>
+          <td>LLM-as-judge scoring of agent responses against stored eval cases</td>
+          <td><code>EvaluationStore</code>, <code>EvaluationRunner</code>, <code>EvaluationToolProvider</code></td>
         </tr>
         </tbody>
       </table>

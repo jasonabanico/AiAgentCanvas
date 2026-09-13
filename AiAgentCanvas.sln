@@ -67,6 +67,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Capabilities.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Capabilities.ComputerUse", "src\Capabilities\AiAgentCanvas.Capabilities.ComputerUse\AiAgentCanvas.Capabilities.ComputerUse.csproj", "{BD6D567E-54E5-4774-861B-232E7D870844}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Capabilities.Evaluation", "src\Capabilities\AiAgentCanvas.Capabilities.Evaluation\AiAgentCanvas.Capabilities.Evaluation.csproj", "{5B2839A5-048A-4B22-944D-536AB2E10986}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataConnection.VectorSearch.Databricks", "src\DataConnections\DataConnection.VectorSearch.Databricks\DataConnection.VectorSearch.Databricks.csproj", "{AC25365F-AE91-4A3A-9ECF-E127D25D5CA0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Providers.Snowflake", "src\Providers\AiAgentCanvas.Providers.Snowflake\AiAgentCanvas.Providers.Snowflake.csproj", "{87428692-5AEA-4BDC-B3D0-2629A248C345}"
@@ -419,6 +421,18 @@ Global
 		{63A7AFCE-9C4A-496B-8C9C-109FF7D12A82}.Release|x64.Build.0 = Release|Any CPU
 		{63A7AFCE-9C4A-496B-8C9C-109FF7D12A82}.Release|x86.ActiveCfg = Release|Any CPU
 		{63A7AFCE-9C4A-496B-8C9C-109FF7D12A82}.Release|x86.Build.0 = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|x64.Build.0 = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Debug|x86.Build.0 = Debug|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|x64.ActiveCfg = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|x64.Build.0 = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|x86.ActiveCfg = Release|Any CPU
+		{5B2839A5-048A-4B22-944D-536AB2E10986}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -452,5 +466,6 @@ Global
 		{AC25365F-AE91-4A3A-9ECF-E127D25D5CA0} = {E969D773-6BAD-8681-88E6-12871378D0A0}
 		{87428692-5AEA-4BDC-B3D0-2629A248C345} = {D9007A03-FD03-1159-6598-E081D0A1BEBA}
 		{63A7AFCE-9C4A-496B-8C9C-109FF7D12A82} = {E969D773-6BAD-8681-88E6-12871378D0A0}
+		{5B2839A5-048A-4B22-944D-536AB2E10986} = {8B68D284-3DE8-39D0-91FE-C345E8B9C4E9}
 	EndGlobalSection
 EndGlobal

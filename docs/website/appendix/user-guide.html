@@ -155,7 +155,8 @@
     &quot;EpisodicMemory&quot;: false,
     &quot;AuditLog&quot;: false,
     &quot;EventTriggers&quot;: false,
-    &quot;ComputerUse&quot;: false
+    &quot;ComputerUse&quot;: false,
+    &quot;Evaluation&quot;: false
   }
 }
 </code></pre>
@@ -240,6 +241,10 @@
         <tr>
           <td><code>ComputerUse</code></td>
           <td>Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content.</td>
+        </tr>
+        <tr>
+          <td><code>Evaluation</code></td>
+          <td>Eval cases (a test input plus grading criteria) and results are stored in SQLite. Running a case sends the input to the raw, unwrapped chat client and grades the response with an LLM-as-judge pass -- evaluation never depends on the tool pipeline it&#x27;s measuring. Agents can add cases, run a single case or a whole category, and pull pass-rate statistics.</td>
         </tr>
         </tbody>
       </table>
