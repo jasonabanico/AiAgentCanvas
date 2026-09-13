@@ -68,30 +68,30 @@ The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.js
 
 ### Feature Flags
 
-Every capability in the platform can be individually enabled or disabled via the `Features` section. All flags default to `true`, so existing behavior is preserved when no flags are set. Set a flag to `false` to exclude that capability from the application entirely -- its services, tools, and endpoints will not be registered.
+Every capability in the platform can be individually enabled via the `Features` section. All flags default to `false` -- the platform is opt-in, so a fresh deployment registers nothing beyond the LLM provider and security until you turn a capability on. Set a flag to `true` to register that capability's services, tools, and endpoints.
 
 ```json
 {
   "Features": {
-    "Personas": true,
-    "Context": true,
-    "Guardrails": true,
-    "UserProfiles": true,
-    "Entities": true,
-    "Skills": true,
-    "SkillRegistry": true,
-    "SkillAuthoring": true,
-    "Workflows": true,
-    "Mcp": true,
-    "SystemTools": true,
-    "Notifications": true,
-    "Scheduling": true,
-    "Rag": true,
-    "InterAgentCommunication": true,
-    "EpisodicMemory": true,
-    "AuditLog": true,
-    "EventTriggers": true,
-    "ComputerUse": true
+    "Personas": false,
+    "Context": false,
+    "Guardrails": false,
+    "UserProfiles": false,
+    "Entities": false,
+    "Skills": false,
+    "SkillRegistry": false,
+    "SkillAuthoring": false,
+    "Workflows": false,
+    "Mcp": false,
+    "SystemTools": false,
+    "Notifications": false,
+    "Scheduling": false,
+    "Rag": false,
+    "InterAgentCommunication": false,
+    "EpisodicMemory": false,
+    "AuditLog": false,
+    "EventTriggers": false,
+    "ComputerUse": false
   }
 }
 ```
@@ -120,20 +120,20 @@ Every capability in the platform can be individually enabled or disabled via the
 
 ### Service Modules (Agents and Data Connections)
 
-Agent projects and data-connection projects use the `IServiceModule` interface instead of feature flags. Each module declares a configuration section name and self-registers its services. The host discovers all modules automatically via assembly scanning at startup.
+Agent projects and data-connection projects use the `IServiceModule` interface instead of feature flags. Each module declares a configuration section name and self-registers its services. Host does not reference these projects at compile time at all: they're loaded at runtime from a `plugins/` folder next to the Host executable, one subfolder per plugin, via `System.Runtime.Loader.AssemblyLoadContext`. `ServiceModuleExtensions.AddServiceModules` scans that folder, loads each plugin into its own isolated `PluginLoadContext`, and reflects over its types for `IServiceModule` implementations.
 
-Modules are enabled by default. To disable one, set `Enabled` to `false` in its configuration section:
+Modules are opt-in, like feature flags: a module with no configuration section, or with `Enabled` absent, stays disabled. Set `Enabled` to `true` in its configuration section to register it:
 
 ```json
 {
   "Agents": {
     "FinancialAnalyst": {
-      "Enabled": false
+      "Enabled": true
     }
   },
   "DataConnections": {
     "MarketData": {
-      "Enabled": false
+      "Enabled": true
     }
   }
 }
@@ -153,7 +153,9 @@ public sealed class MyAgentModule : IServiceModule
 }
 ```
 
-The host picks it up automatically when the project is referenced -- no changes to `Program.cs` required.
+Then wire up the project so its build output lands where the host will look for it: add `<GenerateDependencyFile>true</GenerateDependencyFile>` to its `.csproj`, plus a post-build target that copies the output into `$(HostPluginsDir)$(MSBuildProjectName)\` (copy the target verbatim from an existing plugin project, e.g. `Agent.FinancialAnalyst.csproj`). No `ProjectReference` from Host, no `Program.cs` edit, no line in Host's project file at all. The project only needs to be part of the solution so a normal build produces its output; Host finds it by folder, not by name.
+
+Under the hood, `PluginLoadContext` resolves each plugin's own private dependencies from its folder via `AssemblyDependencyResolver`, but defers to whatever the host has already loaded for shared assemblies, above all `AiAgentCanvas.Abstractions`. Skipping that fallback would give the plugin's copy of `IServiceModule` a different runtime identity than the host's, and the type check that finds modules would silently fail.
 
 ### Provider-Specific Configuration
 

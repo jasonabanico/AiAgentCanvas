@@ -6,34 +6,59 @@ namespace AiAgentCanvas.Host;
 public static class ServiceModuleExtensions
 {
     /// <summary>
-    /// Discovers all <see cref="IServiceModule"/> implementations in referenced assemblies
-    /// and calls <see cref="IServiceModule.ConfigureServices"/> for each one whose config
-    /// section does not set <c>Enabled</c> to <c>false</c>.
+    /// Loads every plugin under <paramref name="pluginsDirectory"/> (one subfolder
+    /// per plugin, holding that plugin's build output) into its own
+    /// <see cref="PluginLoadContext"/>, discovers <see cref="IServiceModule"/>
+    /// implementations in each one via reflection, and calls
+    /// <see cref="IServiceModule.ConfigureServices"/> for each module whose config
+    /// section explicitly sets <c>Enabled</c> to <c>true</c>. Modules are opt-in: a
+    /// module with no config section, or with <c>Enabled</c> absent, stays disabled.
     /// </summary>
+    /// <remarks>
+    /// The Host project never references a plugin assembly directly -- plugins are
+    /// discovered purely by folder layout and the shared <see cref="IServiceModule"/>
+    /// contract in Abstractions. Dropping a new plugin folder in place, or removing
+    /// one, changes what the host loads with no code or project-reference change.
+    /// </remarks>
     public static IServiceCollection AddServiceModules(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        string pluginsDirectory = "plugins")
     {
-        var moduleTypes = AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a =>
-            {
-                try { return a.GetTypes(); }
-                catch (ReflectionTypeLoadException e) { return e.Types.OfType<Type>(); }
-            })
-            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IServiceModule).IsAssignableFrom(t));
+        var root = Path.Combine(AppContext.BaseDirectory, pluginsDirectory);
+        if (!Directory.Exists(root)) return services;
 
-        foreach (var type in moduleTypes)
+        foreach (var pluginDir in Directory.GetDirectories(root))
         {
-            if (Activator.CreateInstance(type) is not IServiceModule module) continue;
+            var pluginName = Path.GetFileName(pluginDir);
+            var assemblyPath = Path.Combine(pluginDir, pluginName + ".dll");
+            if (!File.Exists(assemblyPath)) continue;
 
-            var section = configuration.GetSection(module.SectionName);
-            var enabled = section.GetValue("Enabled", true);
+            var loadContext = new PluginLoadContext(assemblyPath);
+            var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
 
-            if (!enabled) continue;
+            var moduleTypes = GetLoadableTypes(assembly)
+                .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IServiceModule).IsAssignableFrom(t));
 
-            module.ConfigureServices(services, configuration);
+            foreach (var type in moduleTypes)
+            {
+                if (Activator.CreateInstance(type) is not IServiceModule module) continue;
+
+                var section = configuration.GetSection(module.SectionName);
+                var enabled = section.GetValue("Enabled", false);
+
+                if (!enabled) continue;
+
+                module.ConfigureServices(services, configuration);
+            }
         }
 
         return services;
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try { return assembly.GetTypes(); }
+        catch (ReflectionTypeLoadException e) { return e.Types.OfType<Type>(); }
     }
 }

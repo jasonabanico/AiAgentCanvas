@@ -190,16 +190,19 @@ services.AddSingleton&lt;IContextSeed&gt;(new ContextSeed(
       </table>
       <p>You can register multiple seeds of each type. Each one becomes a markdown file in the agent&#x27;s data directory.</p>
       <h3>5. DI Registration</h3>
-      <p>All seeds and tool registrations go into a single extension method. This is the agent&#x27;s entire public API -- one method that wires everything into the service collection.</p>
+      <p>All seeds and tool registrations go into a single <code>IServiceModule</code> implementation. This is the agent&#x27;s entire public API -- one class that wires everything into the service collection.</p>
       <pre><code class="language-csharp">
 using AiAgentCanvas.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agent.FinancialAnalyst;
 
-public static class FinancialAnalystServiceExtensions
+public sealed class FinancialAnalystModule : IServiceModule
 {
-    public static IServiceCollection AddFinancialAnalystAgent(this IServiceCollection services)
+    public string SectionName =&gt; &quot;Agents:FinancialAnalyst&quot;;
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
         // Persona
         services.AddSingleton&lt;IPersonaSeed&gt;(new PersonaSeed(
@@ -219,18 +222,30 @@ public static class FinancialAnalystServiceExtensions
         services.AddSingleton&lt;IAgentToolsSeed&gt;(new AgentToolsSeed(
             agentName: &quot;financial-analyst&quot;,
             toolNames: [&quot;stock_quote&quot;, &quot;stock_history&quot;, &quot;edgar_company_facts&quot;]));
-
-        return services;
     }
 }
 </code></pre>
-      <p>The agent project only needs two dependencies: <code>AiAgentCanvas.Abstractions</code> (for the seed interfaces) and <code>Microsoft.Extensions.DependencyInjection.Abstractions</code> (for <code>IServiceCollection</code>). No AI framework references needed -- the agent does not own tools or the LLM client.</p>
+      <p><code>SectionName</code> points at <code>Agents:FinancialAnalyst</code>, the configuration section that turns this module on. If <code>Enabled</code> there is not <code>true</code>, the module never runs.</p>
+      <p>The agent project only needs two dependencies: <code>AiAgentCanvas.Abstractions</code> (for the seed interfaces and <code>IServiceModule</code>) and <code>Microsoft.Extensions.DependencyInjection.Abstractions</code> (for <code>IServiceCollection</code>). No AI framework references needed -- the agent does not own tools or the LLM client.</p>
       <h3>6. Composition Root</h3>
-      <p>One line in <code>Program.cs</code> activates the agent:</p>
-      <pre><code class="language-csharp">
-builder.Services.AddFinancialAnalystAgent();
+      <p>There is no line in <code>Program.cs</code> to write, and no <code>ProjectReference</code> from Host to add. Host never names this project at all. Instead, the agent project&#x27;s build output is copied into a <code>plugins/Agent.FinancialAnalyst/</code> folder next to the Host executable (a post-build target in the <code>.csproj</code> does this), and at startup <code>ServiceModuleExtensions.AddServiceModules</code> loads every plugin folder it finds through its own <code>AssemblyLoadContext</code>, discovers the <code>IServiceModule</code> implementation by reflection, and calls <code>ConfigureServices</code> if the config section opts in.</p>
+      <p>The two things a new agent project needs, beyond implementing <code>IServiceModule</code>, are:</p>
+      <pre><code class="language-xml">
+&lt;PropertyGroup&gt;
+  &lt;GenerateDependencyFile&gt;true&lt;/GenerateDependencyFile&gt;
+&lt;/PropertyGroup&gt;
+
+&lt;Target Name=&quot;CopyToHostPluginsFolder&quot; AfterTargets=&quot;Build&quot;&gt;
+  &lt;ItemGroup&gt;
+    &lt;PluginOutputFiles Include=&quot;$(TargetDir)**\*.*&quot; /&gt;
+  &lt;/ItemGroup&gt;
+  &lt;Copy SourceFiles=&quot;@(PluginOutputFiles)&quot;
+        DestinationFolder=&quot;$(HostPluginsDir)$(MSBuildProjectName)\%(RecursiveDir)&quot;
+        SkipUnchangedFiles=&quot;true&quot; /&gt;
+&lt;/Target&gt;
 </code></pre>
-      <p>That&#x27;s it. The platform resolves all <code>IPersonaSeed</code>, <code>IContextSeed</code>, and other seed services at startup, persists them to disk, and makes them available to the runtime agent.</p>
+      <p><code>GenerateDependencyFile</code> gives the host&#x27;s plugin loader a <code>.deps.json</code> manifest to resolve the agent&#x27;s own dependencies; the post-build target is what actually places the output where the host looks. <code>$(HostPluginsDir)</code> is defined once in the repo&#x27;s <code>Directory.Build.props</code>.</p>
+      <p>The platform resolves all <code>IPersonaSeed</code>, <code>IContextSeed</code>, and other seed services once the module runs, persists them to disk, and makes them available to the runtime agent.</p>
       <h2>What the Platform Provides</h2>
       <p>Everything outside those six pieces is handled by the platform:</p>
       <ul>

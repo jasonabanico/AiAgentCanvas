@@ -31,11 +31,7 @@
     <ProjectReference Include="..\..\AgentData\AiAgentCanvas.AgentData.Profiles\AiAgentCanvas.AgentData.Profiles.csproj" />
     <ProjectReference Include="..\..\AgentData\AiAgentCanvas.AgentData.Workflows\AiAgentCanvas.AgentData.Workflows.csproj" />
 
-    <!-- Agents -->
-    <ProjectReference Include="..\..\Agents\Agent.FinancialAnalyst\Agent.FinancialAnalyst.csproj" />
-
     <!-- DataConnections -->
-    <ProjectReference Include="..\..\DataConnections\DataConnection.MarketData\DataConnection.MarketData.csproj" />
     <ProjectReference Include="..\..\DataConnections\AiAgentCanvas.Storage.Sqlite\AiAgentCanvas.Storage.Sqlite.csproj" />
     <ProjectReference Include="..\..\DataConnections\DataConnection.VectorStore.Sqlite\DataConnection.VectorStore.Sqlite.csproj" />
     <ProjectReference Include="..\..\DataConnections\DataConnection.VectorSearch.Databricks\DataConnection.VectorSearch.Databricks.csproj" />

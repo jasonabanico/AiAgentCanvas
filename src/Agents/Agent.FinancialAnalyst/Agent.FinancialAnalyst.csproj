@@ -4,6 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Needed so AssemblyDependencyResolver (in the Host's PluginLoadContext)
+         can resolve this plugin's private dependencies at load time. -->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,5 +16,20 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
   </ItemGroup>
+
+  <!--
+    Not referenced by the Host at compile time. This project is loaded at
+    runtime via AssemblyLoadContext (see ServiceModuleExtensions.AddServiceModules).
+    This target just copies the build output into the Host's plugins folder so
+    it's there to load.
+  -->
+  <Target Name="CopyToHostPluginsFolder" AfterTargets="Build">
+    <ItemGroup>
+      <PluginOutputFiles Include="$(TargetDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginOutputFiles)"
+          DestinationFolder="$(HostPluginsDir)$(MSBuildProjectName)\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

@@ -71,8 +71,6 @@ Host
 │   └── Platform.Abstractions
 ├── Platform.Security
 │   └── Platform.Abstractions
-├── Agent.FinancialAnalyst
-│   └── Platform.Abstractions
 ├── Capabilities.Skills
 │   ├── Platform.Abstractions
 │   └── Platform.Orchestration
@@ -110,12 +108,16 @@ Host
 │   └── Platform.Abstractions
 ├── DataConnections.VectorStore.Sqlite
 │   └── Platform.Abstractions
-├── DataConnections.MarketData
-│   └── Platform.Abstractions
 ├── DataConnections.VectorSearch.Databricks
 │   └── Platform.Abstractions
 ├── Providers.AzureAIFoundry
 └── Providers.Databricks
+
+Plugins (loaded at runtime, not referenced above -- see Service Modules)
+├── Agent.FinancialAnalyst
+│   └── Platform.Abstractions
+└── DataConnections.MarketData
+    └── Platform.Abstractions
 </code></pre>
       <h2>Projects in Detail</h2>
       <h3>Platform Layer</h3>
@@ -345,22 +347,29 @@ Frontend                    Host                         LLM
       <h2>Feature Flags and Service Modules</h2>
       <p>The platform uses two mechanisms to control which capabilities are active at runtime.</p>
       <h3>Feature Flags</h3>
-      <p>Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the <code>Features</code> section of <code>appsettings.json</code>. All flags default to <code>true</code>. When a flag is <code>false</code>, the capability&#x27;s services, tools, and endpoints are not registered. This is evaluated once at startup -- there is no runtime toggle.</p>
+      <p>Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the <code>Features</code> section of <code>appsettings.json</code>. All flags default to <code>false</code> -- the platform is opt-in. When a flag is <code>true</code>, the capability&#x27;s services, tools, and endpoints are registered. This is evaluated once at startup -- there is no runtime toggle.</p>
       <pre><code class="language-json">
 {
   &quot;Features&quot;: {
-    &quot;ComputerUse&quot;: false,
-    &quot;EventTriggers&quot;: false
+    &quot;Personas&quot;: true,
+    &quot;Skills&quot;: true
   }
 }
 </code></pre>
       <p>The <code>FeatureFlags</code> class in the Host project binds to this section. <code>Program.cs</code> checks each flag before calling the capability&#x27;s registration method.</p>
       <h3>Service Modules</h3>
-      <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a <code>ConfigureServices</code> method. The host discovers all implementations via assembly scanning at startup and calls <code>ConfigureServices</code> for each one whose config section does not set <code>Enabled</code> to <code>false</code>.</p>
-      <p>This means adding a new agent project requires no changes to <code>Program.cs</code> -- just implement <code>IServiceModule</code>, reference the project from Host, and it is automatically picked up.</p>
+      <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a <code>ConfigureServices</code> method.</p>
+      <p>Unlike every other layer, Host does not hold a project reference to these modules at all. They are loaded at runtime from a <code>plugins/</code> folder next to the Host executable, one subfolder per plugin, using <code>System.Runtime.Loader.AssemblyLoadContext</code>. <code>ServiceModuleExtensions.AddServiceModules</code> walks that folder, loads each plugin&#x27;s assembly into its own <code>PluginLoadContext</code>, reflects over its types for <code>IServiceModule</code> implementations, and calls <code>ConfigureServices</code> for each one whose config section explicitly sets <code>Enabled</code> to <code>true</code>.</p>
+      <p><code>PluginLoadContext</code> resolves a plugin&#x27;s own private dependencies from its folder via <code>AssemblyDependencyResolver</code>, but defers to whatever the host already has loaded for anything shared, most importantly <code>AiAgentCanvas.Abstractions</code> itself. Without that, the plugin&#x27;s copy of <code>IServiceModule</code> would be a distinct runtime type from the host&#x27;s copy, and the <code>is IServiceModule</code> check would fail even though the source is identical.</p>
+      <p>This means adding a new agent or data-connection project touches nothing in Host: no <code>Program.cs</code> change, no <code>ProjectReference</code>, not even a comment. Two things make a project loadable this way:</p>
+      <ul>
+        <li>Implement <code>IServiceModule</code> against Abstractions.</li>
+        <li>Add a post-build target that copies the project&#x27;s own build output into <code>$(HostPluginsDir)$(MSBuildProjectName)\</code> (see <code>Directory.Build.props</code> for <code>HostPluginsDir</code>, and any existing plugin project, e.g. <code>Agent.FinancialAnalyst.csproj</code>, for the target itself). Also set <code>&lt;GenerateDependencyFile&gt;true&lt;/GenerateDependencyFile&gt;</code> so <code>AssemblyDependencyResolver</code> has a manifest to resolve the plugin&#x27;s own dependencies.</li>
+      </ul>
+      <p>The project still needs to be part of the solution so a normal solution build produces its output, but Host&#x27;s own <code>.csproj</code> never names it.</p>
       <pre><code>
-Agents:FinancialAnalyst:Enabled = true   (default)
-DataConnections:MarketData:Enabled = false  (disabled)
+Agents:FinancialAnalyst:Enabled = false  (default -- not registered)
+DataConnections:MarketData:Enabled = true   (opted in)
 </code></pre>
       <h3>Provider-Specific Configuration</h3>
       <p>Provider-specific settings are nested under their provider section rather than in <code>Features</code>. The Databricks Vector Search tool, for example, lives at <code>Databricks:VectorSearch</code> and self-gates based on whether its required settings are present (no explicit <code>Enabled</code> flag needed).</p>

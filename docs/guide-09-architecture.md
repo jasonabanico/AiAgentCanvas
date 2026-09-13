@@ -41,8 +41,6 @@ Host
 │   └── Platform.Abstractions
 ├── Platform.Security
 │   └── Platform.Abstractions
-├── Agent.FinancialAnalyst
-│   └── Platform.Abstractions
 ├── Capabilities.Skills
 │   ├── Platform.Abstractions
 │   └── Platform.Orchestration
@@ -80,12 +78,16 @@ Host
 │   └── Platform.Abstractions
 ├── DataConnections.VectorStore.Sqlite
 │   └── Platform.Abstractions
-├── DataConnections.MarketData
-│   └── Platform.Abstractions
 ├── DataConnections.VectorSearch.Databricks
 │   └── Platform.Abstractions
 ├── Providers.AzureAIFoundry
 └── Providers.Databricks
+
+Plugins (loaded at runtime, not referenced above -- see Service Modules)
+├── Agent.FinancialAnalyst
+│   └── Platform.Abstractions
+└── DataConnections.MarketData
+    └── Platform.Abstractions
 ```
 
 ## Projects in Detail
@@ -199,13 +201,13 @@ The platform uses two mechanisms to control which capabilities are active at run
 
 ### Feature Flags
 
-Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the `Features` section of `appsettings.json`. All flags default to `true`. When a flag is `false`, the capability's services, tools, and endpoints are not registered. This is evaluated once at startup -- there is no runtime toggle.
+Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the `Features` section of `appsettings.json`. All flags default to `false` -- the platform is opt-in. When a flag is `true`, the capability's services, tools, and endpoints are registered. This is evaluated once at startup -- there is no runtime toggle.
 
 ```json
 {
   "Features": {
-    "ComputerUse": false,
-    "EventTriggers": false
+    "Personas": true,
+    "Skills": true
   }
 }
 ```
@@ -214,13 +216,22 @@ The `FeatureFlags` class in the Host project binds to this section. `Program.cs`
 
 ### Service Modules
 
-Agent projects and data-connection projects use the `IServiceModule` interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a `ConfigureServices` method. The host discovers all implementations via assembly scanning at startup and calls `ConfigureServices` for each one whose config section does not set `Enabled` to `false`.
+Agent projects and data-connection projects use the `IServiceModule` interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a `ConfigureServices` method.
 
-This means adding a new agent project requires no changes to `Program.cs` -- just implement `IServiceModule`, reference the project from Host, and it is automatically picked up.
+Unlike every other layer, Host does not hold a project reference to these modules at all. They are loaded at runtime from a `plugins/` folder next to the Host executable, one subfolder per plugin, using `System.Runtime.Loader.AssemblyLoadContext`. `ServiceModuleExtensions.AddServiceModules` walks that folder, loads each plugin's assembly into its own `PluginLoadContext`, reflects over its types for `IServiceModule` implementations, and calls `ConfigureServices` for each one whose config section explicitly sets `Enabled` to `true`.
+
+`PluginLoadContext` resolves a plugin's own private dependencies from its folder via `AssemblyDependencyResolver`, but defers to whatever the host already has loaded for anything shared, most importantly `AiAgentCanvas.Abstractions` itself. Without that, the plugin's copy of `IServiceModule` would be a distinct runtime type from the host's copy, and the `is IServiceModule` check would fail even though the source is identical.
+
+This means adding a new agent or data-connection project touches nothing in Host: no `Program.cs` change, no `ProjectReference`, not even a comment. Two things make a project loadable this way:
+
+1. Implement `IServiceModule` against Abstractions.
+2. Add a post-build target that copies the project's own build output into `$(HostPluginsDir)$(MSBuildProjectName)\` (see `Directory.Build.props` for `HostPluginsDir`, and any existing plugin project, e.g. `Agent.FinancialAnalyst.csproj`, for the target itself). Also set `<GenerateDependencyFile>true</GenerateDependencyFile>` so `AssemblyDependencyResolver` has a manifest to resolve the plugin's own dependencies.
+
+The project still needs to be part of the solution so a normal solution build produces its output, but Host's own `.csproj` never names it.
 
 ```
-Agents:FinancialAnalyst:Enabled = true   (default)
-DataConnections:MarketData:Enabled = false  (disabled)
+Agents:FinancialAnalyst:Enabled = false  (default -- not registered)
+DataConnections:MarketData:Enabled = true   (opted in)
 ```
 
 ### Provider-Specific Configuration
