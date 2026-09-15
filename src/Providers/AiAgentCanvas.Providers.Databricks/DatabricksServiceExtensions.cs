@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,9 @@ public static class DatabricksServiceExtensions
         services.AddSingleton<IChatClient>(sp =>
             sp.GetRequiredService<DatabricksClientFactory>().CreateChatClient());
 
+        RegisterSecondaryClient(services, configuration, AgentClientKeys.Economy, "EconomyModelName");
+        RegisterSecondaryClient(services, configuration, AgentClientKeys.Judge, "JudgeModelName");
+
         return services;
     }
 
@@ -29,5 +33,20 @@ public static class DatabricksServiceExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers a keyed chat client only when its serving endpoint is configured, so
+    /// consumers can tell "not set up" from "set up and unavailable".
+    /// </summary>
+    private static void RegisterSecondaryClient(
+        IServiceCollection services, IConfiguration configuration, string key, string settingName)
+    {
+        var model = configuration[$"{DatabricksOptions.SectionName}:{settingName}"];
+        if (string.IsNullOrWhiteSpace(model))
+            return;
+
+        services.AddKeyedSingleton<IChatClient>(key, (sp, _) =>
+            sp.GetRequiredService<DatabricksClientFactory>().CreateChatClient(model));
     }
 }

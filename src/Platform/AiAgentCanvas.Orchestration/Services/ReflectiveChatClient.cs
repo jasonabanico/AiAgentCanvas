@@ -7,6 +7,14 @@ namespace AiAgentCanvas.Orchestration.Services;
 
 public sealed class ReflectiveOptions
 {
+    public const string SectionName = "Agent:Reflection";
+
+    /// <summary>
+    /// Off by default: reflection adds a model call every few tool rounds, which is
+    /// worth paying for on long multi-step work and wasteful on short lookups.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
     public int ReflectionInterval { get; set; } = 3;
     public string ReflectionPrompt { get; set; } = DefaultReflectionPrompt;
 

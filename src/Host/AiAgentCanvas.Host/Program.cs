@@ -35,10 +35,15 @@ var builder = WebApplication.CreateBuilder(args);
 var features = new FeatureFlags();
 builder.Configuration.GetSection(FeatureFlags.SectionName).Bind(features);
 
+// The platform's own spans and metrics are exported alongside the framework's.
+// Without naming the sources here, everything TracedAIFunction and the loop guard
+// record stays inside the process.
 if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
 {
-    builder.Services.AddOpenTelemetry().UseAzureMonitor(o =>
-        o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]);
+    builder.Services.AddOpenTelemetry()
+        .UseAzureMonitor(o => o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"])
+        .WithTracing(t => t.AddSource(AgentTelemetry.ActivitySourceName))
+        .WithMetrics(m => m.AddMeter(AgentTelemetry.MeterName));
 }
 
 var llmProvider = builder.Configuration["Provider"] ?? "AzureAIFoundry";
@@ -95,10 +100,19 @@ if (features.Mcp) builder.Services.AddAiAgentCanvasMcp();
 
 if (features.SystemTools)
 {
+    // Both lists deny everything when empty, so the workspace is named explicitly
+    // rather than leaving the agent with the host's whole filesystem.
+    var workspace = Path.Combine(Directory.GetCurrentDirectory(), "agent-workspace");
+    Directory.CreateDirectory(workspace);
+
     builder.Services.AddAiAgentCanvasSystemTools(options =>
     {
-        options.AllowedCommands = ["dotnet", "git", "npm", "node"];
-        options.ScriptTimeoutSeconds = 30;
+        builder.Configuration.GetSection("SystemTools").Bind(options);
+
+        if (options.AllowedPaths.Count == 0)
+            options.AllowedPaths = [workspace];
+        if (options.AllowedCommands.Count == 0)
+            options.AllowedCommands = ["dotnet", "git", "npm", "node"];
     });
 }
 
@@ -107,10 +121,10 @@ if (features.Notifications) builder.Services.AddAiAgentCanvasNotifications();
 if (features.Scheduling)
 {
     builder.Services.AddSqliteScheduledTaskStore();
-    builder.Services.AddAiAgentCanvasScheduler();
+    builder.Services.AddAiAgentCanvasScheduler(builder.Configuration);
 }
 
-builder.Services.AddSqliteChatHistory();
+builder.Services.AddSqliteChatHistory(builder.Configuration);
 
 if (features.Rag)
 {
@@ -172,7 +186,7 @@ if (features.InterAgentCommunication)
 
 if (features.EpisodicMemory) builder.Services.AddAiAgentCanvasEpisodicMemory();
 if (features.AuditLog) builder.Services.AddAiAgentCanvasAuditLog();
-if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers();
+if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers(builder.Configuration);
 if (features.ComputerUse) builder.Services.AddAiAgentCanvasComputerUse();
 if (features.Evaluation) builder.Services.AddAiAgentCanvasEvaluation();
 
@@ -182,7 +196,11 @@ app.UseAiAgentCanvasSecurity();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAiAgentCanvas();
-app.MapA2AEndpoints();
+
+// The A2A server is registered by AddAiAgentCanvasInterAgentCommunication, so mapping
+// its endpoints unconditionally crashes startup whenever that feature is off.
+if (features.InterAgentCommunication) app.MapA2AEndpoints();
+
 app.MapDevUI();
 if (features.Notifications) app.MapNotificationEndpoints();
 if (features.EventTriggers) app.MapEventTriggerEndpoints();

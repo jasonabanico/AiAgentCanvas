@@ -27,7 +27,9 @@ public sealed class EvaluationStore : IDisposable
                 input TEXT NOT NULL,
                 expected_criteria TEXT NOT NULL,
                 tags TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                expected_tools TEXT,
+                optimal_steps INTEGER
             );
             CREATE TABLE IF NOT EXISTS eval_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,21 +40,51 @@ public sealed class EvaluationStore : IDisposable
                 passed INTEGER NOT NULL,
                 rationale TEXT,
                 duration_ms INTEGER NOT NULL DEFAULT 0,
-                run_at TEXT NOT NULL
+                run_at TEXT NOT NULL,
+                tool_calls INTEGER NOT NULL DEFAULT 0,
+                tools_used TEXT,
+                tool_use_accuracy REAL,
+                trajectory_efficiency REAL,
+                independent_judge INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_eval_cases_category ON eval_cases(category);
             CREATE INDEX IF NOT EXISTS idx_eval_results_case ON eval_results(eval_case_id);
             CREATE INDEX IF NOT EXISTS idx_eval_results_run_at ON eval_results(run_at DESC);
             """;
         cmd.ExecuteNonQuery();
+
+        AddColumnIfMissing("eval_cases", "expected_tools", "TEXT");
+        AddColumnIfMissing("eval_cases", "optimal_steps", "INTEGER");
+        AddColumnIfMissing("eval_results", "tool_calls", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing("eval_results", "tools_used", "TEXT");
+        AddColumnIfMissing("eval_results", "tool_use_accuracy", "REAL");
+        AddColumnIfMissing("eval_results", "trajectory_efficiency", "REAL");
+        AddColumnIfMissing("eval_results", "independent_judge", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    /// <summary>
+    /// Brings an existing database forward without a migration step. SQLite has no
+    /// ADD COLUMN IF NOT EXISTS, so the column list is checked first.
+    /// </summary>
+    private void AddColumnIfMissing(string table, string column, string definition)
+    {
+        using var check = _db.CreateCommand();
+        check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = @name";
+        check.Parameters.AddWithValue("@name", column);
+        if (Convert.ToInt64(check.ExecuteScalar()) > 0)
+            return;
+
+        using var alter = _db.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        alter.ExecuteNonQuery();
     }
 
     public long AddCase(EvalCase evalCase)
     {
         using var cmd = _db.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO eval_cases (name, category, input, expected_criteria, tags, created_at)
-            VALUES ($name, $category, $input, $criteria, $tags, $created);
+            INSERT INTO eval_cases (name, category, input, expected_criteria, tags, created_at, expected_tools, optimal_steps)
+            VALUES ($name, $category, $input, $criteria, $tags, $created, $expectedTools, $optimalSteps);
             SELECT last_insert_rowid();
             """;
         cmd.Parameters.AddWithValue("$name", evalCase.Name);
@@ -61,6 +93,8 @@ public sealed class EvaluationStore : IDisposable
         cmd.Parameters.AddWithValue("$criteria", evalCase.ExpectedCriteria);
         cmd.Parameters.AddWithValue("$tags", (object?)evalCase.Tags ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$created", evalCase.CreatedAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$expectedTools", (object?)evalCase.ExpectedTools ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$optimalSteps", (object?)evalCase.OptimalSteps ?? DBNull.Value);
 
         var id = (long)cmd.ExecuteScalar()!;
         _logger.LogInformation("Added eval case '{Name}' ({Category}) with id {Id}", evalCase.Name, evalCase.Category, id);
@@ -71,7 +105,7 @@ public sealed class EvaluationStore : IDisposable
     {
         using var cmd = _db.CreateCommand();
         cmd.CommandText = """
-            SELECT id, name, category, input, expected_criteria, tags, created_at
+            SELECT id, name, category, input, expected_criteria, tags, created_at, expected_tools, optimal_steps
             FROM eval_cases WHERE name = $name
             """;
         cmd.Parameters.AddWithValue("$name", name);
@@ -85,7 +119,7 @@ public sealed class EvaluationStore : IDisposable
         using var cmd = _db.CreateCommand();
         var where = category is not null ? "WHERE category = $category" : "";
         cmd.CommandText = $"""
-            SELECT id, name, category, input, expected_criteria, tags, created_at
+            SELECT id, name, category, input, expected_criteria, tags, created_at, expected_tools, optimal_steps
             FROM eval_cases {where}
             ORDER BY created_at DESC
             """;
@@ -103,8 +137,10 @@ public sealed class EvaluationStore : IDisposable
     {
         using var cmd = _db.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO eval_results (eval_case_id, eval_case_name, actual_output, score, passed, rationale, duration_ms, run_at)
-            VALUES ($caseId, $caseName, $output, $score, $passed, $rationale, $duration, $ranAt)
+            INSERT INTO eval_results (eval_case_id, eval_case_name, actual_output, score, passed, rationale, duration_ms, run_at,
+                                      tool_calls, tools_used, tool_use_accuracy, trajectory_efficiency, independent_judge)
+            VALUES ($caseId, $caseName, $output, $score, $passed, $rationale, $duration, $ranAt,
+                    $toolCalls, $toolsUsed, $toolAccuracy, $efficiency, $independent)
             """;
         cmd.Parameters.AddWithValue("$caseId", result.EvalCaseId);
         cmd.Parameters.AddWithValue("$caseName", result.EvalCaseName);
@@ -114,6 +150,11 @@ public sealed class EvaluationStore : IDisposable
         cmd.Parameters.AddWithValue("$rationale", (object?)result.Rationale ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$duration", result.DurationMs);
         cmd.Parameters.AddWithValue("$ranAt", result.RunAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$toolCalls", result.ToolCalls);
+        cmd.Parameters.AddWithValue("$toolsUsed", result.ToolsUsed);
+        cmd.Parameters.AddWithValue("$toolAccuracy", (object?)result.ToolUseAccuracy ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$efficiency", (object?)result.TrajectoryEfficiency ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$independent", result.IndependentJudge ? 1 : 0);
         cmd.ExecuteNonQuery();
     }
 
@@ -140,7 +181,8 @@ public sealed class EvaluationStore : IDisposable
 
         var where = clauses.Count > 0 ? $"WHERE {string.Join(" AND ", clauses)}" : "";
         cmd.CommandText = $"""
-            SELECT r.id, r.eval_case_id, r.eval_case_name, r.actual_output, r.score, r.passed, r.rationale, r.duration_ms, r.run_at
+            SELECT r.id, r.eval_case_id, r.eval_case_name, r.actual_output, r.score, r.passed, r.rationale, r.duration_ms, r.run_at,
+                   r.tool_calls, r.tools_used, r.tool_use_accuracy, r.trajectory_efficiency, r.independent_judge
             FROM {from} {where}
             ORDER BY r.run_at DESC
             LIMIT $limit
@@ -162,12 +204,17 @@ public sealed class EvaluationStore : IDisposable
                 Rationale = reader.IsDBNull(6) ? "" : reader.GetString(6),
                 DurationMs = reader.GetInt64(7),
                 RunAt = DateTimeOffset.Parse(reader.GetString(8)),
+                ToolCalls = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+                ToolsUsed = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                ToolUseAccuracy = reader.IsDBNull(11) ? null : reader.GetDouble(11),
+                TrajectoryEfficiency = reader.IsDBNull(12) ? null : reader.GetDouble(12),
+                IndependentJudge = !reader.IsDBNull(13) && reader.GetInt64(13) != 0,
             });
         }
         return results;
     }
 
-    public (int TotalRuns, int Passed, double AverageScore) GetStats(string? category = null, DateTimeOffset? since = null)
+    public EvalStats GetStats(string? category = null, DateTimeOffset? since = null)
     {
         using var cmd = _db.CreateCommand();
         var clauses = new List<string>();
@@ -187,19 +234,24 @@ public sealed class EvaluationStore : IDisposable
 
         var where = clauses.Count > 0 ? $"WHERE {string.Join(" AND ", clauses)}" : "";
         cmd.CommandText = $"""
-            SELECT COUNT(*), SUM(CASE WHEN r.passed = 1 THEN 1 ELSE 0 END), AVG(r.score)
+            SELECT COUNT(*), SUM(CASE WHEN r.passed = 1 THEN 1 ELSE 0 END), AVG(r.score),
+                   AVG(r.tool_use_accuracy), AVG(r.trajectory_efficiency)
             FROM {from} {where}
             """;
 
         using var reader = cmd.ExecuteReader();
         if (reader.Read() && !reader.IsDBNull(0))
         {
-            var total = reader.GetInt32(0);
-            var passed = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-            var avg = reader.IsDBNull(2) ? 0.0 : reader.GetDouble(2);
-            return (total, passed, avg);
+            return new EvalStats
+            {
+                TotalRuns = reader.GetInt32(0),
+                Passed = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                AverageScore = reader.IsDBNull(2) ? 0.0 : reader.GetDouble(2),
+                AverageToolUseAccuracy = reader.IsDBNull(3) ? null : reader.GetDouble(3),
+                AverageTrajectoryEfficiency = reader.IsDBNull(4) ? null : reader.GetDouble(4),
+            };
         }
-        return (0, 0, 0.0);
+        return new EvalStats();
     }
 
     private static EvalCase ReadCase(SqliteDataReader reader) => new()
@@ -211,7 +263,24 @@ public sealed class EvaluationStore : IDisposable
         ExpectedCriteria = reader.GetString(4),
         Tags = reader.IsDBNull(5) ? null : reader.GetString(5),
         CreatedAt = DateTimeOffset.Parse(reader.GetString(6)),
+        ExpectedTools = reader.IsDBNull(7) ? null : reader.GetString(7),
+        OptimalSteps = reader.IsDBNull(8) ? null : reader.GetInt32(8),
     };
 
     public void Dispose() => _db.Dispose();
+}
+
+/// <summary>
+/// Aggregate view of past runs. Pass rate answers whether the agent works;
+/// tool-use accuracy and trajectory efficiency answer whether it works the right way.
+/// </summary>
+public sealed class EvalStats
+{
+    public int TotalRuns { get; set; }
+    public int Passed { get; set; }
+    public double AverageScore { get; set; }
+    public double? AverageToolUseAccuracy { get; set; }
+    public double? AverageTrajectoryEfficiency { get; set; }
+
+    public double PassRate => TotalRuns > 0 ? (double)Passed / TotalRuns : 0.0;
 }

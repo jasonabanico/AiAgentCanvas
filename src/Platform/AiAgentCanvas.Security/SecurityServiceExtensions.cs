@@ -18,6 +18,18 @@ namespace AiAgentCanvas.Security;
 
 public static class SecurityServiceExtensions
 {
+    /// <summary>
+    /// Side-effecting tools the platform ships. Override with
+    /// <c>Security:ApprovalRequiredTools</c> when a deployment adds its own.
+    /// </summary>
+    private static readonly string[] DefaultApprovalRequiredTools =
+    [
+        "system_write_file",
+        "system_run_script",
+        "connect_mcp_server",
+        "schedule_task",
+    ];
+
     public static IServiceCollection AddAiAgentCanvasSecurity(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -62,10 +74,16 @@ public static class SecurityServiceExtensions
 
         services.AddSingleton<AIContextProvider, GovernanceContextProvider>();
 
+        // These must be the names the tools are actually registered under. An entry
+        // that matches no registered tool silently protects nothing.
+        var approvalRequired = configuration
+            .GetSection("Security:ApprovalRequiredTools")
+            .Get<string[]>() ?? DefaultApprovalRequiredTools;
+
         var mcpConfig = new McpGatewayConfig
         {
             BlockOnSuspiciousPayload = true,
-            ApprovalRequiredTools = ["run_script", "write_file"],
+            ApprovalRequiredTools = approvalRequired.ToList(),
         };
         configureMcp?.Invoke(mcpConfig);
         services.AddSingleton(mcpConfig);

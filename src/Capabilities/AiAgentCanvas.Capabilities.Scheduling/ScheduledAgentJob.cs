@@ -21,15 +21,15 @@ public sealed class ScheduledAgentJob
         _logger = logger;
     }
 
-    public async Task ExecuteAsync(string taskId, string description, string prompt)
+    public async Task ExecuteAsync(string taskId, string description, string prompt, CancellationToken ct = default)
     {
         _logger.LogInformation("Executing scheduled task {TaskId}: {Description}", taskId, description);
 
         var agent = _sp.GetRequiredService<AIAgent>();
-        var session = await agent.CreateSessionAsync();
+        var session = await agent.CreateSessionAsync(ct);
         var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
 
-        var response = await agent.RunAsync(messages, session);
+        var response = await agent.RunAsync(messages, session, cancellationToken: ct);
         var resultText = response.Text ?? "(no response)";
 
         _store.SaveResult(taskId, description, resultText);
@@ -43,7 +43,7 @@ public sealed class ScheduledAgentJob
                 Title = $"Task completed: {description}",
                 Body = resultText.Length > 500 ? resultText[..500] + "..." : resultText,
                 Source = $"scheduler:{taskId}",
-            });
+            }, ct);
         }
         else
         {

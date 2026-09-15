@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

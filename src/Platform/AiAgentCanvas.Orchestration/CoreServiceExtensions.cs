@@ -36,6 +36,18 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<DynamicToolRegistry>();
 
+        var contextBudget = BindSection(configuration, ContextBudgetOptions.SectionName, new ContextBudgetOptions());
+        var loopGuard = BindSection(configuration, LoopGuardOptions.SectionName, new LoopGuardOptions());
+        var reflection = BindSection(configuration, ReflectiveOptions.SectionName, new ReflectiveOptions());
+        var router = BindSection(configuration, ModelRouterOptions.SectionName, new ModelRouterOptions());
+
+        services.AddSingleton(contextBudget);
+        services.AddSingleton(loopGuard);
+        if (reflection.Enabled) services.AddSingleton(reflection);
+        if (router.Enabled) services.AddSingleton(router);
+
+        services.AddSingleton<ITokenCounter>(_ => new TiktokenCounter(configuration["Agent:TokenizerModel"]));
+
         var defaultPrompt = options.SystemPrompt ?? "You are a helpful AI assistant. Use the available tools to help answer questions.";
         services.AddSingleton(new DefaultSystemPrompt(defaultPrompt));
 
@@ -43,15 +55,38 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(sp =>
         {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var rawChatClient = sp.GetRequiredService<IChatClient>();
-            var dedupeLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<ToolDeduplicatingChatClient>();
-            IChatClient pipeline = new ToolDeduplicatingChatClient(rawChatClient, dedupeLogger);
+            var tokenCounter = sp.GetRequiredService<ITokenCounter>();
+
+            // Order matters. Budget enforcement runs closest to the provider so it sees
+            // the final prompt, and the loop guard runs outside it so a terminated run
+            // never pays for compaction it will not use.
+            IChatClient pipeline = new ToolDeduplicatingChatClient(
+                rawChatClient, loggerFactory.CreateLogger<ToolDeduplicatingChatClient>());
+
+            var budgetOptions = sp.GetRequiredService<ContextBudgetOptions>();
+            if (budgetOptions.Enabled)
+            {
+                pipeline = new ContextBudgetChatClient(
+                    pipeline,
+                    budgetOptions,
+                    tokenCounter,
+                    sp.GetKeyedService<IChatClient>(AgentClientKeys.Economy),
+                    loggerFactory.CreateLogger<ContextBudgetChatClient>());
+            }
 
             var routerOptions = sp.GetService<ModelRouterOptions>();
             if (routerOptions is not null)
             {
-                var routerLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<CostAwareModelRouter>();
-                pipeline = new CostAwareModelRouter(pipeline, routerOptions, routerLogger);
+                routerOptions.EconomyClient ??= sp.GetKeyedService<IChatClient>(AgentClientKeys.Economy);
+                if (routerOptions.EconomyClient is null)
+                {
+                    loggerFactory.CreateLogger<CostAwareModelRouter>().LogWarning(
+                        "Agent:ModelRouter is enabled but no economy model is configured, so every turn uses the primary model.");
+                }
+                pipeline = new CostAwareModelRouter(
+                    pipeline, routerOptions, loggerFactory.CreateLogger<CostAwareModelRouter>());
             }
 
             var auditClient = sp.GetService<IAuditingChatClientFactory>();
@@ -61,8 +96,15 @@ public static class ServiceCollectionExtensions
             var reflectiveOptions = sp.GetService<ReflectiveOptions>();
             if (reflectiveOptions is not null)
             {
-                var reflectiveLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<ReflectiveChatClient>();
-                pipeline = new ReflectiveChatClient(pipeline, reflectiveOptions, reflectiveLogger);
+                pipeline = new ReflectiveChatClient(
+                    pipeline, reflectiveOptions, loggerFactory.CreateLogger<ReflectiveChatClient>());
+            }
+
+            var loopGuardOptions = sp.GetRequiredService<LoopGuardOptions>();
+            if (loopGuardOptions.Enabled)
+            {
+                pipeline = new LoopGuardChatClient(
+                    pipeline, loopGuardOptions, tokenCounter, loggerFactory.CreateLogger<LoopGuardChatClient>());
             }
 
             var chatClient = pipeline;
@@ -74,9 +116,8 @@ public static class ServiceCollectionExtensions
             {
                 if (t is not AIFunction fn) return t;
                 if (governanceWrapper is not null) fn = governanceWrapper.Wrap(fn);
-                return (AITool)fn;
+                return (AITool)new TracedAIFunction(fn);
             }).ToList();
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
             toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));
@@ -118,8 +159,8 @@ public static class ServiceCollectionExtensions
                     Tools = defaultTools,
                 },
                 AIContextProviders = contextProviders.Count > 0 ? contextProviders : null,
-                MaxContextWindowTokens = 128_000,
-                MaxOutputTokens = 16_384,
+                MaxContextWindowTokens = contextBudget.MaxContextTokens,
+                MaxOutputTokens = contextBudget.ReservedOutputTokens,
                 DisableWebSearch = true,
                 DisableFileMemory = true,
                 DisableAgentSkillsProvider = true,
@@ -199,6 +240,17 @@ public static class ServiceCollectionExtensions
 
     internal static readonly ActivitySource AguiActivitySource =
         new(AGUIServerInstrumentation.ActivitySourceName);
+
+    /// <summary>
+    /// Binds a colon-delimited config section onto a defaults instance. Returns the
+    /// defaults untouched when the section is absent, so an unconfigured host still
+    /// gets a budget and a loop guard rather than none.
+    /// </summary>
+    private static T BindSection<T>(IConfiguration configuration, string sectionName, T defaults) where T : class
+    {
+        configuration.GetSection(sectionName).Bind(defaults);
+        return defaults;
+    }
 
     private static IEnumerable<BaseEvent> ToStateSnapshot(FunctionResultContent result)
     {
