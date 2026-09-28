@@ -1,4 +1,4 @@
-namespace AiAgentCanvas.Capabilities.Scheduling;
+namespace AiAgentCanvas.Abstractions;
 
 public interface IScheduledTaskStore : IDisposable
 {
