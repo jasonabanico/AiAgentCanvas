@@ -182,7 +182,7 @@ public static class ServiceCollectionExtensions
 
         services.AddAGUIServer();
         services.AddHttpContextAccessor();
-        services.AddSingleton<SessionIsolationKeyProvider, HttpContextSessionIsolationKeyProvider>();
+        services.AddSingleton<AgentIsolationKeyProvider, HttpContextSessionIsolationKeyProvider>();
         services.AddKeyedSingleton<AgentSessionStore>(options.AgentName,
             (_, _) => new InMemoryAgentSessionStore());
 

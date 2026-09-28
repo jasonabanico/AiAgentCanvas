@@ -1,6 +1,6 @@
 # AI Agent Canvas
 
-Multi-agent enterprise copilot: .NET 9 backend + Next.js frontend, built on Microsoft Agent Framework (MAF) and the AG-UI protocol (SSE).
+Multi-agent enterprise copilot: .NET 10 backend + Next.js frontend, built on Microsoft Agent Framework (MAF) and the AG-UI protocol (SSE).
 
 ## Architecture
 
@@ -32,6 +32,14 @@ dotnet test tests/AiAgentCanvas.Tests/AiAgentCanvas.Tests.csproj
 # Frontend
 cd frontend && npm install && npm run dev
 ```
+
+## Dependencies
+
+Package versions live only in `Directory.Packages.props` (Central Package Management);
+csproj files carry bare `PackageReference` entries with no `Version` attribute. Transitive
+pinning is on, so a vulnerable transitive package is fixed by adding a `PackageVersion`
+entry rather than waiting for its parent to update. `nuget.config` scopes the repo to
+nuget.org with source mapping.
 
 ## Key conventions
 
