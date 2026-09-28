@@ -41,6 +41,22 @@ public static class AgentTelemetry
     public static readonly Counter<long> ContextCompactions =
         Meter.CreateCounter<long>("aiagentcanvas.context.compactions", "{compaction}", "Context compactions by strategy");
 
+    /// <summary>Model calls, tagged with model and outcome.</summary>
+    public static readonly Counter<long> ModelCalls =
+        Meter.CreateCounter<long>("aiagentcanvas.model.calls", "{call}", "Model invocations by model and outcome");
+
+    /// <summary>Tokens billed, tagged with model and direction (input or output).</summary>
+    public static readonly Counter<long> ModelTokens =
+        Meter.CreateCounter<long>("aiagentcanvas.model.tokens", "{token}", "Tokens consumed by model and direction");
+
+    /// <summary>
+    /// Estimated spend in the configured currency, tagged with model and direction.
+    /// A token count only becomes an answer to "what did last night cost" once a
+    /// price is applied to it, so this is recorded alongside the raw counts.
+    /// </summary>
+    public static readonly Counter<double> ModelCost =
+        Meter.CreateCounter<double>("aiagentcanvas.model.cost", "{currency}", "Estimated model spend by model and direction");
+
     /// <summary>Evaluation cases run, tagged with category and pass/fail.</summary>
     public static readonly Counter<long> EvalCases =
         Meter.CreateCounter<long>("aiagentcanvas.eval.cases", "{case}", "Evaluation cases by category and outcome");

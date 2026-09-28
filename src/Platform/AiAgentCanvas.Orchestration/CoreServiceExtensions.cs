@@ -40,8 +40,10 @@ public static class ServiceCollectionExtensions
         var loopGuard = BindSection(configuration, LoopGuardOptions.SectionName, new LoopGuardOptions());
         var reflection = BindSection(configuration, ReflectiveOptions.SectionName, new ReflectiveOptions());
         var router = BindSection(configuration, ModelRouterOptions.SectionName, new ModelRouterOptions());
+        var pricing = BindSection(configuration, ModelPricingOptions.SectionName, new ModelPricingOptions());
 
         services.AddSingleton(contextBudget);
+        services.AddSingleton(pricing);
         services.AddSingleton(loopGuard);
         if (reflection.Enabled) services.AddSingleton(reflection);
         if (router.Enabled) services.AddSingleton(router);
@@ -64,6 +66,11 @@ public static class ServiceCollectionExtensions
             // never pays for compaction it will not use.
             IChatClient pipeline = new ToolDeduplicatingChatClient(
                 rawChatClient, loggerFactory.CreateLogger<ToolDeduplicatingChatClient>());
+
+            pipeline = new CostTrackingChatClient(
+                pipeline,
+                sp.GetRequiredService<ModelPricingOptions>(),
+                loggerFactory.CreateLogger<CostTrackingChatClient>());
 
             var budgetOptions = sp.GetRequiredService<ContextBudgetOptions>();
             if (budgetOptions.Enabled)
