@@ -228,20 +228,41 @@ public static class ServiceCollectionExtensions
         services.AddCors(cors =>
         {
             cors.AddDefaultPolicy(policy =>
-                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+            {
+                if (options.AllowedOrigins.Count > 0)
+                {
+                    policy.WithOrigins([.. options.AllowedOrigins])
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                }
+                else
+                {
+                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                }
+            });
         });
 
         return services;
     }
 
-    public static WebApplication UseAiAgentCanvas(this WebApplication app, string agentName = "AiAgentCanvas", string aguiPattern = "/api/copilotkit")
+    public static WebApplication UseAiAgentCanvas(
+        this WebApplication app,
+        string agentName = "AiAgentCanvas",
+        string aguiPattern = "/api/copilotkit",
+        Action<IEndpointConventionBuilder, string>? configureEndpoint = null)
     {
         app.UseCors();
-        app.MapAGUIServer(agentName, aguiPattern);
-        app.MapHealthChecks("/api/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+
+        var agui = app.MapAGUIServer(agentName, aguiPattern);
+        configureEndpoint?.Invoke(agui, "agui");
+
+        var health = app.MapHealthChecks("/api/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             ResponseWriter = WriteHealthResponse,
         });
+        configureEndpoint?.Invoke(health, "health");
+
         return app;
     }
 
@@ -309,6 +330,12 @@ public sealed class AiAgentCanvasOptions
     public string AgentName { get; set; } = "AiAgentCanvas";
     public string AgentDescription { get; set; } = "A multi-tool AI assistant";
     public string? SystemPrompt { get; set; }
+
+    /// <summary>
+    /// Browser origins allowed to call the API. Empty keeps the permissive
+    /// any-origin policy, which browsers refuse to combine with credentials.
+    /// </summary>
+    public List<string> AllowedOrigins { get; set; } = [];
 }
 
 internal sealed class SystemPromptProvider : AIContextProvider

@@ -8,7 +8,7 @@ namespace AiAgentCanvas.Capabilities.EventTriggers;
 
 public static class WebhookEndpoints
 {
-    public static IEndpointRouteBuilder MapEventTriggerEndpoints(this IEndpointRouteBuilder endpoints)
+    public static RouteGroupBuilder MapEventTriggerEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/triggers");
 
@@ -54,6 +54,6 @@ public static class WebhookEndpoints
             }));
         });
 
-        return endpoints;
+        return group;
     }
 }

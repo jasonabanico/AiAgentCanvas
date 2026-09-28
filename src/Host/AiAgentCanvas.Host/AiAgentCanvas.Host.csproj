@@ -11,6 +11,7 @@
     <!-- Platform -->
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Orchestration\AiAgentCanvas.Orchestration.csproj" />
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
+    <ProjectReference Include="..\..\Platform\AiAgentCanvas.Authentication\AiAgentCanvas.Authentication.csproj" />
 
     <!-- Capabilities -->
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Rag\AiAgentCanvas.Capabilities.Rag.csproj" />

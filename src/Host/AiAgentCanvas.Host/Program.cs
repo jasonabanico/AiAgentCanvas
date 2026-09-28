@@ -1,6 +1,7 @@
 #pragma warning disable MEAI001
 
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Authentication;
 using AiAgentCanvas.AgentData.Context;
 using AiAgentCanvas.AgentData.Entities;
 using AiAgentCanvas.AgentData.Guardrails;
@@ -60,6 +61,10 @@ else
     builder.Services.AddAzureAIFoundry(builder.Configuration);
 }
 
+var auth = new AgentAuthenticationOptions();
+builder.Configuration.GetSection(AgentAuthenticationOptions.SectionName).Bind(auth);
+builder.Services.AddAiAgentCanvasAuthentication(builder.Configuration);
+
 builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
 builder.Services.AddAiAgentCanvasPurview(builder.Configuration);
 builder.Services.AddDevUI();
@@ -68,6 +73,7 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 {
     options.AgentName = "AiAgentCanvas";
     options.AgentDescription = "A multi-tool AI assistant with market data, scheduling, skills, and MCP integration.";
+    options.AllowedOrigins = auth.AllowedOrigins;
 });
 
 builder.Services.AddServiceModules(builder.Configuration);
@@ -195,15 +201,22 @@ var app = builder.Build();
 app.UseAiAgentCanvasSecurity();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseAiAgentCanvas();
+app.UseAiAgentCanvasAuthentication();
+
+app.UseAiAgentCanvas(configureEndpoint: (endpoint, key) => endpoint.RequireAgentAuthorization(auth, key));
 
 // The A2A server is registered by AddAiAgentCanvasInterAgentCommunication, so mapping
 // its endpoints unconditionally crashes startup whenever that feature is off.
-if (features.InterAgentCommunication) app.MapA2AEndpoints();
+if (features.InterAgentCommunication)
+    app.MapA2AEndpoints().RequireAgentAuthorization(auth, "a2a");
 
-app.MapDevUI();
-if (features.Notifications) app.MapNotificationEndpoints();
-if (features.EventTriggers) app.MapEventTriggerEndpoints();
+app.MapDevUI().RequireAgentAuthorization(auth, "devui");
+
+if (features.Notifications)
+    app.MapNotificationEndpoints().RequireAgentAuthorization(auth, "notifications");
+
+if (features.EventTriggers)
+    app.MapEventTriggerEndpoints().RequireAgentAuthorization(auth, "webhooks");
 app.MapFallbackToFile("index.html");
 
 app.Run();

@@ -51,6 +51,25 @@ nuget.org with source mapping.
 - AG-UI protocol (SSE) endpoint and agent orchestration live in `AiAgentCanvas.Orchestration`; Host calls `builder.Services.AddAiAgentCanvas(config, options)` + `app.UseAiAgentCanvas()`.
 - Provider config lives under `AIFoundry` / `Databricks` / `Snowflake` sections in `appsettings.json`; capability flags live under `Features`; runtime limits live under `Agent`.
 
+## Authentication
+
+`AiAgentCanvas.Authentication` (Platform) picks schemes by name from
+`Authentication:Schemes`, the same way `Provider` picks an LLM backend. Built in:
+`ApiKey` for machine callers and `JwtBearer` for any OIDC authority, which covers
+Entra ID, Auth0, Okta and Keycloak without a vendor-specific dependency. Add an
+`IAgentAuthenticationScheme` to DI and it becomes selectable by name.
+
+That port lives in the Authentication project rather than `Abstractions` on
+purpose: every implementation needs ASP.NET Core authentication types, and adding
+that framework reference to `Abstractions` would push a web dependency onto every
+capability that references it.
+
+Endpoints are protected with `RequireAgentAuthorization(auth, key)` rather than
+`RequireAuthorization`, so the `Authentication:AllowAnonymous` list is honoured in
+one place. Keys in use: `agui`, `a2a`, `devui`, `notifications`, `webhooks`,
+`health`. Authentication is off by default and the Host logs a prominent warning
+on every start while it is.
+
 ## Runtime invariants
 
 These exist because an agent without them fails in ways that produce no error:
@@ -60,4 +79,7 @@ These exist because an agent without them fails in ways that produce no error:
 - **Maker and checker are separate.** `EvaluationRunner` runs a case through the built agent and grades it with the keyed `judge` client. It falls back to the primary model when no judge is configured, and flags every result it produces that way.
 - **Filesystem and shell access are allowlisted, and empty means deny.** `SystemToolOptions.AllowedPaths` and `AllowedCommands` both deny everything when empty. Commands run without a shell.
 - **Governance approval lists reference real tool names.** `Security:ApprovalRequiredTools` must match the names tools register under (`SystemToolNames`), or it silently protects nothing.
+- **Every model call is counted and priced.** `CostTrackingChatClient` records
+  `aiagentcanvas.model.{calls,tokens,cost}`, streaming included. Rates live in
+  `Agent:Pricing`; an unpriced model reports tokens rather than zero spend.
 - **Background producers have consumers.** The scheduler has `ScheduledTaskRunner`; event triggers have `TriggerDispatchService`; the trigger queue is bounded. A producer without a consumer is a feature that accepts work and never does it.

@@ -56,9 +56,10 @@ public static class OrchestrationServiceExtensions
         return services;
     }
 
-    public static WebApplication MapA2AEndpoints(this WebApplication app, string agentName = "AiAgentCanvas", string path = "/a2a")
-    {
-        app.MapA2AHttpJson(agentName, path);
-        return app;
-    }
+    /// <summary>
+    /// Returns the endpoint builder rather than the app so the Host can attach an
+    /// authorization policy to the A2A surface.
+    /// </summary>
+    public static IEndpointConventionBuilder MapA2AEndpoints(this WebApplication app, string agentName = "AiAgentCanvas", string path = "/a2a")
+        => app.MapA2AHttpJson(agentName, path);
 }

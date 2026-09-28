@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Platform\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Platform\AiAgentCanvas.Orchestration\AiAgentCanvas.Orchestration.csproj" />
+    <ProjectReference Include="..\..\src\Platform\AiAgentCanvas.Authentication\AiAgentCanvas.Authentication.csproj" />
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.SystemTools\AiAgentCanvas.Capabilities.SystemTools.csproj" />
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.EpisodicMemory\AiAgentCanvas.Capabilities.EpisodicMemory.csproj" />
   </ItemGroup>
