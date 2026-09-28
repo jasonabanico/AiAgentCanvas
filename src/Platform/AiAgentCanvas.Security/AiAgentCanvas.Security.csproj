@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,11 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.AgentGovernance" Version="4.0.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.15.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Purview" Version="1.15.0-rc1" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.AgentGovernance" />
+    <PackageReference Include="Microsoft.Agents.AI.Abstractions" />
+    <PackageReference Include="Microsoft.Agents.AI.Purview" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
 
   <ItemGroup>

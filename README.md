@@ -1,6 +1,6 @@
 # [AI Agent Canvas](https://jasonabanico.github.io/AiAgentCanvas/)
 
-A multi-agent enterprise copilot platform built with .NET 9, Microsoft Agent Framework (MAF), and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry, with inter-agent communication, scheduled and event-driven execution, and runtime governance.
+A multi-agent enterprise copilot platform built with .NET 10, Microsoft Agent Framework (MAF), and the AG-UI protocol. Compose specialized AI agents that reason, plan, and act through a shared tool registry, with inter-agent communication, scheduled and event-driven execution, and runtime governance.
 
 ## Architecture
 
@@ -65,7 +65,7 @@ Agents start **in-process** but are designed to separate into independent servic
 
 ### Prerequisites
 
-- [.NET SDK 9](https://dotnet.microsoft.com/download)
+- [.NET SDK 10](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - An Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account
 - No additional API keys needed for the included samples (Yahoo Finance and SEC EDGAR are free)
@@ -183,7 +183,7 @@ Seeded components are written to disk on first startup and never overwrite manua
 |-------|-----------|
 | Frontend | Next.js 15, React 19, hand-rolled AG-UI SSE client |
 | Protocol | AG-UI (Server-Sent Events), A2A (JSON over HTTP) |
-| Backend | ASP.NET Core 9, Minimal APIs |
+| Backend | ASP.NET Core 10, Minimal APIs |
 | Agent Framework | Microsoft Agent Framework (MAF) |
 | AI | Azure AI Foundry, Databricks Foundation Model APIs, Snowflake Cortex |
 | Tokenizer | `Microsoft.ML.Tokenizers` (cl100k / o200k) |

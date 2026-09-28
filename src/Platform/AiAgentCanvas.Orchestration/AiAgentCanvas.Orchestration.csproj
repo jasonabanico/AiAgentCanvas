@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,17 +11,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.15.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.15.0" />
-    <PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.15.0-preview.260722.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Harness" Version="1.15.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.15.0-preview.260722.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.15.0-preview.260722.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.15.0" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
-    <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />
-    <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Abstractions" />
+    <PackageReference Include="Microsoft.Agents.AI.A2A" />
+    <PackageReference Include="Microsoft.Agents.AI.Harness" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+    <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" />
+    <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" />
   </ItemGroup>
 
   <ItemGroup>

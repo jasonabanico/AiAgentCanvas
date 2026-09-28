@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace AiAgentCanvas.Orchestration.Services;
 
-internal sealed class HttpContextSessionIsolationKeyProvider : SessionIsolationKeyProvider
+internal sealed class HttpContextSessionIsolationKeyProvider : AgentIsolationKeyProvider
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -14,7 +14,7 @@ internal sealed class HttpContextSessionIsolationKeyProvider : SessionIsolationK
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public override ValueTask<string?> GetSessionIsolationKeyAsync(CancellationToken cancellationToken = default)
+    public override ValueTask<string?> GetIsolationKeyAsync(CancellationToken cancellationToken = default)
     {
         var context = _httpContextAccessor.HttpContext;
         if (context is null)
