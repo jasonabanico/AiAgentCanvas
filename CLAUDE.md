@@ -4,17 +4,27 @@ Multi-agent enterprise copilot: .NET 10 backend + Next.js frontend, built on Mic
 
 ## Architecture
 
-All projects sit flat under `src/`, grouped by solution folders in Visual Studio:
+Projects are grouped by layer under `src/<Layer>/<Project>/`, and the solution
+folders mirror that tree one-to-one. References run strictly downward:
+
+```
+Host ──> Capabilities, AgentData, DataConnections, Providers, Platform
+Capabilities ──> AgentData, Platform
+AgentData, DataConnections, Providers, Agents ──> Platform
+```
+
+Platform depends on nothing else in the solution. Agents are plugin-loaded, so the
+Host holds no compile-time reference to them.
+
 
 - **Platform** — engine and cross-cutting concerns:
   - `AiAgentCanvas.Abstractions` — shared interfaces (`IServiceModule`, seed contracts, `IAgentMessaging`, `IAgentRegistry`, `IAgentHandoff`, `INotificationSink`), plus `CronSchedule`, `AgentTelemetry`, and `AgentClientKeys`
   - `AiAgentCanvas.Orchestration` — MAF agent wiring, AG-UI endpoint, agent registry/handoff, inter-agent messaging, and the chat-client pipeline (context budget, loop guard, model router, reflection, tool dedupe, tool tracing)
   - `AiAgentCanvas.Security` — Microsoft Agent Governance Toolkit + Purview integration
-  - `AiAgentCanvas.Storage.Sqlite` — SQLite-backed chat history
 - **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation), `Evaluation` (LLM-as-judge run against the built agent)
 - **AgentData** — MD-persisted agent state: `Personas`, `Context`, `Entities`, `Guardrails`, `Profiles`, `Workflows`
 - **Agents** — specialist agent projects, e.g. `Agent.FinancialAnalyst` (sample: financial analysis persona + tools)
-- **DataConnections** — tool providers and vector stores: `DataConnection.MarketData` (Yahoo Finance + SEC EDGAR), `DataConnection.VectorStore.Sqlite`, `DataConnection.VectorSearch.Databricks`, `DataConnection.VectorSearch.Snowflake`
+- **DataConnections** — tool providers and storage adapters: `DataConnection.MarketData` (Yahoo Finance + SEC EDGAR), `DataConnection.VectorSearch.Databricks`, `DataConnection.VectorSearch.Snowflake`, `DataConnection.VectorStore.Sqlite` (vectors + chat history), `DataConnection.Storage.Sqlite` (scheduled tasks)
 - **Providers** — swappable LLM/data backends selected by the `Provider` config key: `AiAgentCanvas.Providers.AzureAIFoundry`, `AiAgentCanvas.Providers.Databricks`, `AiAgentCanvas.Providers.Snowflake`
 - **Host** — `AiAgentCanvas.Host`, the composition root (`Program.cs`)
 - **tests/AiAgentCanvas.Tests** — xUnit coverage of the deterministic runtime pieces
@@ -32,6 +42,14 @@ dotnet test tests/AiAgentCanvas.Tests/AiAgentCanvas.Tests.csproj
 # Frontend
 cd frontend && npm install && npm run dev
 ```
+
+## Where contracts live
+
+Every port belongs in `AiAgentCanvas.Abstractions`, including the ones a capability
+owns: `IAgentMessaging`, `IAgentRegistry`, `IAgentHandoff`, `INotificationSink`,
+`IScheduledTaskStore` and the `I*Seed` family. A capability that defines an interface
+in its own project forces its storage adapter to depend upward on the capability,
+which is the one thing that breaks the layering above.
 
 ## Dependencies
 

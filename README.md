@@ -35,8 +35,7 @@ src/
 ├── Platform/
 │   ├── AiAgentCanvas.Abstractions/   # seed contracts, cron, telemetry, messaging interfaces
 │   ├── AiAgentCanvas.Orchestration/  # MAF wiring, AG-UI endpoint, registry, handoff, chat pipeline
-│   ├── AiAgentCanvas.Security/       # Agent Governance Toolkit + Purview
-│   └── AiAgentCanvas.Storage/
+│   └── AiAgentCanvas.Security/       # Agent Governance Toolkit + Purview
 ├── Capabilities/                     # Rag, Scheduling, Skills, Notifications, SystemTools,
 │                                     # EpisodicMemory, AuditLog, EventTriggers, ComputerUse, Evaluation
 ├── AgentData/                        # Personas, Context, Entities, Guardrails, Profiles, Workflows
@@ -47,7 +46,7 @@ src/
 │   ├── DataConnection.VectorStore.Sqlite/
 │   ├── DataConnection.VectorSearch.Databricks/
 │   ├── DataConnection.VectorSearch.Snowflake/
-│   └── AiAgentCanvas.Storage.Sqlite/
+│   └── DataConnection.Storage.Sqlite/ # scheduled task store
 ├── Providers/                        # AzureAIFoundry, Databricks, Snowflake
 └── Host/
     └── AiAgentCanvas.Host/           # composition root (Program.cs)

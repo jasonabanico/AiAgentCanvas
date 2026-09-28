@@ -19,7 +19,7 @@ using AiAgentCanvas.Capabilities.Evaluation;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Host;
 using AiAgentCanvas.Orchestration;
-using AiAgentCanvas.Storage.Sqlite;
+using DataConnection.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
 using AiAgentCanvas.Providers.Snowflake;
