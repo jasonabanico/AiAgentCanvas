@@ -8,50 +8,83 @@ namespace AiAgentCanvas.Capabilities.EpisodicMemory;
 
 public static class EpisodicMemoryToolProvider
 {
-    public static IReadOnlyList<AITool> CreateTools(EpisodicMemoryStore store)
+    /// <summary>
+    /// Recall ranks by embedding similarity when <paramref name="embeddingGenerator"/>
+    /// is supplied and by keyword match when it is not, so the capability works with
+    /// or without an embedding model configured.
+    /// </summary>
+    public static IReadOnlyList<AITool> CreateTools(
+        EpisodicMemoryStore store,
+        IEmbeddingGenerator<string, Embedding<float>>? embeddingGenerator = null,
+        string agentName = "AiAgentCanvas")
     {
         return
         [
             AIFunctionFactory.Create(
-                [Description("Search past episodes from memory for similar goals or outcomes")]
-                (string query, string? agentName, int? limit) =>
+                [Description("Search past episodes for goals similar to this one. Ranks by meaning when an embedding model is configured, by keyword otherwise")]
+                async (string query, string? agentFilter, int? limit, CancellationToken ct) =>
                 {
-                    var results = store.Search(query, agentName, limit ?? 5);
-                    return JsonSerializer.Serialize(results.Select(e => new
+                    var take = limit ?? 5;
+                    IReadOnlyList<Episode> results;
+
+                    if (embeddingGenerator is not null && !string.IsNullOrWhiteSpace(query))
                     {
-                        e.Id, e.AgentName, e.Goal, e.Summary, e.Outcome,
-                        e.ToolsUsed, e.TurnCount, CompletedAt = e.CompletedAt.ToString("g"),
-                    }));
+                        var embedding = await embeddingGenerator.GenerateVectorAsync(query, cancellationToken: ct);
+                        results = store.SearchByEmbedding(embedding, agentFilter, take, query);
+                    }
+                    else
+                    {
+                        results = store.Search(query, agentFilter, take);
+                    }
+
+                    return Serialize(results);
                 }, "search_memory"),
 
             AIFunctionFactory.Create(
                 [Description("Get the most recent episodes from memory")]
-                (string? agentName, int? limit) =>
-                {
-                    var results = store.GetRecent(agentName, limit ?? 5);
-                    return JsonSerializer.Serialize(results.Select(e => new
-                    {
-                        e.Id, e.AgentName, e.Goal, e.Summary, e.Outcome,
-                        e.ToolsUsed, e.TurnCount, CompletedAt = e.CompletedAt.ToString("g"),
-                    }));
-                }, "recall_recent_memory"),
+                (string? agentFilter, int? limit) => Serialize(store.GetRecent(agentFilter, limit ?? 5)),
+                "recall_recent_memory"),
 
             AIFunctionFactory.Create(
-                [Description("Record an episode to memory for future recall")]
-                (string goal, string summary, string outcome, string[] toolsUsed, int turnCount) =>
+                [Description("Record a completed episode for future recall. Set importance from 0 to 1: use a high value for a hard-won lesson or a failure worth avoiding, a low value for a routine lookup. Low-importance episodes are not stored")]
+                async (string goal, string summary, string outcome, string[] toolsUsed, int turnCount, double? importance, CancellationToken ct) =>
                 {
                     var episode = new Episode
                     {
-                        AgentName = "AiAgentCanvas",
+                        AgentName = agentName,
                         Goal = goal,
                         Summary = summary,
                         Outcome = outcome,
                         ToolsUsed = toolsUsed.ToList(),
                         TurnCount = turnCount,
+                        Importance = Math.Clamp(importance ?? 0.5, 0.0, 1.0),
                     };
-                    store.Save(episode);
-                    return JsonSerializer.Serialize(new { saved = true, episode.Id });
+
+                    if (embeddingGenerator is not null)
+                    {
+                        var vector = await embeddingGenerator.GenerateVectorAsync($"{goal}\n{summary}", cancellationToken: ct);
+                        episode.Embedding = vector.ToArray();
+                    }
+
+                    var saved = store.Save(episode);
+                    return JsonSerializer.Serialize(saved
+                        ? new { saved = true, episode.Id, note = (string?)null }
+                        : new { saved = false, episode.Id, note = (string?)"Importance was below the store's threshold, so this episode was not kept." });
                 }, "save_to_memory"),
         ];
     }
+
+    private static string Serialize(IReadOnlyList<Episode> episodes) =>
+        JsonSerializer.Serialize(episodes.Select(e => new
+        {
+            e.Id,
+            e.AgentName,
+            e.Goal,
+            e.Summary,
+            e.Outcome,
+            e.ToolsUsed,
+            e.TurnCount,
+            e.Importance,
+            CompletedAt = e.CompletedAt.ToString("g"),
+        }));
 }

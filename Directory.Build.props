@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Shared build-time location for dynamically-loaded plugins. Agent and
+    data-connection projects that should NOT be compile-time referenced by
+    the Host (see AssemblyLoadContext-based loading in ServiceModuleExtensions)
+    copy their build output here as a post-build step.
+  -->
+  <PropertyGroup>
+    <HostOutputDir>$(MSBuildThisFileDirectory)src\Host\AiAgentCanvas.Host\bin\$(Configuration)\net9.0\</HostOutputDir>
+    <HostPluginsDir>$(HostOutputDir)plugins\</HostPluginsDir>
+  </PropertyGroup>
+
+</Project>

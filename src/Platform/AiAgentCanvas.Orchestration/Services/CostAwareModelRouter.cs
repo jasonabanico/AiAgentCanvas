@@ -1,5 +1,6 @@
 #pragma warning disable MEAI001
 
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -7,7 +8,20 @@ namespace AiAgentCanvas.Orchestration.Services;
 
 public sealed class ModelRouterOptions
 {
+    public const string SectionName = "Agent:ModelRouter";
+
+    /// <summary>
+    /// Off by default. Turning it on without an economy model configured changes
+    /// nothing except a startup warning.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
+    /// Cheaper model for low-complexity turns. Populated from the keyed
+    /// <see cref="AgentClientKeys.Economy"/> client when the host registers one.
+    /// </summary>
     public IChatClient? EconomyClient { get; set; }
+
     public int ComplexityThresholdTokens { get; set; } = 200;
     public IReadOnlyList<string>? ComplexityKeywords { get; set; }
 }

@@ -8,6 +8,15 @@ public sealed class ScheduledTaskRecord
     public string? CronExpression { get; set; }
     public bool IsRecurring { get; set; }
     public string CreatedAt { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When the runner last executed this task. Null means it has never run, which
+    /// is what makes a one-shot task due and gives a recurring task its first tick.
+    /// </summary>
+    public DateTimeOffset? LastRunAt { get; set; }
+
+    /// <summary>Set when the last execution threw, so a failing task is visible in the list.</summary>
+    public string? LastError { get; set; }
 }
 
 public sealed class ScheduledTaskResult

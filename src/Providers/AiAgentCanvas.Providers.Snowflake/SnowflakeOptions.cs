@@ -37,6 +37,19 @@ public sealed class SnowflakeOptions
     /// </summary>
     public string? EmbeddingModelName { get; set; }
 
+    /// <summary>
+    /// Optional cheaper model. When set, the cost-aware router sends low-complexity
+    /// turns here and history summarization uses it too.
+    /// </summary>
+    public string? EconomyModelName { get; set; }
+
+    /// <summary>
+    /// Optional model used to grade evaluation output. Set it to a different model
+    /// from the one under test: a model grading itself is lenient with its own work.
+    /// </summary>
+    public string? JudgeModelName { get; set; }
+
+
     /// <summary>Builds the OpenAI-compatible base URL: <c>{AccountUrl}/api/v2/cortex/v1</c>.</summary>
     public Uri BuildCortexEndpointUri()
     {

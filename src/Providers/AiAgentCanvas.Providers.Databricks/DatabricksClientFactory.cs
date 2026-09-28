@@ -24,7 +24,13 @@ public sealed class DatabricksClientFactory
         _logger = logger;
     }
 
-    public IChatClient CreateChatClient()
+    public IChatClient CreateChatClient() => CreateChatClient(null);
+
+    /// <summary>
+    /// Builds a client for <paramref name="modelName"/>, or the primary serving
+    /// endpoint when it is null.
+    /// </summary>
+    public IChatClient CreateChatClient(string? modelName)
     {
         _logger.LogInformation("Creating Databricks chat client. WorkspaceUrl={WorkspaceUrl}, Model={Model}, HasToken={HasToken}",
             _options.WorkspaceUrl, _options.ModelName, !string.IsNullOrWhiteSpace(_options.PersonalAccessToken));
@@ -32,7 +38,7 @@ public sealed class DatabricksClientFactory
         Validate();
 
         var client = CreateOpenAIClient();
-        return client.GetChatClient(_options.ModelName).AsIChatClient();
+        return client.GetChatClient(modelName ?? _options.ModelName).AsIChatClient();
     }
 
     public IEmbeddingGenerator<string, Embedding<float>>? CreateEmbeddingGenerator()

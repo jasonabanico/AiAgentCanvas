@@ -19,7 +19,11 @@ public static class EpisodicMemoryServiceExtensions
             new EpisodicMemoryStore(path, sp.GetRequiredService<ILogger<EpisodicMemoryStore>>()));
 
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            EpisodicMemoryToolProvider.CreateTools(sp.GetRequiredService<EpisodicMemoryStore>()));
+            EpisodicMemoryToolProvider.CreateTools(
+                sp.GetRequiredService<EpisodicMemoryStore>(),
+                // Optional: present only when a provider registered embeddings, which is
+                // what upgrades recall from keyword matching to similarity ranking.
+                sp.GetService<IEmbeddingGenerator<string, Embedding<float>>>()));
 
         services.AddSingleton<AIContextProvider>(sp =>
             new EpisodicMemoryContextProvider(

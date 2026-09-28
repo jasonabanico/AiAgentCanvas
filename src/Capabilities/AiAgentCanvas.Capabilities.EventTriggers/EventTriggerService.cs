@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -8,16 +9,19 @@ public sealed class EventTriggerService : BackgroundService
 {
     private readonly TriggerRegistry _registry;
     private readonly Channel<TriggerEvent> _eventChannel;
+    private readonly EventTriggerOptions _options;
     private readonly ILogger<EventTriggerService> _logger;
     private readonly List<FileSystemWatcher> _watchers = [];
 
     public EventTriggerService(
         TriggerRegistry registry,
         Channel<TriggerEvent> eventChannel,
+        EventTriggerOptions options,
         ILogger<EventTriggerService> logger)
     {
         _registry = registry;
         _eventChannel = eventChannel;
+        _options = options;
         _logger = logger;
     }
 
@@ -34,7 +38,7 @@ public sealed class EventTriggerService : BackgroundService
             try
             {
                 await CheckScheduledTriggers(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(Math.Max(5, _options.PollSeconds)), stoppingToken);
                 RefreshFileWatchers();
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -64,15 +68,18 @@ public sealed class EventTriggerService : BackgroundService
 
     private bool ShouldFire(EventTrigger trigger)
     {
-        if (trigger.CronExpression is null) return false;
-        if (trigger.LastFired is null) return true;
-
-        var parts = trigger.CronExpression.Split(' ');
-        if (parts.Length < 1 || !int.TryParse(parts[0].TrimEnd('m', 's'), out var intervalMinutes))
+        if (string.IsNullOrWhiteSpace(trigger.CronExpression))
             return false;
 
-        var elapsed = DateTimeOffset.UtcNow - trigger.LastFired.Value;
-        return elapsed.TotalMinutes >= intervalMinutes;
+        if (!CronSchedule.TryParse(trigger.CronExpression, out var schedule) || schedule is null)
+        {
+            _logger.LogWarning(
+                "Trigger {Id} has an unparsable cron expression '{Cron}' and will not fire",
+                trigger.Id, trigger.CronExpression);
+            return false;
+        }
+
+        return schedule.IsDue(trigger.LastFired, DateTimeOffset.UtcNow);
     }
 
     private async Task FireTrigger(EventTrigger trigger, CancellationToken ct)
@@ -143,8 +150,13 @@ public sealed class EventTriggerService : BackgroundService
         };
 
         _registry.RecordFired(trigger.Id);
-        _eventChannel.Writer.TryWrite(evt);
-        _logger.LogInformation("File trigger {Id} fired: {File} ({Change})", trigger.Id, e.Name, e.ChangeType);
+
+        // The queue is bounded, so a file storm drops events rather than growing
+        // without limit. The drop is logged so it is not silent.
+        if (_eventChannel.Writer.TryWrite(evt))
+            _logger.LogInformation("File trigger {Id} fired: {File} ({Change})", trigger.Id, e.Name, e.ChangeType);
+        else
+            _logger.LogWarning("Trigger queue full, dropped file event for trigger {Id}: {File}", trigger.Id, e.Name);
     }
 
     private void CleanupWatchers()

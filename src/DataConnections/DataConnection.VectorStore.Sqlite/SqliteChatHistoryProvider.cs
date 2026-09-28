@@ -9,12 +9,17 @@ public sealed class SqliteChatHistoryProvider : ChatHistoryProvider
 {
     private readonly SqliteConnection _connection;
     private readonly ILogger<SqliteChatHistoryProvider> _logger;
+    private readonly int _maxMessages;
     private bool _initialized;
 
-    public SqliteChatHistoryProvider(string connectionString, ILogger<SqliteChatHistoryProvider> logger)
+    public SqliteChatHistoryProvider(
+        string connectionString,
+        ILogger<SqliteChatHistoryProvider> logger,
+        int maxMessages = 200)
     {
         _connection = new SqliteConnection(connectionString);
         _logger = logger;
+        _maxMessages = Math.Max(2, maxMessages);
     }
 
     private async Task EnsureInitializedAsync(CancellationToken ct)
@@ -52,9 +57,20 @@ public sealed class SqliteChatHistoryProvider : ChatHistoryProvider
 
         var messages = new List<ChatMessage>();
 
+        // Take the newest slice and reverse it, rather than every message ever stored.
+        // The prompt budget would compact an unbounded load anyway, so reading it all
+        // only buys a larger query and a longer summarization pass.
         await using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "SELECT role, content FROM chat_history WHERE conversation_id = @cid ORDER BY id";
+        cmd.CommandText = """
+            SELECT role, content FROM (
+                SELECT id, role, content FROM chat_history
+                WHERE conversation_id = @cid
+                ORDER BY id DESC
+                LIMIT @limit
+            ) ORDER BY id
+            """;
         cmd.Parameters.AddWithValue("@cid", conversationId);
+        cmd.Parameters.AddWithValue("@limit", _maxMessages);
 
         await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -68,7 +84,8 @@ public sealed class SqliteChatHistoryProvider : ChatHistoryProvider
             messages.Add(new ChatMessage(role, reader.GetString(1)));
         }
 
-        _logger.LogDebug("Loaded {Count} messages for conversation {ConversationId}", messages.Count, conversationId);
+        _logger.LogDebug("Loaded {Count} of at most {Limit} messages for conversation {ConversationId}",
+            messages.Count, _maxMessages, conversationId);
         return messages;
     }
 

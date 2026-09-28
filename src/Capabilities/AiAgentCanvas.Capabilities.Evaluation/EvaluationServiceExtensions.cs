@@ -1,3 +1,5 @@
+using AiAgentCanvas.Abstractions;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,10 +18,20 @@ public static class EvaluationServiceExtensions
             new EvaluationStore(path, sp.GetRequiredService<ILogger<EvaluationStore>>()));
 
         services.AddSingleton(sp =>
-            new EvaluationRunner(
-                sp.GetRequiredService<IChatClient>(),
+        {
+            // Prefer a judge model distinct from the one under test. Falling back to
+            // the primary client keeps the capability usable, and the runner says so
+            // in its output and its logs rather than presenting inflated scores as clean.
+            var judge = sp.GetKeyedService<IChatClient>(AgentClientKeys.Judge);
+            var independent = judge is not null;
+
+            return new EvaluationRunner(
+                () => sp.GetRequiredService<AIAgent>(),
+                judge ?? sp.GetRequiredService<IChatClient>(),
+                independent,
                 sp.GetRequiredService<EvaluationStore>(),
-                sp.GetRequiredService<ILogger<EvaluationRunner>>()));
+                sp.GetRequiredService<ILogger<EvaluationRunner>>());
+        });
 
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
             EvaluationToolProvider.CreateTools(

@@ -19,7 +19,13 @@ public sealed class AzureAIFoundryClientFactory
         _logger = logger;
     }
 
-    public IChatClient CreateChatClient()
+    public IChatClient CreateChatClient() => CreateChatClient(null);
+
+    /// <summary>
+    /// Builds a client for <paramref name="deploymentName"/>, or the primary
+    /// deployment when it is null.
+    /// </summary>
+    public IChatClient CreateChatClient(string? deploymentName)
     {
         _logger.LogInformation("Creating chat client. Endpoint={Endpoint}, Deployment={Deployment}, UseAzureCredential={UseAzure}, HasKey={HasKey}",
             _options.Endpoint, _options.DeploymentName, _options.UseAzureCredential, !string.IsNullOrWhiteSpace(_options.Key));
@@ -37,7 +43,7 @@ public sealed class AzureAIFoundryClientFactory
             ? new AzureOpenAIClient(endpoint, new DefaultAzureCredential())
             : new AzureOpenAIClient(endpoint, new AzureKeyCredential(_options.Key!));
 
-        ChatClient chatClient = azureClient.GetChatClient(_options.DeploymentName);
+        ChatClient chatClient = azureClient.GetChatClient(deploymentName ?? _options.DeploymentName);
         return chatClient.AsIChatClient();
     }
 

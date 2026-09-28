@@ -18,7 +18,9 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
                 prompt TEXT NOT NULL,
                 cron_expression TEXT,
                 is_recurring INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_run_at TEXT,
+                last_error TEXT
             );
             CREATE TABLE IF NOT EXISTS scheduled_task_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,6 +31,26 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
             );
             """;
         cmd.ExecuteNonQuery();
+
+        AddColumnIfMissing(connection, "scheduled_tasks", "last_run_at", "TEXT");
+        AddColumnIfMissing(connection, "scheduled_tasks", "last_error", "TEXT");
+    }
+
+    /// <summary>
+    /// Brings an existing database forward without a migration step. SQLite has no
+    /// ADD COLUMN IF NOT EXISTS, so the column list is checked first.
+    /// </summary>
+    private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string type)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = @name";
+        check.Parameters.AddWithValue("@name", column);
+        if (Convert.ToInt64(check.ExecuteScalar()) > 0)
+            return;
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type}";
+        alter.ExecuteNonQuery();
     }
 
     public void SaveTask(ScheduledTaskRecord task)
@@ -51,7 +73,10 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
     {
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT id, description, prompt, cron_expression, is_recurring, created_at FROM scheduled_tasks ORDER BY created_at DESC";
+        cmd.CommandText = """
+            SELECT id, description, prompt, cron_expression, is_recurring, created_at, last_run_at, last_error
+            FROM scheduled_tasks ORDER BY created_at DESC
+            """;
 
         var tasks = new List<ScheduledTaskRecord>();
         using var reader = cmd.ExecuteReader();
@@ -65,6 +90,8 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
                 CronExpression = reader.IsDBNull(3) ? null : reader.GetString(3),
                 IsRecurring = reader.GetInt32(4) == 1,
                 CreatedAt = reader.GetString(5),
+                LastRunAt = reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6)),
+                LastError = reader.IsDBNull(7) ? null : reader.GetString(7),
             });
         }
         return tasks;
@@ -113,6 +140,17 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
             });
         }
         return results;
+    }
+
+    public void MarkRun(string id, DateTimeOffset runAt, string? error = null)
+    {
+        using var connection = OpenConnection();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE scheduled_tasks SET last_run_at = @at, last_error = @err WHERE id = @id";
+        cmd.Parameters.AddWithValue("@at", runAt.ToString("o"));
+        cmd.Parameters.AddWithValue("@err", (object?)error ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
     }
 
     public void Dispose() { }

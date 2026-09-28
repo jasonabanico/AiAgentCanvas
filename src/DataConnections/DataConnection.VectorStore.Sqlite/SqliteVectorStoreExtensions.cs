@@ -26,10 +26,25 @@ public static class SqliteVectorStoreExtensions
         return services.AddSqliteVectorStore(connectionString);
     }
 
-    public static IServiceCollection AddSqliteChatHistory(this IServiceCollection services, string connectionString = "Data Source=chathistory.db")
+    public static IServiceCollection AddSqliteChatHistory(
+        this IServiceCollection services,
+        string connectionString = "Data Source=chathistory.db",
+        int maxMessages = 200)
     {
         services.AddSingleton<ChatHistoryProvider>(sp =>
-            new SqliteChatHistoryProvider(connectionString, sp.GetRequiredService<ILogger<SqliteChatHistoryProvider>>()));
+            new SqliteChatHistoryProvider(
+                connectionString,
+                sp.GetRequiredService<ILogger<SqliteChatHistoryProvider>>(),
+                maxMessages));
         return services;
+    }
+
+    public static IServiceCollection AddSqliteChatHistory(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration["ChatHistory:ConnectionString"] ?? "Data Source=chathistory.db";
+        var maxMessages = configuration.GetValue("ChatHistory:MaxMessages", 200);
+        return services.AddSqliteChatHistory(connectionString, maxMessages);
     }
 }

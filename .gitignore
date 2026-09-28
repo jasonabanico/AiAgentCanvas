@@ -11,15 +11,23 @@ publish/
 **/wwwroot/
 
 ## Runtime databases
+## These hold conversation history, recalled episodes and audit trails, so they
+## stay out of the repo.
 hangfire.db*
 scheduler.db*
 skills.db*
 chathistory.db*
 vectorstore.db*
+audit-log.db*
+episodic-memory.db*
+evaluation.db*
+agentmailbox.db*
+workqueue.db*
 
 ## Agent runtime data
 agent-workspace/
 agent-file-memory/
+agent-data/
 
 ## Node / Next.js
 node_modules/

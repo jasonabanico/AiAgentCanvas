@@ -1,3 +1,4 @@
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,9 @@ public static class AzureAIFoundryServiceExtensions
         services.AddSingleton<IChatClient>(sp =>
             sp.GetRequiredService<AzureAIFoundryClientFactory>().CreateChatClient());
 
+        RegisterSecondaryClient(services, configuration, AgentClientKeys.Economy, "EconomyDeploymentName");
+        RegisterSecondaryClient(services, configuration, AgentClientKeys.Judge, "JudgeDeploymentName");
+
         return services;
     }
 
@@ -29,5 +33,20 @@ public static class AzureAIFoundryServiceExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers a keyed chat client only when its deployment is configured, so
+    /// consumers can tell "not set up" from "set up and unavailable".
+    /// </summary>
+    private static void RegisterSecondaryClient(
+        IServiceCollection services, IConfiguration configuration, string key, string settingName)
+    {
+        var deployment = configuration[$"{AzureAIFoundryOptions.SectionName}:{settingName}"];
+        if (string.IsNullOrWhiteSpace(deployment))
+            return;
+
+        services.AddKeyedSingleton<IChatClient>(key, (sp, _) =>
+            sp.GetRequiredService<AzureAIFoundryClientFactory>().CreateChatClient(deployment));
     }
 }
