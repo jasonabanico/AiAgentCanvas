@@ -30,17 +30,23 @@ public sealed class ScheduledTaskRunner : BackgroundService
     private readonly ScheduledAgentJob _job;
     private readonly SchedulerOptions _options;
     private readonly ILogger<ScheduledTaskRunner> _logger;
+    private readonly IBudgetGuard? _budget;
+    private readonly IJobRunner? _jobs;
 
     public ScheduledTaskRunner(
         IScheduledTaskStore store,
         ScheduledAgentJob job,
         SchedulerOptions options,
-        ILogger<ScheduledTaskRunner> logger)
+        ILogger<ScheduledTaskRunner> logger,
+        IBudgetGuard? budget = null,
+        IJobRunner? jobs = null)
     {
+        _jobs = jobs;
         _store = store;
         _job = job;
         _options = options;
         _logger = logger;
+        _budget = budget;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,6 +82,21 @@ public sealed class ScheduledTaskRunner : BackgroundService
         if (due.Count == 0)
             return;
 
+        // A refused task is left untouched, not claimed, so it stays due and runs on the
+        // first tick after the limit clears. Jobs spend no tokens, so a spend limit on
+        // the agent does not hold them back.
+        if (_budget is not null && due.Any(t => string.IsNullOrWhiteSpace(t.JobName)))
+        {
+            var decision = await _budget.CheckAsync(_job.AgentName, null, stoppingToken);
+            if (!decision.Allowed)
+            {
+                _logger.LogDebug("Skipping scheduled agent task(s): {Reason}", decision.Reason);
+                due = due.Where(t => !string.IsNullOrWhiteSpace(t.JobName)).ToList();
+                if (due.Count == 0)
+                    return;
+            }
+        }
+
         _logger.LogInformation("Running {Count} due scheduled task(s)", due.Count);
         await Task.WhenAll(due.Select(task => RunOneAsync(task, now, stoppingToken)));
     }
@@ -95,7 +116,11 @@ public sealed class ScheduledTaskRunner : BackgroundService
 
         try
         {
-            await _job.ExecuteAsync(task.Id, task.Description, task.Prompt, timeout.Token);
+            if (!string.IsNullOrWhiteSpace(task.JobName))
+                await RunJobAsync(task, timeout.Token);
+            else
+                await _job.ExecuteAsync(task.Id, task.Description, task.Prompt, timeout.Token);
+
             activity?.SetStatus(ActivityStatusCode.Ok);
 
             if (!task.IsRecurring)
@@ -117,6 +142,18 @@ public sealed class ScheduledTaskRunner : BackgroundService
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(ex, "Scheduled task {TaskId} failed", task.Id);
         }
+    }
+
+    private async Task RunJobAsync(ScheduledTaskRecord task, CancellationToken ct)
+    {
+        var runner = _jobs ?? throw new InvalidOperationException(
+            $"Task {task.Id} runs job '{task.JobName}' but the Jobs capability is not enabled.");
+
+        var result = await runner.RunAsync(new JobRequest(task.JobName!, task.JobArguments, TaskId: task.Id), ct);
+        _store.SaveResult(task.Id, task.Description, result.Summary);
+
+        if (!result.Ok)
+            throw new InvalidOperationException(result.Summary);
     }
 
     /// <summary>

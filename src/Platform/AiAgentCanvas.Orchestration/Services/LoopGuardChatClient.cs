@@ -24,6 +24,13 @@ public sealed class LoopGuardOptions
     /// <summary>Token ceiling for a single run, counted across the accumulated prompt.</summary>
     public int MaxRunTokens { get; set; } = 250_000;
 
+    /// <summary>
+    /// Ceiling on estimated spend for one run, in the currency of <c>Agent:Pricing</c>.
+    /// Zero means no ceiling. Applies to tracked runs (scheduled, trigger, handoff, job),
+    /// which are the ones nobody is watching.
+    /// </summary>
+    public double MaxRunCost { get; set; }
+
     /// <summary>Identical tool calls tolerated before the run is nudged off the repeat.</summary>
     public int RepeatWarningThreshold { get; set; } = 2;
 
@@ -43,6 +50,7 @@ public enum RunTermination
     GoalReached,
     MaxToolRounds,
     TokenBudget,
+    CostBudget,
     RepeatedAction,
     NoProgress,
 }
@@ -106,6 +114,7 @@ public sealed class LoopGuardChatClient : DelegatingChatClient
         {
             AgentTelemetry.RunTerminations.Add(1, new KeyValuePair<string, object?>("reason", termination.Value.ToString()));
             AgentTelemetry.RunToolRounds.Record(toolRounds);
+            AgentRunContext.Current?.SetTermination(termination.Value.ToString());
 
             _logger?.LogWarning(
                 "Loop guard stopping run after {Rounds} tool rounds. Reason={Reason}",
@@ -139,6 +148,13 @@ public sealed class LoopGuardChatClient : DelegatingChatClient
 
         if (_counter.CountMessages(run) >= _options.MaxRunTokens)
             return RunTermination.TokenBudget;
+
+        if (_options.MaxRunCost > 0
+            && AgentRunContext.Current is { } tracked
+            && tracked.EstimatedCost >= _options.MaxRunCost)
+        {
+            return RunTermination.CostBudget;
+        }
 
         var repeated = MostRepeatedCall(run);
         if (repeated is not null && repeated.Value.Count >= _options.RepeatTerminationThreshold)
@@ -233,6 +249,9 @@ public sealed class LoopGuardChatClient : DelegatingChatClient
             + "not complete, and what the user would need to provide for you to finish.",
         RunTermination.TokenBudget =>
             "This run has reached its token budget. Tools are now unavailable. Summarize what you "
+            + "established, what remains, and what you would do next.",
+        RunTermination.CostBudget =>
+            "This run has reached its spend limit. Tools are now unavailable. Summarize what you "
             + "established, what remains, and what you would do next.",
         RunTermination.RepeatedAction =>
             "You have repeated the same tool call with the same arguments several times without a "

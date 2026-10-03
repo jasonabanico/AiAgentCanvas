@@ -57,6 +57,29 @@ public static class AgentTelemetry
     public static readonly Counter<double> ModelCost =
         Meter.CreateCounter<double>("aiagentcanvas.model.cost", "{currency}", "Estimated model spend by model and direction");
 
+    /// <summary>
+    /// Trigger events by outcome: accepted, duplicate, rejected, succeeded, retried or dead.
+    /// A rising dead or rejected count means work is being lost or refused.
+    /// </summary>
+    public static readonly Counter<long> TriggerEvents =
+        Meter.CreateCounter<long>("aiagentcanvas.trigger.events", "{event}", "Trigger events by outcome");
+
+    /// <summary>Runs refused or flagged by a spend limit, tagged with scope and action.</summary>
+    public static readonly Counter<long> BudgetDecisions =
+        Meter.CreateCounter<long>("aiagentcanvas.budget.decisions", "{decision}", "Spend limit decisions by scope and action");
+
+    /// <summary>Job runs by job name and outcome: ok, failed, error, skipped or unknown.</summary>
+    public static readonly Counter<long> JobRuns =
+        Meter.CreateCounter<long>("aiagentcanvas.job.runs", "{run}", "Job runs by name and outcome");
+
+    /// <summary>Calls a connector made to an outside service, by connector and outcome.</summary>
+    public static readonly Counter<long> ConnectorCalls =
+        Meter.CreateCounter<long>("aiagentcanvas.connector.calls", "{call}", "Connector calls by connector and outcome");
+
+    /// <summary>Duration of a connector call to an outside service.</summary>
+    public static readonly Histogram<double> ConnectorDuration =
+        Meter.CreateHistogram<double>("aiagentcanvas.connector.duration", "ms", "Connector call duration");
+
     /// <summary>Evaluation cases run, tagged with category and pass/fail.</summary>
     public static readonly Counter<long> EvalCases =
         Meter.CreateCounter<long>("aiagentcanvas.eval.cases", "{case}", "Evaluation cases by category and outcome");
@@ -74,4 +97,10 @@ public static class AgentClientKeys
 
     /// <summary>Independent model used to grade output, keeping maker and checker separate.</summary>
     public const string Judge = "judge";
+
+    /// <summary>
+    /// The guarded client every agent runs on: tool de-duplication, cost tracking,
+    /// context budget, routing, audit, reflection and the loop guard, in that order.
+    /// </summary>
+    public const string Pipeline = "pipeline";
 }

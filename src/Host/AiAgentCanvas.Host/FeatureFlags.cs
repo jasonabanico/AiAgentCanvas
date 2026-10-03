@@ -30,4 +30,12 @@ public sealed class FeatureFlags
     public bool AuditLog { get; set; } = false;
     public bool EventTriggers { get; set; } = false;
     public bool ComputerUse { get; set; } = false;
+    public bool RunLedger { get; set; } = false;
+    public bool Jobs { get; set; } = false;
+
+    /// <summary>Encrypted account credentials, OAuth connect flow and token refresh.</summary>
+    public bool Connections { get; set; } = false;
+
+    /// <summary>Connectors to outside services. Requires <see cref="Connections"/>.</summary>
+    public bool Connectors { get; set; } = false;
 }

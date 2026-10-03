@@ -91,8 +91,19 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.ComputerUse
 │   └── Platform.Abstractions
-├── Capabilities.Evaluation
+├── Capabilities.RunLedger
 │   └── Platform.Abstractions
+├── Capabilities.Jobs
+│   └── Platform.Abstractions
+├── Platform.Connections
+│   └── Platform.Abstractions
+├── Platform.Connectors
+│   ├── Platform.Connections
+│   └── Platform.Orchestration
+├── Connector.TwilioSms
+│   └── Platform.Connectors
+├── Connector.Mcp
+│   └── Platform.Connectors
 ├── AgentData.Personas
 │   └── Platform.Abstractions
 ├── AgentData.Context
@@ -242,8 +253,8 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         </tr>
         <tr>
           <td><strong>EventTriggers</strong></td>
-          <td>Proactive agent engagement via scheduled, file-watch, and webhook triggers</td>
-          <td><code>TriggerRegistry</code>, <code>EventTriggerService</code>, <code>EventTriggerToolProvider</code></td>
+          <td>Proactive agent engagement via scheduled, file-watch, webhook and connector triggers, held in a durable queue</td>
+          <td><code>TriggerRegistry</code>, <code>TriggerStore</code>, <code>TriggerEventQueue</code>, <code>TriggerDispatchService</code>, <code>ConnectorEventBridge</code></td>
         </tr>
         <tr>
           <td><strong>ComputerUse</strong></td>
@@ -251,12 +262,18 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
           <td><code>BrowserSession</code>, <code>ComputerUseToolProvider</code></td>
         </tr>
         <tr>
-          <td><strong>Evaluation</strong></td>
-          <td>LLM-as-judge scoring of agent responses against stored eval cases</td>
-          <td><code>EvaluationStore</code>, <code>EvaluationRunner</code>, <code>EvaluationToolProvider</code></td>
+          <td><strong>RunLedger</strong></td>
+          <td>One record per unattended run, with usage, tool calls and outcome</td>
+          <td><code>SqliteRunLedger</code>, <code>RunLedgerEndpoints</code>, <code>RunLedgerToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>Jobs</strong></td>
+          <td>Deterministic scheduled work that runs without a model</td>
+          <td><code>JobRunner</code>, <code>IAgentJob</code>, <code>JobToolProvider</code></td>
         </tr>
         </tbody>
       </table>
+      <p>Connections and connectors sit in the Platform layer because other capabilities depend on them. <code>Platform.Connections</code> stores credentials and runs OAuth. <code>Platform.Connectors</code> defines the connector contracts and runs one connector per stored connection. See <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
       <h3>DataConnections and Providers</h3>
       <p>Storage backends and external data sources. These projects implement the persistence and data-access interfaces defined in Abstractions.</p>
       <p><strong>DataConnections:</strong></p>

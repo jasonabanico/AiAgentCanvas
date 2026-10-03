@@ -129,8 +129,13 @@ public sealed class CostTrackingChatClient : DelegatingChatClient
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("outcome", outcome));
 
+        var run = AgentRunContext.Current;
+
         if (usage is null)
+        {
+            run?.AddModelUsage(0, 0, 0);
             return;
+        }
 
         var input = usage.InputTokenCount ?? 0;
         var output = usage.OutputTokenCount ?? 0;
@@ -140,14 +145,13 @@ public sealed class CostTrackingChatClient : DelegatingChatClient
         if (output > 0)
             AgentTelemetry.ModelTokens.Add(output, Tags(model, "output"));
 
-        if (!_pricing.Enabled)
-            return;
-
-        var rate = _pricing.RateFor(modelId);
+        var rate = _pricing.Enabled ? _pricing.RateFor(modelId) : null;
         if (rate is null)
         {
             // Counted but unpriced. Better than reporting zero spend, which reads as free.
-            _logger?.LogDebug("No rate configured for model {Model}, tokens counted without cost", model);
+            if (_pricing.Enabled)
+                _logger?.LogDebug("No rate configured for model {Model}, tokens counted without cost", model);
+            run?.AddModelUsage(input, output, 0);
             return;
         }
 
@@ -158,6 +162,8 @@ public sealed class CostTrackingChatClient : DelegatingChatClient
             AgentTelemetry.ModelCost.Add(inputCost, Tags(model, "input", _pricing.Currency));
         if (outputCost > 0)
             AgentTelemetry.ModelCost.Add(outputCost, Tags(model, "output", _pricing.Currency));
+
+        run?.AddModelUsage(input, output, inputCost + outputCost);
 
         _logger?.LogDebug(
             "Model {Model}: {Input} in, {Output} out, about {Cost} {Currency}",

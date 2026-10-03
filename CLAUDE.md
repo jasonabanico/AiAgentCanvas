@@ -8,10 +8,13 @@ All projects sit flat under `src/`, grouped by solution folders in Visual Studio
 
 - **Platform** — engine and cross-cutting concerns:
   - `AiAgentCanvas.Abstractions` — shared interfaces (`IServiceModule`, seed contracts, `IAgentMessaging`, `IAgentRegistry`, `IAgentHandoff`, `INotificationSink`), plus `CronSchedule`, `AgentTelemetry`, and `AgentClientKeys`
+  - `AiAgentCanvas.Connections` — encrypted credential store (Data Protection), OAuth authorization code flow with PKCE, single-flight token refresh, `ICredentialProvider`
+  - `AiAgentCanvas.Connectors` — connector contracts (`IConnectorDefinition`, `IToolConnector`, `IEventSourceConnector`), `ConnectorHost`, the guarded per-connection HTTP client, and the webhook route
   - `AiAgentCanvas.Orchestration` — MAF agent wiring, AG-UI endpoint, agent registry/handoff, inter-agent messaging, and the chat-client pipeline (context budget, loop guard, model router, reflection, tool dedupe, tool tracing)
   - `AiAgentCanvas.Security` — Microsoft Agent Governance Toolkit + Purview integration
   - `AiAgentCanvas.Storage.Sqlite` — SQLite-backed chat history
-- **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation)
+- **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation), `RunLedger`, `Jobs`, `Connections`, `Connectors` (needs `Connections`)
+- **Connectors** — `AiAgentCanvas.Connector.TwilioSms` and `AiAgentCanvas.Connector.Mcp` (Gmail and any MCP server). A connector is a definition plus one instance per stored connection; see `docs/design/connectors.md`
 - **AgentData** — MD-persisted agent state: `Personas`, `Context`, `Entities`, `Guardrails`, `Profiles`, `Workflows`
 - **Agents** — specialist agent projects, e.g. `Agent.FinancialAnalyst` (sample: financial analysis persona + tools)
 - **DataConnections** — tool providers and vector stores: `DataConnection.MarketData` (Yahoo Finance + SEC EDGAR), `DataConnection.VectorStore.Sqlite`, `DataConnection.VectorSearch.Databricks`, `DataConnection.VectorSearch.Snowflake`
@@ -68,7 +71,10 @@ capability that references it.
 Endpoints are protected with `RequireAgentAuthorization(auth, key)` rather than
 `RequireAuthorization`, so the `Authentication:AllowAnonymous` list is honoured in
 one place. Keys in use: `agui`, `a2a`, `devui`, `notifications`, `webhooks`,
-`health`. Authentication is off by default and the Host logs a prominent warning
+`health`, `runs`, `connections`, `connectors`. Two routes carry no endpoint
+authorization on purpose, because the caller is another service and not one of ours: the
+OAuth callback (`MapConnectionCallback`, protected by encrypted time-limited state) and
+the connector webhook (`MapConnectorWebhook`, protected by the sender's own signature). Authentication is off by default and the Host logs a prominent warning
 on every start while it is.
 
 ## Runtime invariants
@@ -83,4 +89,7 @@ These exist because an agent without them fails in ways that produce no error:
 - **Every model call is counted and priced.** `CostTrackingChatClient` records
   `aiagentcanvas.model.{calls,tokens,cost}`, streaming included. Rates live in
   `Agent:Pricing`; an unpriced model reports tokens rather than zero spend.
-- **Background producers have consumers.** The scheduler has `ScheduledTaskRunner`; event triggers have `TriggerDispatchService`; the trigger queue is bounded. A producer without a consumer is a feature that accepts work and never does it.
+- **Background producers have consumers.** The scheduler has `ScheduledTaskRunner`; event triggers have `TriggerDispatchService`; the trigger queue is bounded and durable (`TriggerStore`), with at-least-once delivery, dedupe keys, backoff and a dead-letter state. A producer without a consumer is a feature that accepts work and never does it.
+- **Every unattended run is recorded and limited.** `RunTracking.RunAsync` writes a ledger record for scheduled tasks, triggers, handoffs and jobs. `Agent:Budgets` refuses a run once an agent, trigger or total daily limit is spent, measured from the ledger, and refuses to start without `RunLedger` and `Agent:Pricing`. Persona agents use the same pipeline as the default agent (`AgentPipeline`), so a limit applies to delegated work too.
+- **Secrets never reach the model, a log or a response.** Credentials are encrypted at rest and leave `ICredentialProvider` only to the connection's HTTP client. A connector gets its HTTP client from `IConnectionContext`, which restricts hosts, refuses redirects and retries only safe methods.
+- **Tools that reach people need approval.** A connector tool with risk `Send` or `Destructive` is wrapped in `ApprovalRequiredAIFunction` unless `Connectors:ApprovalMode` is `Audit`. `Security:ApprovalRequiredTools` is a separate mechanism and blocks the tool without asking.

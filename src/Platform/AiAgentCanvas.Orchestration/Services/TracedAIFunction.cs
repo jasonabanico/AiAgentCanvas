@@ -56,6 +56,7 @@ public sealed class TracedAIFunction : DelegatingAIFunction
 
             AgentTelemetry.ToolCalls.Add(1, tags);
             AgentTelemetry.ToolDuration.Record(elapsed, tags);
+            AgentRunContext.Current?.AddToolCall(toolName, outcome, elapsed);
             activity?.SetTag("tool.duration_ms", elapsed);
         }
     }

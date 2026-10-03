@@ -5,6 +5,11 @@ public sealed class ScheduledTaskRecord
     public string Id { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Prompt { get; set; } = string.Empty;
+
+    /// <summary>When set, the task runs this job instead of sending the prompt to the agent.</summary>
+    public string? JobName { get; set; }
+
+    public Dictionary<string, string>? JobArguments { get; set; }
     public string? CronExpression { get; set; }
     public bool IsRecurring { get; set; }
     public string CreatedAt { get; set; } = string.Empty;

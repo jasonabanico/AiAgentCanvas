@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,14 +15,25 @@ public static class EventTriggerServiceExtensions
         configuration?.GetSection(EventTriggerOptions.SectionName).Bind(options);
         services.AddSingleton(options);
 
+        services.AddSingleton(_ =>
+        {
+            var path = Path.IsPathRooted(options.DatabasePath)
+                ? options.DatabasePath
+                : Path.Combine(Directory.GetCurrentDirectory(), options.DatabasePath);
+            return new TriggerStore(path);
+        });
+
+        // The same store holds cursors, so pull-mode readers share one durable position.
+        services.AddSingleton<ICursorStore>(sp => sp.GetRequiredService<TriggerStore>());
+
         services.AddSingleton<TriggerRegistry>();
 
-        services.AddSingleton(Channel.CreateBounded<TriggerEvent>(
-            new BoundedChannelOptions(Math.Max(16, options.QueueCapacity))
-            {
-                FullMode = BoundedChannelFullMode.DropWrite,
-                SingleReader = true,
-            }));
+        // Available to the job runner when the Jobs capability is on. Harmless otherwise.
+        services.AddSingleton<IAgentJob, TriggerQueueHealthJob>();
+        services.AddSingleton<TriggerEventQueue>();
+
+        // Connected services publish their events here when the Connectors capability is on.
+        services.AddSingleton<IConnectorEventSink, ConnectorEventBridge>();
 
         services.AddHostedService<EventTriggerService>();
 
@@ -30,7 +41,9 @@ public static class EventTriggerServiceExtensions
         services.AddHostedService<TriggerDispatchService>();
 
         services.AddSingleton<IReadOnlyList<AITool>>(sp =>
-            EventTriggerToolProvider.CreateTools(sp.GetRequiredService<TriggerRegistry>()));
+            EventTriggerToolProvider.CreateTools(
+                sp.GetRequiredService<TriggerRegistry>(),
+                sp.GetRequiredService<TriggerEventQueue>()));
 
         return services;
     }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
+import RunsView from "./RunsView";
+import ConnectionsView from "./ConnectionsView";
 
 interface Message {
   id: string;
@@ -61,6 +63,7 @@ export default function Home() {
   const [reasoning, setReasoning] = useState<ReasoningBlock | null>(null);
   const [interrupt, setInterrupt] = useState<InterruptInfo | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
+  const [view, setView] = useState<"chat" | "runs" | "connections">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadId = useThreadId();
   const currentRunId = useRef<string>("");
@@ -68,6 +71,13 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // The OAuth provider sends the browser back here, so open the page that shows the result.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("connection")) {
+      setView("connections");
+    }
+  }, []);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/notifications");
@@ -438,7 +448,21 @@ export default function Home() {
       <header style={styles.header}>
         <h1 style={styles.title}>AI Agent Canvas</h1>
         <p style={styles.subtitle}>Multi-agent enterprise copilot</p>
+        <nav style={styles.nav}>
+          {(["chat", "runs", "connections"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{ ...styles.navButton, ...(view === v ? styles.navButtonActive : {}) }}
+            >
+              {v === "chat" ? "Chat" : v === "runs" ? "Runs" : "Connections"}
+            </button>
+          ))}
+        </nav>
       </header>
+
+      {view === "chat" && (
+      <>
 
       {healthStatus && (
         <div
@@ -612,7 +636,7 @@ export default function Home() {
               </button>
             </div>
             <pre style={styles.statePanelContent}>
-              {statePanel.snapshot && JSON.stringify(statePanel.snapshot, null, 2)}
+              {!!statePanel.snapshot && JSON.stringify(statePanel.snapshot, null, 2)}
               {statePanel.deltas.length > 0 && (
                 <>
                   {statePanel.snapshot && "\n\n--- Deltas ---\n\n"}
@@ -623,6 +647,11 @@ export default function Home() {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {view === "runs" && <RunsView />}
+      {view === "connections" && <ConnectionsView />}
     </div>
   );
 }
@@ -650,6 +679,25 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "4px 0 0",
     fontSize: "0.875rem",
     color: "#6b7280",
+  },
+  nav: {
+    display: "flex",
+    gap: "4px",
+    marginTop: "12px",
+  },
+  navButton: {
+    padding: "6px 14px",
+    border: "1px solid #e5e7eb",
+    borderRadius: "6px",
+    background: "#fff",
+    color: "#374151",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+  },
+  navButtonActive: {
+    background: "#2563eb",
+    borderColor: "#2563eb",
+    color: "#fff",
   },
   banner: {
     padding: "12px 24px",

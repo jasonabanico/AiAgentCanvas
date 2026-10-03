@@ -92,7 +92,10 @@ Every capability in the platform can be individually enabled via the `Features` 
     "AuditLog": false,
     "EventTriggers": false,
     "ComputerUse": false,
-    "Evaluation": false
+    "RunLedger": false,
+    "Jobs": false,
+    "Connections": false,
+    "Connectors": false
   }
 }
 ```
@@ -118,7 +121,12 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
 | `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
 | `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
-| `Evaluation` | Eval cases (a test input plus grading criteria) and results are stored in SQLite. Running a case sends the input to the raw, unwrapped chat client and grades the response with an LLM-as-judge pass -- evaluation never depends on the tool pipeline it's measuring. Agents can add cases, run a single case or a whole category, and pull pass-rate statistics. |
+| `RunLedger` | One SQLite record per scheduled, triggered, delegated and job run: input, output, tool calls, tokens, estimated cost and how it ended. Adds the `/api/runs` endpoints and the Runs tab. Daily spend limits (`Agent:Budgets`) need it. |
+| `Jobs` | Deterministic jobs that run without a model, started from a schedule, a trigger or an agent tool. |
+| `Connections` | Encrypted credential storage, the OAuth connect flow with PKCE, and token refresh. Adds the `/api/connections` endpoints and the Connections tab. |
+| `Connectors` | Connectors to outside services (Twilio SMS, Gmail and other MCP servers). Needs `Connections`. Adds the connector host, `/api/connectors/{connectionId}/webhook`, and connector triggers. |
+
+The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in [Operations and Connectors](guide-11-operations-and-connectors.md).
 
 ### Service Modules (Agents and Data Connections)
 

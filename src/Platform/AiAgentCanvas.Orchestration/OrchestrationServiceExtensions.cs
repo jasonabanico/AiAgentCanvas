@@ -2,6 +2,7 @@
 #pragma warning disable MEAI001
 
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Orchestration.Services;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
@@ -22,10 +23,14 @@ public static class OrchestrationServiceExtensions
 
         services.AddSingleton(sp =>
         {
-            var chatClient = sp.GetRequiredService<IChatClient>();
+            // Persona agents run on the same guarded pipeline and wrapped tools as the
+            // default agent. The raw client and raw tools would skip the loop guard, the
+            // context budget, cost tracking and the governance policy.
+            var chatClient = sp.GetRequiredKeyedService<IChatClient>(AgentClientKeys.Pipeline);
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
 
-            var toolsFactory = () => sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t);
+            var toolsFactory = () => (IEnumerable<AITool>)AgentPipeline.WrapTools(
+                sp, sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t));
             var contextProvidersFactory = () => sp.GetServices<AIContextProvider>();
             var personaLookup = personaLookupFactory(sp);
             var personaListAll = personaListAllFactory(sp);

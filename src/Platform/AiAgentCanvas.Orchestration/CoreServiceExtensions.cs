@@ -55,76 +55,16 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<AIContextProvider>(new SystemPromptProvider(defaultPrompt));
 
+        services.AddKeyedSingleton<IChatClient>(AgentClientKeys.Pipeline, (sp, _) => AgentPipeline.BuildChatClient(sp));
+
         services.AddSingleton(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var rawChatClient = sp.GetRequiredService<IChatClient>();
-            var tokenCounter = sp.GetRequiredService<ITokenCounter>();
-
-            // Order matters. Budget enforcement runs closest to the provider so it sees
-            // the final prompt, and the loop guard runs outside it so a terminated run
-            // never pays for compaction it will not use.
-            IChatClient pipeline = new ToolDeduplicatingChatClient(
-                rawChatClient, loggerFactory.CreateLogger<ToolDeduplicatingChatClient>());
-
-            pipeline = new CostTrackingChatClient(
-                pipeline,
-                sp.GetRequiredService<ModelPricingOptions>(),
-                loggerFactory.CreateLogger<CostTrackingChatClient>());
-
-            var budgetOptions = sp.GetRequiredService<ContextBudgetOptions>();
-            if (budgetOptions.Enabled)
-            {
-                pipeline = new ContextBudgetChatClient(
-                    pipeline,
-                    budgetOptions,
-                    tokenCounter,
-                    sp.GetKeyedService<IChatClient>(AgentClientKeys.Economy),
-                    loggerFactory.CreateLogger<ContextBudgetChatClient>());
-            }
-
-            var routerOptions = sp.GetService<ModelRouterOptions>();
-            if (routerOptions is not null)
-            {
-                routerOptions.EconomyClient ??= sp.GetKeyedService<IChatClient>(AgentClientKeys.Economy);
-                if (routerOptions.EconomyClient is null)
-                {
-                    loggerFactory.CreateLogger<CostAwareModelRouter>().LogWarning(
-                        "Agent:ModelRouter is enabled but no economy model is configured, so every turn uses the primary model.");
-                }
-                pipeline = new CostAwareModelRouter(
-                    pipeline, routerOptions, loggerFactory.CreateLogger<CostAwareModelRouter>());
-            }
-
-            var auditClient = sp.GetService<IAuditingChatClientFactory>();
-            if (auditClient is not null)
-                pipeline = auditClient.Wrap(pipeline);
-
-            var reflectiveOptions = sp.GetService<ReflectiveOptions>();
-            if (reflectiveOptions is not null)
-            {
-                pipeline = new ReflectiveChatClient(
-                    pipeline, reflectiveOptions, loggerFactory.CreateLogger<ReflectiveChatClient>());
-            }
-
-            var loopGuardOptions = sp.GetRequiredService<LoopGuardOptions>();
-            if (loopGuardOptions.Enabled)
-            {
-                pipeline = new LoopGuardChatClient(
-                    pipeline, loopGuardOptions, tokenCounter, loggerFactory.CreateLogger<LoopGuardChatClient>());
-            }
-
-            var chatClient = pipeline;
+            var chatClient = sp.GetRequiredKeyedService<IChatClient>(AgentClientKeys.Pipeline);
             var contextProviders = sp.GetServices<AIContextProvider>().ToList();
 
-            var rawTools = sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t).ToList();
+            var tools = AgentPipeline.WrapTools(sp, sp.GetServices<IReadOnlyList<AITool>>().SelectMany(t => t));
             var governanceWrapper = sp.GetService<IToolGovernanceWrapper>();
-            var tools = rawTools.Select(t =>
-            {
-                if (t is not AIFunction fn) return t;
-                if (governanceWrapper is not null) fn = governanceWrapper.Wrap(fn);
-                return (AITool)new TracedAIFunction(fn);
-            }).ToList();
             var toolLogger = loggerFactory.CreateLogger("AiAgentCanvas.ToolRegistration");
             toolLogger.LogInformation("Registered {ToolCount} tools (governance={Governed}): {ToolNames}",
                 tools.Count, governanceWrapper is not null, string.Join(", ", tools.Select(t => t.Name)));

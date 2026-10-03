@@ -16,6 +16,7 @@ Build intelligent AI agents with .NET 9 and Microsoft Agent Framework. From a si
 | 8 | [Multi-Agent Setup](guide-08-multi-agent.md) | Handoff, background delegation, and A2A protocol |
 | 9 | [Architecture](guide-09-architecture.md) | Five-layer architecture and request flow |
 | 10 | [Behavior Patterns](guide-10-behavior-patterns.md) | Seven agent behavior patterns with code examples |
+| 11 | [Operations and Connectors](guide-11-operations-and-connectors.md) | Run ledger, spend limits, durable triggers, jobs, stored credentials, OAuth, and connectors |
 
 ## Appendix
 

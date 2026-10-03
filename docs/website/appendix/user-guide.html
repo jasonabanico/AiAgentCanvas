@@ -156,7 +156,10 @@
     &quot;AuditLog&quot;: false,
     &quot;EventTriggers&quot;: false,
     &quot;ComputerUse&quot;: false,
-    &quot;Evaluation&quot;: false
+    &quot;RunLedger&quot;: false,
+    &quot;Jobs&quot;: false,
+    &quot;Connections&quot;: false,
+    &quot;Connectors&quot;: false
   }
 }
 </code></pre>
@@ -243,11 +246,24 @@
           <td>Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content.</td>
         </tr>
         <tr>
-          <td><code>Evaluation</code></td>
-          <td>Eval cases (a test input plus grading criteria) and results are stored in SQLite. Running a case sends the input to the raw, unwrapped chat client and grades the response with an LLM-as-judge pass -- evaluation never depends on the tool pipeline it&#x27;s measuring. Agents can add cases, run a single case or a whole category, and pull pass-rate statistics.</td>
+          <td><code>RunLedger</code></td>
+          <td>One SQLite record per scheduled, triggered, delegated and job run: input, output, tool calls, tokens, estimated cost and how it ended. Adds the <code>/api/runs</code> endpoints and the Runs tab. Daily spend limits (<code>Agent:Budgets</code>) need it.</td>
+        </tr>
+        <tr>
+          <td><code>Jobs</code></td>
+          <td>Deterministic jobs that run without a model, started from a schedule, a trigger or an agent tool.</td>
+        </tr>
+        <tr>
+          <td><code>Connections</code></td>
+          <td>Encrypted credential storage, the OAuth connect flow with PKCE, and token refresh. Adds the <code>/api/connections</code> endpoints and the Connections tab.</td>
+        </tr>
+        <tr>
+          <td><code>Connectors</code></td>
+          <td>Connectors to outside services (Twilio SMS, Gmail and other MCP servers). Needs <code>Connections</code>. Adds the connector host, <code>/api/connectors/{connectionId}/webhook</code>, and connector triggers.</td>
         </tr>
         </tbody>
       </table>
+      <p>The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
       <h3>Service Modules (Agents and Data Connections)</h3>
       <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface instead of feature flags. Each module declares a configuration section name and self-registers its services. Host does not reference these projects at compile time at all: they&#x27;re loaded at runtime from a <code>plugins/</code> folder next to the Host executable, one subfolder per plugin, via <code>System.Runtime.Loader.AssemblyLoadContext</code>. <code>ServiceModuleExtensions.AddServiceModules</code> scans that folder, loads each plugin into its own isolated <code>PluginLoadContext</code>, and reflects over its types for <code>IServiceModule</code> implementations.</p>
       <p>Modules are opt-in, like feature flags: a module with no configuration section, or with <code>Enabled</code> absent, stays disabled. Set <code>Enabled</code> to <code>true</code> in its configuration section to register it:</p>

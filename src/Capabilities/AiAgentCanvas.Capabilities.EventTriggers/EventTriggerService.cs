@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,24 +7,22 @@ namespace AiAgentCanvas.Capabilities.EventTriggers;
 public sealed class EventTriggerService : BackgroundService
 {
     private readonly TriggerRegistry _registry;
-    private readonly Channel<TriggerEvent> _eventChannel;
+    private readonly TriggerEventQueue _queue;
     private readonly EventTriggerOptions _options;
     private readonly ILogger<EventTriggerService> _logger;
     private readonly List<FileSystemWatcher> _watchers = [];
 
     public EventTriggerService(
         TriggerRegistry registry,
-        Channel<TriggerEvent> eventChannel,
+        TriggerEventQueue queue,
         EventTriggerOptions options,
         ILogger<EventTriggerService> logger)
     {
         _registry = registry;
-        _eventChannel = eventChannel;
+        _queue = queue;
         _options = options;
         _logger = logger;
     }
-
-    public ChannelReader<TriggerEvent> Events => _eventChannel.Reader;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -37,7 +34,7 @@ public sealed class EventTriggerService : BackgroundService
         {
             try
             {
-                await CheckScheduledTriggers(stoppingToken);
+                CheckScheduledTriggers();
                 await Task.Delay(TimeSpan.FromSeconds(Math.Max(5, _options.PollSeconds)), stoppingToken);
                 RefreshFileWatchers();
             }
@@ -54,15 +51,13 @@ public sealed class EventTriggerService : BackgroundService
         CleanupWatchers();
     }
 
-    private async Task CheckScheduledTriggers(CancellationToken ct)
+    private void CheckScheduledTriggers()
     {
         var scheduledTriggers = _registry.GetEnabled(EventTriggerType.Scheduled);
         foreach (var trigger in scheduledTriggers)
         {
             if (ShouldFire(trigger))
-            {
-                await FireTrigger(trigger, ct);
-            }
+                FireTrigger(trigger);
         }
     }
 
@@ -82,18 +77,26 @@ public sealed class EventTriggerService : BackgroundService
         return schedule.IsDue(trigger.LastFired, DateTimeOffset.UtcNow);
     }
 
-    private async Task FireTrigger(EventTrigger trigger, CancellationToken ct)
+    private void FireTrigger(EventTrigger trigger)
     {
+        var now = DateTimeOffset.UtcNow;
         var evt = new TriggerEvent
         {
             TriggerId = trigger.Id,
             TriggerName = trigger.Name,
             Message = trigger.AgentMessage,
             TargetAgent = trigger.TargetAgent,
+            TargetJob = trigger.TargetJob,
+            // One event per trigger per minute, so a restart that races the last-fired
+            // write cannot run the same occurrence twice.
+            DedupeKey = $"scheduled:{now:yyyyMMddHHmm}",
         };
 
+        // A refused event leaves the trigger due, so the next poll tries again.
+        if (_queue.Enqueue(evt) == EnqueueOutcome.Rejected)
+            return;
+
         _registry.RecordFired(trigger.Id);
-        await _eventChannel.Writer.WriteAsync(evt, ct);
         _logger.LogInformation("Fired trigger {Id}: {Name}", trigger.Id, trigger.Name);
     }
 
@@ -146,17 +149,23 @@ public sealed class EventTriggerService : BackgroundService
             TriggerName = trigger.Name,
             Message = $"{trigger.AgentMessage} [File: {e.Name}, Change: {e.ChangeType}]",
             TargetAgent = trigger.TargetAgent,
+            TargetJob = trigger.TargetJob,
             Metadata = { ["filePath"] = e.FullPath, ["changeType"] = e.ChangeType.ToString() },
+            // One write raises several change events within a moment. Coalescing them
+            // by second keeps a single save from running the agent more than once.
+            DedupeKey = $"file:{e.FullPath}:{e.ChangeType}:{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}",
         };
 
-        _registry.RecordFired(trigger.Id);
-
-        // The queue is bounded, so a file storm drops events rather than growing
-        // without limit. The drop is logged so it is not silent.
-        if (_eventChannel.Writer.TryWrite(evt))
-            _logger.LogInformation("File trigger {Id} fired: {File} ({Change})", trigger.Id, e.Name, e.ChangeType);
-        else
-            _logger.LogWarning("Trigger queue full, dropped file event for trigger {Id}: {File}", trigger.Id, e.Name);
+        switch (_queue.Enqueue(evt))
+        {
+            case EnqueueOutcome.Accepted:
+                _registry.RecordFired(trigger.Id);
+                _logger.LogInformation("File trigger {Id} fired: {File} ({Change})", trigger.Id, e.Name, e.ChangeType);
+                break;
+            case EnqueueOutcome.Rejected:
+                _logger.LogWarning("Trigger backlog full, refused file event for trigger {Id}: {File}", trigger.Id, e.Name);
+                break;
+        }
     }
 
     private void CleanupWatchers()

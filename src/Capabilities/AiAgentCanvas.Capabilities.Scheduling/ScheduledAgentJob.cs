@@ -21,16 +21,27 @@ public sealed class ScheduledAgentJob
         _logger = logger;
     }
 
+    /// <summary>The agent scheduled tasks run on, which a spend limit is checked against.</summary>
+    public string AgentName => _sp.GetService<AIAgent>()?.Name ?? "default";
+
     public async Task ExecuteAsync(string taskId, string description, string prompt, CancellationToken ct = default)
     {
         _logger.LogInformation("Executing scheduled task {TaskId}: {Description}", taskId, description);
 
         var agent = _sp.GetRequiredService<AIAgent>();
-        var session = await agent.CreateSessionAsync(ct);
-        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
 
-        var response = await agent.RunAsync(messages, session, cancellationToken: ct);
-        var resultText = response.Text ?? "(no response)";
+        var resultText = await RunTracking.RunAsync(
+            _sp.GetService<IRunLedger>(),
+            new RunStart(RunSource.Scheduled, agent.Name ?? "default", prompt, TaskId: taskId),
+            async token =>
+            {
+                var session = await agent.CreateSessionAsync(token);
+                var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
+                var response = await agent.RunAsync(messages, session, cancellationToken: token);
+                return response.Text ?? "(no response)";
+            },
+            ct,
+            ex => _logger.LogWarning(ex, "Run ledger write failed for task {TaskId}", taskId));
 
         _store.SaveResult(taskId, description, resultText);
         _logger.LogInformation("Scheduled task {TaskId} completed. Result length: {Length}", taskId, resultText.Length);
