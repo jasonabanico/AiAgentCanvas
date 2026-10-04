@@ -26,7 +26,7 @@ using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Host;
 using AiAgentCanvas.Orchestration;
 using AiAgentCanvas.Orchestration.Services;
-using AiAgentCanvas.Storage.Sqlite;
+using DataConnection.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
 using AiAgentCanvas.Providers.Snowflake;

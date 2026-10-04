@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 
-namespace AiAgentCanvas.Storage.Sqlite;
+namespace DataConnection.Storage.Sqlite;
 
 public abstract class SqliteStoreBase
 {

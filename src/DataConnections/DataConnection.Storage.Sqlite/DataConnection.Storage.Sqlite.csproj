@@ -12,7 +12,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Abstractions\AiAgentCanvas.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Scheduling\AiAgentCanvas.Capabilities.Scheduling.csproj" />
   </ItemGroup>
 
 </Project>

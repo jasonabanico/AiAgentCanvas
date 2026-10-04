@@ -33,7 +33,7 @@
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.EventTriggers\AiAgentCanvas.Capabilities.EventTriggers.csproj" />
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.Scheduling\AiAgentCanvas.Capabilities.Scheduling.csproj" />
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.Jobs\AiAgentCanvas.Capabilities.Jobs.csproj" />
-    <ProjectReference Include="..\..\src\DataConnections\AiAgentCanvas.Storage.Sqlite\AiAgentCanvas.Storage.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\DataConnections\DataConnection.Storage.Sqlite\DataConnection.Storage.Sqlite.csproj" />
   </ItemGroup>
 
 </Project>

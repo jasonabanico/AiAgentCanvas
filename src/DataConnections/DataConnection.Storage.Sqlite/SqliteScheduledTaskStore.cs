@@ -1,7 +1,7 @@
-using AiAgentCanvas.Capabilities.Scheduling;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Data.Sqlite;
 
-namespace AiAgentCanvas.Storage.Sqlite;
+namespace DataConnection.Storage.Sqlite;
 
 public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskStore
 {

@@ -1,7 +1,7 @@
-using AiAgentCanvas.Capabilities.Scheduling;
+using AiAgentCanvas.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AiAgentCanvas.Storage.Sqlite;
+namespace DataConnection.Storage.Sqlite;
 
 public static class StorageSqliteServiceExtensions
 {

@@ -51,7 +51,7 @@ src/
 │   ├── DataConnection.VectorStore.Sqlite/
 │   ├── DataConnection.VectorSearch.Databricks/
 │   ├── DataConnection.VectorSearch.Snowflake/
-│   └── AiAgentCanvas.Storage.Sqlite/
+│   └── DataConnection.Storage.Sqlite/ # scheduled task store
 ├── Providers/                        # AzureAIFoundry, Databricks, Snowflake
 └── Host/
     └── AiAgentCanvas.Host/           # composition root (Program.cs)

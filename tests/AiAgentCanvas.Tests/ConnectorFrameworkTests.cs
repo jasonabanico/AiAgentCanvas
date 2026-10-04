@@ -631,7 +631,7 @@ public class ConnectorEventBridgeTests : TriggerTestBase
         AgentMessage = "Draft a reply.",
     };
 
-    private static ConnectorEvent Event(string id = "sms:1", string type = "sms.received", string body = "hello") =>
+    private static new ConnectorEvent Event(string id = "sms:1", string type = "sms.received", string body = "hello") =>
         new(id, type, DateTimeOffset.UtcNow, "Text from +1555", new Dictionary<string, string> { ["body"] = body });
 
     [Fact]

@@ -55,7 +55,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Host", "Host", "{7226ABEA-7
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Host", "src\Host\AiAgentCanvas.Host\AiAgentCanvas.Host.csproj", "{AA781027-31C9-496E-8FE3-8BDFA5817FC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Storage.Sqlite", "src\DataConnections\AiAgentCanvas.Storage.Sqlite\AiAgentCanvas.Storage.Sqlite.csproj", "{E65BA035-EB91-4942-A6ED-1EA333FAA5A4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataConnection.Storage.Sqlite", "src\DataConnections\DataConnection.Storage.Sqlite\DataConnection.Storage.Sqlite.csproj", "{E65BA035-EB91-4942-A6ED-1EA333FAA5A4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Providers.Databricks", "src\Providers\AiAgentCanvas.Providers.Databricks\AiAgentCanvas.Providers.Databricks.csproj", "{0DD65A4C-6231-4F6E-8DE5-5C36203C53B4}"
 EndProject

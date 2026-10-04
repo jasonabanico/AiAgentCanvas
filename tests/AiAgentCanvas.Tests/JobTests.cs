@@ -3,7 +3,7 @@ using AiAgentCanvas.Capabilities.EventTriggers;
 using AiAgentCanvas.Capabilities.Jobs;
 using AiAgentCanvas.Capabilities.RunLedger;
 using AiAgentCanvas.Capabilities.Scheduling;
-using AiAgentCanvas.Storage.Sqlite;
+using DataConnection.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
