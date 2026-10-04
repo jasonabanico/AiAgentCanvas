@@ -12,9 +12,9 @@ public static class NotificationEndpoint
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static void MapNotificationEndpoints(this WebApplication app)
+    public static IEndpointConventionBuilder MapNotificationEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/notifications", HandleNotificationStream);
+        return app.MapGet("/api/notifications", HandleNotificationStream);
     }
 
     private static async Task HandleNotificationStream(HttpContext context, INotificationSink sink)

@@ -61,8 +61,19 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.ComputerUse
 │   └── Platform.Abstractions
-├── Capabilities.Evaluation
+├── Capabilities.RunLedger
 │   └── Platform.Abstractions
+├── Capabilities.Jobs
+│   └── Platform.Abstractions
+├── Platform.Connections
+│   └── Platform.Abstractions
+├── Platform.Connectors
+│   ├── Platform.Connections
+│   └── Platform.Orchestration
+├── Connector.TwilioSms
+│   └── Platform.Connectors
+├── Connector.Mcp
+│   └── Platform.Connectors
 ├── AgentData.Personas
 │   └── Platform.Abstractions
 ├── AgentData.Context
@@ -130,9 +141,12 @@ Cross-cutting features that agents use but that are not specific to any single d
 | **RAG** | Vector-based retrieval-augmented generation with citation tracking | `RagToolProvider`, `RagContextProvider`, `VectorSearchService` |
 | **EpisodicMemory** | Cross-session memory with relevance decay, search, and context injection | `EpisodicMemoryStore`, `EpisodicMemoryToolProvider`, `EpisodicMemoryContextProvider`, `MemoryDecayService` |
 | **AuditLog** | Comprehensive agent activity tracking with sensitive parameter redaction | `AuditLogStore`, `AuditingChatClient`, `AuditLogToolProvider` |
-| **EventTriggers** | Proactive agent engagement via scheduled, file-watch, and webhook triggers | `TriggerRegistry`, `EventTriggerService`, `EventTriggerToolProvider` |
+| **EventTriggers** | Proactive agent engagement via scheduled, file-watch, webhook and connector triggers, held in a durable queue | `TriggerRegistry`, `TriggerStore`, `TriggerEventQueue`, `TriggerDispatchService`, `ConnectorEventBridge` |
 | **ComputerUse** | Browser automation via headless Chromium (Playwright) | `BrowserSession`, `ComputerUseToolProvider` |
-| **Evaluation** | LLM-as-judge scoring of agent responses against stored eval cases | `EvaluationStore`, `EvaluationRunner`, `EvaluationToolProvider` |
+| **RunLedger** | One record per unattended run, with usage, tool calls and outcome | `SqliteRunLedger`, `RunLedgerEndpoints`, `RunLedgerToolProvider` |
+| **Jobs** | Deterministic scheduled work that runs without a model | `JobRunner`, `IAgentJob`, `JobToolProvider` |
+
+Connections and connectors sit in the Platform layer because other capabilities depend on them. `Platform.Connections` stores credentials and runs OAuth. `Platform.Connectors` defines the connector contracts and runs one connector per stored connection. See [Operations and Connectors](guide-11-operations-and-connectors.md).
 
 ### DataConnections and Providers
 

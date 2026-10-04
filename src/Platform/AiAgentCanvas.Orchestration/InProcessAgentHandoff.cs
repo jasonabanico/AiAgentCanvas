@@ -8,11 +8,16 @@ public sealed class InProcessAgentHandoff : IAgentHandoff
 {
     private readonly AgentRegistry _registry;
     private readonly ILogger<InProcessAgentHandoff> _logger;
+    private readonly IRunLedger? _ledger;
 
-    public InProcessAgentHandoff(AgentRegistry registry, ILogger<InProcessAgentHandoff> logger)
+    public InProcessAgentHandoff(
+        AgentRegistry registry,
+        ILogger<InProcessAgentHandoff> logger,
+        IRunLedger? ledger = null)
     {
         _registry = registry;
         _logger = logger;
+        _ledger = ledger;
     }
 
     public async Task<HandoffResult> HandoffAsync(string targetAgent, string context, CancellationToken cancellationToken = default)
@@ -26,10 +31,18 @@ public sealed class InProcessAgentHandoff : IAgentHandoff
 
         try
         {
-            var session = await agent.CreateSessionAsync(cancellationToken);
-            var messages = new List<ChatMessage> { new(ChatRole.User, context) };
-            var response = await agent.RunAsync(messages, session, cancellationToken: cancellationToken);
-            var resultText = response.Text ?? "(no response from agent)";
+            var resultText = await RunTracking.RunAsync(
+                _ledger,
+                new RunStart(RunSource.Handoff, targetAgent, context),
+                async ct =>
+                {
+                    var session = await agent.CreateSessionAsync(ct);
+                    var messages = new List<ChatMessage> { new(ChatRole.User, context) };
+                    var response = await agent.RunAsync(messages, session, cancellationToken: ct);
+                    return response.Text ?? "(no response from agent)";
+                },
+                cancellationToken,
+                ex => _logger.LogWarning(ex, "Run ledger write failed for handoff to {Target}", targetAgent));
 
             _logger.LogInformation("Handoff to {Target} completed. Response length: {Length}", targetAgent, resultText.Length);
 

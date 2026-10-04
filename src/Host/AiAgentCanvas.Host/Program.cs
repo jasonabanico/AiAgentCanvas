@@ -1,6 +1,7 @@
 #pragma warning disable MEAI001
 
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Authentication;
 using AiAgentCanvas.AgentData.Context;
 using AiAgentCanvas.AgentData.Entities;
 using AiAgentCanvas.AgentData.Guardrails;
@@ -15,10 +16,16 @@ using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
 using AiAgentCanvas.Capabilities.ComputerUse;
 using AiAgentCanvas.Capabilities.EventTriggers;
-using AiAgentCanvas.Capabilities.Evaluation;
+using AiAgentCanvas.Capabilities.Jobs;
+using AiAgentCanvas.Connections;
+using AiAgentCanvas.Connectors;
+using AiAgentCanvas.Connectors.Mcp;
+using AiAgentCanvas.Connectors.TwilioSms;
+using AiAgentCanvas.Capabilities.RunLedger;
 using AiAgentCanvas.Capabilities.SystemTools;
 using AiAgentCanvas.Host;
 using AiAgentCanvas.Orchestration;
+using AiAgentCanvas.Orchestration.Services;
 using DataConnection.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
@@ -60,6 +67,10 @@ else
     builder.Services.AddAzureAIFoundry(builder.Configuration);
 }
 
+var auth = new AgentAuthenticationOptions();
+builder.Configuration.GetSection(AgentAuthenticationOptions.SectionName).Bind(auth);
+builder.Services.AddAiAgentCanvasAuthentication(builder.Configuration);
+
 builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
 builder.Services.AddAiAgentCanvasPurview(builder.Configuration);
 builder.Services.AddDevUI();
@@ -68,6 +79,7 @@ builder.Services.AddAiAgentCanvas(builder.Configuration, options =>
 {
     options.AgentName = "AiAgentCanvas";
     options.AgentDescription = "A multi-tool AI assistant with market data, scheduling, skills, and MCP integration.";
+    options.AllowedOrigins = auth.AllowedOrigins;
 });
 
 builder.Services.AddServiceModules(builder.Configuration);
@@ -188,22 +200,83 @@ if (features.EpisodicMemory) builder.Services.AddAiAgentCanvasEpisodicMemory();
 if (features.AuditLog) builder.Services.AddAiAgentCanvasAuditLog();
 if (features.EventTriggers) builder.Services.AddAiAgentCanvasEventTriggers(builder.Configuration);
 if (features.ComputerUse) builder.Services.AddAiAgentCanvasComputerUse();
-if (features.Evaluation) builder.Services.AddAiAgentCanvasEvaluation();
+if (features.RunLedger) builder.Services.AddAiAgentCanvasRunLedger(builder.Configuration);
+if (features.Jobs) builder.Services.AddAiAgentCanvasJobs(builder.Configuration);
+
+if (features.Connectors && !features.Connections)
+{
+    throw new InvalidOperationException(
+        "Features:Connectors requires Features:Connections, because connectors read their credentials from the connection store.");
+}
+
+if (features.Connections) builder.Services.AddAiAgentCanvasConnections(builder.Configuration);
+
+if (features.Connectors)
+{
+    builder.Services.AddAiAgentCanvasConnectors(builder.Configuration);
+    builder.Services.AddTwilioSmsConnector();
+    builder.Services.AddGmailMcpConnector();
+    builder.Services.AddMcpConnector();
+}
+
+var budgets = new BudgetOptions();
+builder.Configuration.GetSection(BudgetOptions.SectionName).Bind(budgets);
+if (budgets.Enabled)
+{
+    // Limits are measured from recorded runs. Without the ledger a limit would be
+    // configured and never enforced, which is worse than having none.
+    if (!features.RunLedger)
+    {
+        throw new InvalidOperationException(
+            "Agent:Budgets:Enabled requires Features:RunLedger, because spend limits are measured from the run ledger.");
+    }
+
+    builder.Services.AddAiAgentCanvasBudgets(builder.Configuration);
+}
 
 var app = builder.Build();
 
 app.UseAiAgentCanvasSecurity();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseAiAgentCanvas();
+app.UseAiAgentCanvasAuthentication();
+
+app.UseAiAgentCanvas(configureEndpoint: (endpoint, key) => endpoint.RequireAgentAuthorization(auth, key));
 
 // The A2A server is registered by AddAiAgentCanvasInterAgentCommunication, so mapping
 // its endpoints unconditionally crashes startup whenever that feature is off.
-if (features.InterAgentCommunication) app.MapA2AEndpoints();
+if (features.InterAgentCommunication)
+    app.MapA2AEndpoints().RequireAgentAuthorization(auth, "a2a");
 
-app.MapDevUI();
-if (features.Notifications) app.MapNotificationEndpoints();
-if (features.EventTriggers) app.MapEventTriggerEndpoints();
+app.MapDevUI().RequireAgentAuthorization(auth, "devui");
+
+if (features.Notifications)
+    app.MapNotificationEndpoints().RequireAgentAuthorization(auth, "notifications");
+
+if (features.EventTriggers)
+    app.MapEventTriggerEndpoints().RequireAgentAuthorization(auth, "webhooks");
+
+if (features.RunLedger)
+    app.MapRunLedgerEndpoints().RequireAgentAuthorization(auth, "runs");
+
+if (features.Connections)
+{
+    app.MapConnectionEndpoints().RequireAgentAuthorization(auth, "connections");
+
+    // The provider's redirect carries no credentials of ours. The encrypted, time-limited
+    // state is what proves this host started the flow.
+    app.MapConnectionCallback();
+}
+
+if (features.Connectors)
+{
+    app.MapConnectorEndpoints().RequireAgentAuthorization(auth, "connectors");
+
+    // Services deliver webhooks without our credentials. Each connector verifies the
+    // sender's own signature before anything is read.
+    app.MapConnectorWebhook();
+}
+
 app.MapFallbackToFile("index.html");
 
 app.Run();

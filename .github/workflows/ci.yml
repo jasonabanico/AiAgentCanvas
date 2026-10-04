@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build, test and scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore AiAgentCanvas.sln
+
+      - name: Build
+        run: dotnet build AiAgentCanvas.sln --no-restore --configuration Release
+
+      # Deterministic tests: no model, no credentials, safe on a fork PR.
+      - name: Unit tests
+        run: dotnet test tests/AiAgentCanvas.Tests/AiAgentCanvas.Tests.csproj --no-build --configuration Release
+
+      # A vulnerable transitive package should fail the build rather than sit in a log.
+      - name: Vulnerable package scan
+        run: |
+          dotnet list AiAgentCanvas.sln package --vulnerable --include-transitive 2>&1 | tee scan.log
+          if grep -q "has the following vulnerable packages" scan.log; then
+            echo "::error::Vulnerable packages found"
+            exit 1
+          fi
+
+  evals:
+    name: Evaluation suite
+    runs-on: ubuntu-latest
+    needs: build
+    # Secrets are unavailable to fork PRs, where the suite would skip every case
+    # and report a misleading pass.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run evaluations
+        env:
+          AIFoundry__Endpoint: ${{ secrets.AIFOUNDRY_ENDPOINT }}
+          AIFoundry__Key: ${{ secrets.AIFOUNDRY_KEY }}
+          AIFoundry__DeploymentName: ${{ secrets.AIFOUNDRY_DEPLOYMENT }}
+          AIFoundry__JudgeDeploymentName: ${{ secrets.AIFOUNDRY_JUDGE_DEPLOYMENT }}
+          EVAL_STORAGE_ROOT: ${{ github.workspace }}/eval-results
+        run: dotnet test tests/AiAgentCanvas.EvalTests/AiAgentCanvas.EvalTests.csproj --configuration Release
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results/
+          if-no-files-found: ignore

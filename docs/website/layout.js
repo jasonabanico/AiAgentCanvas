@@ -13,6 +13,7 @@ const NAV_SECTIONS = [
       { title: '8. Multi-Agent Setup', file: 'multi-agent.html' },
       { title: '9. Architecture', file: 'architecture.html' },
       { title: '10. Behavior Patterns', file: 'behavior-patterns.html' },
+      { title: '11. Operations and Connectors', file: 'operations-and-connectors.html' },
     ]
   },
   {

@@ -11,6 +11,7 @@
     <!-- Platform -->
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Orchestration\AiAgentCanvas.Orchestration.csproj" />
     <ProjectReference Include="..\..\Platform\AiAgentCanvas.Security\AiAgentCanvas.Security.csproj" />
+    <ProjectReference Include="..\..\Platform\AiAgentCanvas.Authentication\AiAgentCanvas.Authentication.csproj" />
 
     <!-- Capabilities -->
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Rag\AiAgentCanvas.Capabilities.Rag.csproj" />
@@ -22,7 +23,12 @@
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.AuditLog\AiAgentCanvas.Capabilities.AuditLog.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.EventTriggers\AiAgentCanvas.Capabilities.EventTriggers.csproj" />
     <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.ComputerUse\AiAgentCanvas.Capabilities.ComputerUse.csproj" />
-    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Evaluation\AiAgentCanvas.Capabilities.Evaluation.csproj" />
+    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.RunLedger\AiAgentCanvas.Capabilities.RunLedger.csproj" />
+    <ProjectReference Include="..\..\Capabilities\AiAgentCanvas.Capabilities.Jobs\AiAgentCanvas.Capabilities.Jobs.csproj" />
+    <ProjectReference Include="..\..\Platform\AiAgentCanvas.Connections\AiAgentCanvas.Connections.csproj" />
+    <ProjectReference Include="..\..\Platform\AiAgentCanvas.Connectors\AiAgentCanvas.Connectors.csproj" />
+    <ProjectReference Include="..\..\Connectors\AiAgentCanvas.Connector.TwilioSms\AiAgentCanvas.Connector.TwilioSms.csproj" />
+    <ProjectReference Include="..\..\Connectors\AiAgentCanvas.Connector.Mcp\AiAgentCanvas.Connector.Mcp.csproj" />
 
     <!-- AgentData -->
     <ProjectReference Include="..\..\AgentData\AiAgentCanvas.AgentData.Personas\AiAgentCanvas.AgentData.Personas.csproj" />

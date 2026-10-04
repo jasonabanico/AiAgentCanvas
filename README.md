@@ -35,9 +35,14 @@ src/
 ├── Platform/
 │   ├── AiAgentCanvas.Abstractions/   # seed contracts, cron, telemetry, messaging interfaces
 │   ├── AiAgentCanvas.Orchestration/  # MAF wiring, AG-UI endpoint, registry, handoff, chat pipeline
-│   └── AiAgentCanvas.Security/       # Agent Governance Toolkit + Purview
+│   ├── AiAgentCanvas.Security/       # Agent Governance Toolkit + Purview
+│   ├── AiAgentCanvas.Authentication/ # API key and JWT bearer schemes
+│   ├── AiAgentCanvas.Connections/    # encrypted credential store, OAuth, token refresh
+│   └── AiAgentCanvas.Connectors/     # connector contracts, host, guarded HTTP client, webhooks
 ├── Capabilities/                     # Rag, Scheduling, Skills, Notifications, SystemTools,
-│                                     # EpisodicMemory, AuditLog, EventTriggers, ComputerUse, Evaluation
+│                                     # EpisodicMemory, AuditLog, EventTriggers, ComputerUse,
+│                                     # RunLedger, Jobs
+├── Connectors/                       # Connector.TwilioSms, Connector.Mcp (Gmail and any MCP server)
 ├── AgentData/                        # Personas, Context, Entities, Guardrails, Profiles, Workflows
 ├── Agents/
 │   └── Agent.FinancialAnalyst/       # sample: financial analysis persona + tool declarations
@@ -51,8 +56,9 @@ src/
 └── Host/
     └── AiAgentCanvas.Host/           # composition root (Program.cs)
 
-tests/AiAgentCanvas.Tests/            # cron, token counting, context budget, loop guard,
-                                      # system-tool sandboxing, episodic memory
+tests/AiAgentCanvas.Tests/            # cron, token counting, context budget, loop guard, run ledger,
+                                      # budgets, trigger queue, jobs, credentials, connectors
+tests/AiAgentCanvas.EvalTests/        # checked-in model evaluations, run in CI
 agent-data/                           # per-agent runtime data (created on first run)
 frontend/                             # Next.js AG-UI chat client
 docs/                                 # GitHub Pages documentation site
@@ -87,7 +93,7 @@ Create `src/Host/AiAgentCanvas.Host/appsettings.Development.json`:
 Two optional deployments are worth setting:
 
 - `EconomyDeploymentName` gives the cost-aware router a cheaper model for low-complexity turns and gives history compaction a cheap summarizer.
-- `JudgeDeploymentName` gives the Evaluation capability a model distinct from the one under test. Without it, evaluation grades the model with itself and says so in its output.
+- `JudgeDeploymentName` gives the evaluation suite in `tests/AiAgentCanvas.EvalTests` a model distinct from the one under test. Without it, the suite skips itself.
 
 ### 2. Run the Backend
 
@@ -170,9 +176,13 @@ Seeded components are written to disk on first startup and never overwrite manua
 - **RAG** — hybrid retrieval, chunk overlap, LLM reranking, cited sources
 - **MCP connections** — connect to external MCP servers at runtime, with auth, issuer checks, health pings, and reconnect
 - **Scheduled tasks** — cron-scheduled agent runs executed by a hosted runner, with per-task timeouts
-- **Event triggers** — cron, file-watch, and webhook triggers dispatched to the agent through a bounded queue
+- **Event triggers** — cron, file-watch, webhook and connector triggers held in a durable SQLite queue with deduplication, retry with backoff, and a dead-letter state
+- **Run ledger** — one record per unattended run: source, tool calls, tokens, cost, and how it ended, with a Runs tab in the UI
+- **Spend limits** — per-run and daily limits per agent, per trigger and in total, measured from the ledger
+- **Jobs** — deterministic scheduled work that runs without a model
+- **Connections and connectors** — encrypted credentials, OAuth with refresh, and connectors with risk-tagged tools, approval for sends, signed webhooks and events (Twilio SMS and Gmail through MCP ship in the box)
 - **Inter-agent communication** — agent registry with A2A agent cards, mailbox messaging, synchronous handoff
-- **Evaluation** — LLM-as-judge against the full agent, graded by a separate model, with task success rate, tool-use accuracy, and trajectory efficiency
+- **Evaluation** — checked-in cases graded by `Microsoft.Extensions.AI.Evaluation.Quality`, run in CI, so a regression fails the build
 - **Observability** — OpenTelemetry spans per tool call and metrics for tool outcomes, run terminations, context pressure, and eval results
 - **Security** — Agent Governance Toolkit, prompt-injection detection, approval gates on side-effecting tools, allowlisted filesystem and shell access
 

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operations and Connectors - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Operations and Connectors</h1>
+      <p>This guide covers two groups of features. The first group serves agents that run without a person watching: a record of each run, spend limits, durable event triggers and deterministic jobs. The second group serves agents that act inside outside accounts: stored credentials, OAuth, and connectors to services such as Twilio and Gmail.</p>
+      <p>All of it is off by default and sits behind <code>Features:*</code> flags.</p>
+      <table>
+        <thead><tr>
+          <th>Flag</th>
+          <th>Adds</th>
+          <th>Needs</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>RunLedger</code></td>
+          <td>A record of each run, the <code>/api/runs</code> endpoints, and the Runs tab</td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td><code>Jobs</code></td>
+          <td>Deterministic jobs that need no model</td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td><code>Connections</code></td>
+          <td>Encrypted credentials, the OAuth connect flow, token refresh</td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td><code>Connectors</code></td>
+          <td>Connectors, their tools, webhooks and events</td>
+          <td><code>Connections</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <p><code>Agent:Budgets</code> is a configuration section and not a flag. It needs <code>RunLedger</code> and <code>Agent:Pricing</code>, and the Host refuses to start with budgets enabled and no ledger.</p>
+      <h2>Run ledger</h2>
+      <p>An unattended agent leaves no trace in a chat window. The run ledger writes one record per run to SQLite: what started it, what it did, what it cost and how it ended.</p>
+      <p>A record holds the agent name, the source (<code>Interactive</code>, <code>Scheduled</code>, <code>Trigger</code>, <code>Handoff</code> or <code>Job</code>), the trigger or task id, start and end times, status, the input and output text, token counts, estimated cost, the tool calls with outcome and duration, and the reason a run was cut short, if it was.</p>
+      <ul>
+        <li><strong>Nesting.</strong> A run started inside another run, such as a handoff, records its parent. The parent&#x27;s totals include the child&#x27;s usage. Totals reported by the API count top-level runs only, so delegated work is not counted twice.</li>
+        <li><strong>Restarts.</strong> A run still marked <code>Running</code> when the process starts again is marked <code>Abandoned</code>. Its outcome is unknown.</li>
+        <li><strong>Text limits.</strong> Input and output are cut to <code>MaxTextChars</code>.</li>
+        <li><strong>Scope.</strong> Scheduled tasks, triggers, handoffs and jobs are recorded. Chat sessions through the AG-UI endpoint are not.</li>
+      </ul>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:RunLedger</code>)</th>
+          <th>Default</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>DatabasePath</code></td>
+          <td><code>run-ledger.db</code></td>
+          <td>SQLite file</td>
+        </tr>
+        <tr>
+          <td><code>RetentionDays</code></td>
+          <td>30</td>
+          <td>Finished runs older than this are deleted daily</td>
+        </tr>
+        <tr>
+          <td><code>MaxTextChars</code></td>
+          <td>4000</td>
+          <td>Longest stored input or output</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Read the ledger through the <strong>Runs</strong> tab, the endpoints (<code>GET /api/runs</code>, <code>/api/runs/totals</code>, <code>/api/runs/{id}</code>, endpoint key <code>runs</code>), or the agent tools <code>list_recent_runs</code>, <code>get_run</code> and <code>run_totals</code>. The list takes <code>hours</code>, <code>agent</code>, <code>status</code>, <code>source</code> and <code>triggerId</code> filters.</p>
+      <h2>Spend limits</h2>
+      <p>Each model call is priced from <code>Agent:Pricing</code>, which lists the rate per million tokens for each model. Two limits use those prices.</p>
+      <p><strong>Per run.</strong> <code>Agent:LoopGuard:MaxRunCost</code> ends a run once it has spent that amount. The loop guard withdraws the tools and asks the model to report what it has. The ledger records the termination as <code>CostBudget</code>.</p>
+      <p><strong>Per day.</strong> <code>Agent:Budgets</code> limits unattended spend over a rolling 24 hours, measured from the ledger, so it survives a restart.</p>
+      <pre><code class="language-json">
+{
+  &quot;Agent&quot;: {
+    &quot;Pricing&quot;: { &quot;Models&quot;: { &quot;gpt-4o&quot;: { &quot;InputPer1M&quot;: 2.5, &quot;OutputPer1M&quot;: 10 } } },
+    &quot;LoopGuard&quot;: { &quot;MaxRunCost&quot;: 0.50 },
+    &quot;Budgets&quot;: {
+      &quot;Enabled&quot;: true,
+      &quot;TotalDailyLimit&quot;: 20,
+      &quot;DailyLimit&quot;: 5,
+      &quot;Agents&quot;: { &quot;FinancialAnalyst&quot;: 10 },
+      &quot;Triggers&quot;: { &quot;reply-to-texts&quot;: 3 }
+    }
+  }
+}
+</code></pre>
+      <p>A limit of zero means no limit. Before a scheduled task or trigger event starts a model run, the budget guard checks the limits for the agent, the trigger and the total.</p>
+      <ul>
+        <li>A <strong>trigger event</strong> over its limit is deferred without spending an attempt, and the guard is asked again after <code>DeferMinutes</code>.</li>
+        <li>A <strong>scheduled agent task</strong> over its limit is skipped for that tick. Job tasks, which use no model, still run.</li>
+        <li>A notification goes out once per day when a limit passes <code>WarnAtFraction</code> (default 0.8) and once when it is reached.</li>
+      </ul>
+      <p>A run that is still in flight does not count until it ends, so concurrent runs can pass a limit by their own cost. Set <code>MaxRunCost</code> to bound that overshoot.</p>
+      <h2>Durable event triggers</h2>
+      <p>Event triggers hold their queue in SQLite. A restart loses no pending event and a full queue refuses events and says so, where an in-memory channel dropped them without notice.</p>
+      <p>Delivery is at least once. An event interrupted mid-run runs again, so the work an agent does for an event must be safe to repeat. Send tools accept an idempotency key for this reason.</p>
+      <ul>
+        <li><strong>Deduplication.</strong> An event carries an optional dedupe key. A second event with the same trigger and key is dropped. Scheduled triggers key by minute, file watchers key by path, change type and second, and a webhook sender sets the <code>Idempotency-Key</code> header.</li>
+        <li><strong>Retry.</strong> A failed run is retried with exponential backoff up to <code>MaxAttempts</code>. After that the event is parked as <code>Dead</code> and a notification goes out.</li>
+        <li><strong>Inspection.</strong> <code>GET /api/triggers/queue</code> shows counts. <code>GET /api/triggers/events/dead</code> lists parked events with their last error. <code>POST /api/triggers/events/{id}/retry</code> gives one a fresh set of attempts. The tools <code>trigger_queue_status</code>, <code>list_failed_trigger_events</code> and <code>retry_trigger_event</code> do the same for an agent.</li>
+        <li><strong>Webhooks.</strong> A body over <code>MaxWebhookBodyBytes</code> gets 413. A full queue gets 503 with <code>Retry-After</code>.</li>
+      </ul>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:EventTriggers</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>DatabasePath</code></td>
+          <td><code>event-triggers.db</code></td>
+        </tr>
+        <tr>
+          <td><code>QueueCapacity</code></td>
+          <td>256</td>
+        </tr>
+        <tr>
+          <td><code>MaxAttempts</code></td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td><code>RetryBaseSeconds</code></td>
+          <td>30</td>
+        </tr>
+        <tr>
+          <td><code>MaxRetryDelayMinutes</code></td>
+          <td>15</td>
+        </tr>
+        <tr>
+          <td><code>SucceededRetentionDays</code></td>
+          <td>7</td>
+        </tr>
+        <tr>
+          <td><code>MaxWebhookBodyBytes</code></td>
+          <td>262144</td>
+        </tr>
+        <tr>
+          <td><code>RunTimeoutMinutes</code></td>
+          <td>10</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>Jobs</h2>
+      <p>Some scheduled work needs no model: prune a table, post a nightly summary, check a queue. A job is a class that implements <code>IAgentJob</code>.</p>
+      <pre><code class="language-csharp">
+public sealed class NightlyReportJob : IAgentJob
+{
+    public string Name =&gt; &quot;nightly-report&quot;;
+    public string Description =&gt; &quot;Posts yesterday&#x27;s run totals.&quot;;
+
+    public async Task&lt;JobResult&gt; RunAsync(JobContext context, CancellationToken ct)
+    {
+        // read arguments from context.Arguments, do the work, return a result
+        return JobResult.Success(&quot;done&quot;);
+    }
+}
+
+services.AddAgentJob&lt;NightlyReportJob&gt;();
+</code></pre>
+      <p>Job names are lowercase letters, digits and hyphens. A job reports a problem it found by returning <code>JobResult.Failure</code>. An exception means the job itself broke. A job does not overlap itself: a second start while one is running is skipped. A job that runs longer than <code>Agent:Jobs:TimeoutSeconds</code> (default 600) is cancelled and recorded as failed. Each run appears in the ledger with source <code>Job</code>.</p>
+      <p>A job can be started from a scheduled task (<code>schedule_job</code>), from a trigger (<code>targetJob</code> on <code>create_trigger</code> or <code>create_connector_trigger</code>), or by an agent with <code>run_job</code>. <code>list_jobs</code> lists what is registered. Two jobs ship with the platform: <code>run-failure-report</code> summarizes recent failed runs and notifies, and <code>trigger-queue-health</code> reports parked events.</p>
+      <h2>Connections</h2>
+      <p>A connection is one configured account for one connector: a Gmail mailbox or a Twilio account. Enable <code>Connections</code> to store them.</p>
+      <p><strong>Where secrets live.</strong> Metadata (label, status, settings) is stored in the clear in <code>connections.db</code>. Secrets are encrypted with ASP.NET Core Data Protection before they reach the database. The key ring lives in <code>KeyRingPath</code> and, on Windows, is also wrapped with DPAPI. Whoever can read both the key ring and the database can read all stored secrets, so keep the key ring out of source control and out of the web root. Back up both files together: without the key ring the stored secrets cannot be read.</p>
+      <p>No endpoint returns a secret. The connection list shows status, scopes and settings only.</p>
+      <p><strong>Key connections.</strong> <code>POST /api/connections/key</code> stores an API key or a key pair (for Twilio, an API key SID and secret). Extra secrets, such as a webhook signing token, go in <code>extras</code>. The <strong>Connections</strong> tab has a form for this.</p>
+      <p><strong>OAuth connections.</strong> The OAuth flow uses the authorization code grant with PKCE. The <code>state</code> value is encrypted and expires, so the callback completes only a flow this host started. Built-in providers are <code>google</code>, <code>microsoft</code>, <code>slack</code>, <code>github</code>, <code>notion</code> and <code>hubspot</code>. Add or override one under <code>Connections:OAuthProviders</code>.</p>
+      <ul>
+        <li>Register an OAuth application with the provider. Set its redirect address to <code>{PublicBaseUrl}/api/connections/oauth/callback</code>.</li>
+        <li>Enter the client id and secret on the Connections tab, or set <code>Connections:OAuthApps:&lt;provider&gt;</code> in configuration.</li>
+        <li>Choose the connector and select <strong>Connect</strong>.</li>
+      </ul>
+      <p><code>Connections:PublicBaseUrl</code> is required for OAuth. The redirect address is built from it and not from the request, so a forged <code>Host</code> header cannot send an authorization code elsewhere.</p>
+      <p><strong>Refresh.</strong> An access token within <code>RefreshSkewSeconds</code> of expiry is refreshed before it is handed out. Refreshes are serialized per connection, because providers that rotate refresh tokens invalidate the old one at once and a second concurrent refresh would fail. A background sweep refreshes tokens due to expire soon. When a provider answers <code>invalid_grant</code>, the connection becomes <code>NeedsReauth</code>, its tools stop, and one notification asks a person to reconnect.</p>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Connections</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>DatabasePath</code></td>
+          <td><code>connections.db</code></td>
+        </tr>
+        <tr>
+          <td><code>KeyRingPath</code></td>
+          <td><code>data-protection-keys</code></td>
+        </tr>
+        <tr>
+          <td><code>ProtectKeysWithDpapi</code></td>
+          <td>true (Windows only)</td>
+        </tr>
+        <tr>
+          <td><code>PublicBaseUrl</code></td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td><code>ReturnUrl</code></td>
+          <td><code>/</code></td>
+        </tr>
+        <tr>
+          <td><code>RefreshSkewSeconds</code></td>
+          <td>120</td>
+        </tr>
+        <tr>
+          <td><code>OAuthApps</code>, <code>OAuthProviders</code></td>
+          <td>empty</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The management endpoints use endpoint key <code>connections</code>. The OAuth callback has no authorization attribute, because the browser arrives from the provider carrying no credentials of ours.</p>
+      <h2>Connectors</h2>
+      <p>A connector turns a service into tools, events or documents. The full contract is in <code>docs/design/connectors.md</code>. This section describes what an operator sees.</p>
+      <p>Enable <code>Connectors</code> (and <code>Connections</code>). The Host registers the shipped connectors, runs one instance per stored connection, and reconciles every <code>ReconcileSeconds</code> (default 15), so a connection added on the Connections tab starts within seconds.</p>
+      <p><strong>Tool names.</strong> Tools are named <code>{prefix}_{verb}</code>. The first connection of a connector uses the connector&#x27;s own prefix (<code>twilio_sms_send</code>). A later connection adds its label (<code>twilio_sms_frontdesk_send</code>) so two accounts do not share names. If the first connection is removed, the next one takes the plain prefix.</p>
+      <p><strong>Risk and approval.</strong> Each tool declares a risk: <code>Read</code>, <code>Write</code>, <code>Send</code> or <code>Destructive</code>. A tool that sends to another person or deletes is wrapped in an approval requirement. The default interactive agent shows the approval prompt in chat. Agents without an approval channel, and unattended runs, do not execute the call. Where agents must send without a person present, set <code>Connectors:ApprovalMode</code> to <code>Audit</code>. Calls are still traced and counted.</p>
+      <p><strong>Network rules.</strong> A connector cannot build its own HTTP client. The one it receives:</p>
+      <ul>
+        <li>sends only to hosts in the connector&#x27;s allowed list, over https (http is accepted for loopback only);</li>
+        <li>follows no redirects;</li>
+        <li>attaches the stored credential and, on a 401 with an OAuth token, refreshes once and retries once;</li>
+        <li>retries only requests that are safe to repeat, so the host does not repeat a send automatically;</li>
+        <li>reports <code>aiagentcanvas.connector.calls</code> and <code>aiagentcanvas.connector.duration</code>, and logs the host and path but not the query string or any header.</li>
+      </ul>
+      <p><strong>Health.</strong> The host checks each connection every <code>CheckIntervalSeconds</code> (default 300). A connection the service refuses becomes <code>NeedsReauth</code>. A connection that fails for another reason shows <code>Error</code> with the detail, and clears when a later check passes.</p>
+      <p><strong>Webhooks and events.</strong> A connector with the Events capability receives webhooks at <code>/api/connectors/{connectionId}/webhook</code>. The route carries no endpoint authorization. The connector checks the sender&#x27;s own signature and the route refuses a failed check with 401 before parsing anything. The Connections tab shows each connection&#x27;s webhook address.</p>
+      <p>A verified event goes to the trigger system. Create a trigger for it:</p>
+      <pre><code>
+create_connector_trigger(name: &quot;reply to texts&quot;, connectionId: &quot;tw1&quot;,
+    eventType: &quot;sms.received&quot;, agentMessage: &quot;Draft a reply to this text.&quot;)
+</code></pre>
+      <p><code>eventType</code> matches exactly, or by family with a trailing <code>.*</code> (<code>sms.*</code>). The event id is the dedupe key, so a service that delivers the same webhook twice runs the agent once. The sender&#x27;s text reaches the agent after a line that marks it as data from an outside party. A full queue answers the webhook with 503 so the service retries.</p>
+      <h3>Twilio SMS</h3>
+      <table>
+        <thead><tr>
+          <th>Setting</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>account_sid</code></td>
+          <td>Required. The account SID (<code>AC</code> and 32 hex digits)</td>
+        </tr>
+        <tr>
+          <td><code>from_number</code></td>
+          <td>A sender number in E.164 form. Either this or <code>messaging_service_sid</code> is required</td>
+        </tr>
+        <tr>
+          <td><code>messaging_service_sid</code></td>
+          <td>A Messaging Service SID to send from</td>
+        </tr>
+        <tr>
+          <td><code>quiet_hours</code></td>
+          <td>For example <code>21:00-08:00</code>. Sends in this window are refused</td>
+        </tr>
+        <tr>
+          <td><code>timezone</code></td>
+          <td>IANA zone for quiet hours. Default UTC</td>
+        </tr>
+        <tr>
+          <td><code>max_sends_per_hour</code></td>
+          <td>Default 30</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Credentials are a key pair: an API key SID and secret, or the account SID and auth token. Webhooks need the account auth token stored as the <code>AuthToken</code> extra, which verifies <code>X-Twilio-Signature</code>.</p>
+      <p>Tools: <code>twilio_sms_send</code> (risk Send), <code>twilio_sms_list</code>, <code>twilio_sms_get</code> and <code>twilio_sms_missed_calls</code> (risk Read). Events: <code>sms.received</code>, <code>sms.failed</code> and <code>call.missed</code>.</p>
+      <p>Protections in the send tool: the number must be E.164, the body is capped at 1600 characters, a recipient who replied STOP is refused until they reply START, and the quiet-hours and hourly limits apply. A repeated <code>idempotencyKey</code> within 24 hours returns the first result and sends nothing. Opt-outs, the idempotency window and the hourly count are held in memory, so they reset on restart. Twilio enforces opt-outs itself, and the connector learns of one from the first refused send.</p>
+      <h3>Gmail and other MCP servers</h3>
+      <p>The MCP connector runs an MCP client over the connection&#x27;s guarded HTTP client, so the credential comes from the store and the token refreshes. Nothing about the account passes through the model. This replaces typing a bearer token into <code>connect_mcp_server</code>.</p>
+      <table>
+        <thead><tr>
+          <th>Setting</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>endpoint</code></td>
+          <td>Required. The server&#x27;s https address. Calls may reach only this host</td>
+        </tr>
+        <tr>
+          <td><code>include</code></td>
+          <td>Optional comma-separated tool names to expose. Empty exposes all</td>
+        </tr>
+        <tr>
+          <td><code>risk.&lt;tool&gt;</code></td>
+          <td>Optional override: <code>Read</code>, <code>Write</code>, <code>Send</code> or <code>Destructive</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Gmail is the generic connector with Google OAuth and the scopes <code>gmail.readonly</code> and <code>gmail.compose</code>. It reads mail and creates drafts. Add <code>gmail.send</code> when connecting only if agents should send. The <code>endpoint</code> must be an MCP server that fronts Gmail. No address is built in.</p>
+      <p>An MCP server describes its own tools, so the connector decides risk itself, in this order: your <code>risk.&lt;tool&gt;</code> setting, then the definition&#x27;s fixed risks, then the tool name. A name with a delete-like word (<code>delete</code>, <code>remove</code>, <code>trash</code>, <code>purge</code>, <code>cancel</code> and others) is <code>Destructive</code>. A name with a send-like word (<code>send</code>, <code>post</code>, <code>publish</code>, <code>reply</code>, <code>forward</code>) is <code>Send</code>. A server cannot talk a tool down from these. Only then are the server&#x27;s <code>destructiveHint</code> and <code>readOnlyHint</code> used, and a name with a read-like word (<code>get</code>, <code>list</code>, <code>search</code>) is <code>Read</code>. Everything else is <code>Write</code>. A misspelled <code>risk.</code> value stops the connection from starting.</p>
+      <p>If the server drops its session, the next check reconnects and the tools are fetched again.</p>
+      <h3>Writing a connector</h3>
+      <ul>
+        <li>Implement <code>IConnectorDefinition</code>: a <code>ConnectorDescriptor</code> (id, auth kind, allowed hosts, capabilities) and a factory.</li>
+        <li>Implement <code>IConnector</code> plus <code>IToolConnector</code>, <code>IEventSourceConnector</code> or both. Build tools with <code>ConnectorTools.Create</code>, which sets the prefixed name and the risk.</li>
+        <li>Get credentials from <code>IConnectionContext.GetCredentialAsync</code> and the HTTP client from <code>CreateHttpClient</code>. Return failures as <code>ConnectorTools.Error(code, message)</code>.</li>
+        <li>Register with <code>services.AddConnector(definition)</code>.</li>
+        <li>Add a test class that derives from <code>ConnectorConformance</code> in <code>tests/AiAgentCanvas.Tests</code>. It checks tool naming, descriptions, declared risk, capability flags, check behavior against a failing service, double disposal and webhook rejection.</li>
+      </ul>
+      <h2>Limits to know</h2>
+      <ul>
+        <li><strong>Approval list.</strong> <code>Security:ApprovalRequiredTools</code> blocks a tool outright. It does not ask. <code>schedule_task</code>, <code>system_write_file</code>, <code>system_run_script</code> and <code>connect_mcp_server</code> are blocked by default and have no approval path. Connector tools use the approval requirement described above and are not in that list.</li>
+        <li><strong>Dynamic tools.</strong> Tools from <code>connect_mcp_server</code> and from skills bypass the governance wrapper and tracing. Connector tools do not.</li>
+        <li><strong>Chat runs.</strong> The ledger and the daily budgets cover unattended work. A chat session is not recorded and not limited by <code>Agent:Budgets</code>.</li>
+        <li><strong>Approval channel.</strong> Only the default interactive agent has an approval channel. A persona agent that calls a send tool does not execute it.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

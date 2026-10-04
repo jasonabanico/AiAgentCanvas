@@ -8,13 +8,30 @@ namespace AiAgentCanvas.Capabilities.Scheduling;
 public sealed class SchedulerToolProvider
 {
     private readonly IScheduledTaskStore _store;
+    private readonly IJobRunner? _jobs;
 
-    public SchedulerToolProvider(IScheduledTaskStore store)
+    public SchedulerToolProvider(IScheduledTaskStore store, IJobRunner? jobs = null)
     {
         _store = store;
+        _jobs = jobs;
     }
 
     public IReadOnlyList<AITool> GetTools()
+    {
+        var tools = new List<AITool>(GetAgentTools());
+
+        // Present only when the Jobs capability is on, so the model is never offered a
+        // tool that can only fail.
+        if (_jobs is not null)
+        {
+            tools.Add(AIFunctionFactory.Create(ScheduleJob, "schedule_job",
+                "Schedule a job (a fixed task that runs without a model) to run once or on a recurring schedule"));
+        }
+
+        return tools;
+    }
+
+    private IReadOnlyList<AITool> GetAgentTools()
     {
         return
         [
@@ -67,6 +84,48 @@ public sealed class SchedulerToolProvider
         });
     }
 
+    [Description("Schedule a job (a fixed task that runs without a model) to run once or on a recurring schedule")]
+    private string ScheduleJob(
+        [Description("Short description of what the schedule is for")] string description,
+        [Description("Name of the job to run. Use list_jobs to see the available names.")] string jobName,
+        [Description("5-field UTC cron expression for a recurring schedule, e.g. '0 8 * * *'. Omit to run once.")] string? cronExpression = null,
+        [Description("Arguments passed to the job")] Dictionary<string, string>? arguments = null)
+    {
+        if (_jobs is null || _jobs.List().All(j => j.Name != jobName))
+        {
+            var known = _jobs is null ? "none" : string.Join(", ", _jobs.List().Select(j => j.Name));
+            return JsonSerializer.Serialize(new { error = $"No job named '{jobName}'. Available: {known}." });
+        }
+
+        CronSchedule? schedule = null;
+        if (!string.IsNullOrWhiteSpace(cronExpression)
+            && !CronSchedule.TryParse(cronExpression, out schedule))
+        {
+            return JsonSerializer.Serialize(new { error = $"'{cronExpression}' is not a valid 5-field cron expression." });
+        }
+
+        var taskId = $"task-{Guid.NewGuid():N}"[..16];
+
+        _store.SaveTask(new ScheduledTaskRecord
+        {
+            Id = taskId,
+            Description = description,
+            JobName = jobName,
+            JobArguments = arguments,
+            CronExpression = cronExpression,
+            IsRecurring = cronExpression is not null,
+        });
+
+        return JsonSerializer.Serialize(new
+        {
+            status = "scheduled",
+            taskId,
+            jobName,
+            cronExpression,
+            nextRunUtc = schedule?.GetNextOccurrence(DateTimeOffset.UtcNow)?.ToString("u"),
+        });
+    }
+
     [Description("List all scheduled tasks")]
     private string ListScheduledTasks()
     {
@@ -77,6 +136,7 @@ public sealed class SchedulerToolProvider
             t.Description,
             t.CronExpression,
             t.IsRecurring,
+            t.JobName,
             t.CreatedAt,
             LastRunUtc = t.LastRunAt?.ToString("u"),
             NextRunUtc = NextRun(t, now)?.ToString("u"),

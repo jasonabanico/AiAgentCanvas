@@ -20,7 +20,9 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
                 is_recurring INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 last_run_at TEXT,
-                last_error TEXT
+                last_error TEXT,
+                job_name TEXT,
+                job_arguments TEXT
             );
             CREATE TABLE IF NOT EXISTS scheduled_task_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +36,8 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
 
         AddColumnIfMissing(connection, "scheduled_tasks", "last_run_at", "TEXT");
         AddColumnIfMissing(connection, "scheduled_tasks", "last_error", "TEXT");
+        AddColumnIfMissing(connection, "scheduled_tasks", "job_name", "TEXT");
+        AddColumnIfMissing(connection, "scheduled_tasks", "job_arguments", "TEXT");
     }
 
     /// <summary>
@@ -58,14 +62,18 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
-            INSERT OR REPLACE INTO scheduled_tasks (id, description, prompt, cron_expression, is_recurring)
-            VALUES (@id, @desc, @prompt, @cron, @recurring)
+            INSERT OR REPLACE INTO scheduled_tasks (id, description, prompt, cron_expression, is_recurring, job_name, job_arguments)
+            VALUES (@id, @desc, @prompt, @cron, @recurring, @job, @jobArgs)
             """;
         cmd.Parameters.AddWithValue("@id", task.Id);
         cmd.Parameters.AddWithValue("@desc", task.Description);
         cmd.Parameters.AddWithValue("@prompt", task.Prompt);
         cmd.Parameters.AddWithValue("@cron", (object?)task.CronExpression ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@recurring", task.IsRecurring ? 1 : 0);
+        cmd.Parameters.AddWithValue("@job", (object?)task.JobName ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@jobArgs", task.JobArguments is { Count: > 0 }
+            ? System.Text.Json.JsonSerializer.Serialize(task.JobArguments)
+            : DBNull.Value);
         cmd.ExecuteNonQuery();
     }
 
@@ -74,7 +82,8 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
         using var connection = OpenConnection();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
-            SELECT id, description, prompt, cron_expression, is_recurring, created_at, last_run_at, last_error
+            SELECT id, description, prompt, cron_expression, is_recurring, created_at, last_run_at, last_error,
+                   job_name, job_arguments
             FROM scheduled_tasks ORDER BY created_at DESC
             """;
 
@@ -92,6 +101,10 @@ public sealed class SqliteScheduledTaskStore : SqliteStoreBase, IScheduledTaskSt
                 CreatedAt = reader.GetString(5),
                 LastRunAt = reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6)),
                 LastError = reader.IsDBNull(7) ? null : reader.GetString(7),
+                JobName = reader.IsDBNull(8) ? null : reader.GetString(8),
+                JobArguments = reader.IsDBNull(9)
+                    ? null
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(9)),
             });
         }
         return tasks;
