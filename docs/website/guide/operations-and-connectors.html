@@ -177,11 +177,11 @@ services.AddAgentJob&lt;NightlyReportJob&gt;();
       <p>No endpoint returns a secret. The connection list shows status, scopes and settings only.</p>
       <p><strong>Key connections.</strong> <code>POST /api/connections/key</code> stores an API key or a key pair (for Twilio, an API key SID and secret). Extra secrets, such as a webhook signing token, go in <code>extras</code>. The <strong>Connections</strong> tab has a form for this.</p>
       <p><strong>OAuth connections.</strong> The OAuth flow uses the authorization code grant with PKCE. The <code>state</code> value is encrypted and expires, so the callback completes only a flow this host started. Built-in providers are <code>google</code>, <code>microsoft</code>, <code>slack</code>, <code>github</code>, <code>notion</code> and <code>hubspot</code>. Add or override one under <code>Connections:OAuthProviders</code>.</p>
-      <ul>
+      <ol>
         <li>Register an OAuth application with the provider. Set its redirect address to <code>{PublicBaseUrl}/api/connections/oauth/callback</code>.</li>
         <li>Enter the client id and secret on the Connections tab, or set <code>Connections:OAuthApps:&lt;provider&gt;</code> in configuration.</li>
         <li>Choose the connector and select <strong>Connect</strong>.</li>
-      </ul>
+      </ol>
       <p><code>Connections:PublicBaseUrl</code> is required for OAuth. The redirect address is built from it and not from the request, so a forged <code>Host</code> header cannot send an authorization code elsewhere.</p>
       <p><strong>Refresh.</strong> An access token within <code>RefreshSkewSeconds</code> of expiry is refreshed before it is handed out. Refreshes are serialized per connection, because providers that rotate refresh tokens invalidate the old one at once and a second concurrent refresh would fail. A background sweep refreshes tokens due to expire soon. When a provider answers <code>invalid_grant</code>, the connection becomes <code>NeedsReauth</code>, its tools stop, and one notification asks a person to reconnect.</p>
       <table>
@@ -304,13 +304,13 @@ create_connector_trigger(name: &quot;reply to texts&quot;, connectionId: &quot;t
       <p>An MCP server describes its own tools, so the connector decides risk itself, in this order: your <code>risk.&lt;tool&gt;</code> setting, then the definition&#x27;s fixed risks, then the tool name. A name with a delete-like word (<code>delete</code>, <code>remove</code>, <code>trash</code>, <code>purge</code>, <code>cancel</code> and others) is <code>Destructive</code>. A name with a send-like word (<code>send</code>, <code>post</code>, <code>publish</code>, <code>reply</code>, <code>forward</code>) is <code>Send</code>. A server cannot talk a tool down from these. Only then are the server&#x27;s <code>destructiveHint</code> and <code>readOnlyHint</code> used, and a name with a read-like word (<code>get</code>, <code>list</code>, <code>search</code>) is <code>Read</code>. Everything else is <code>Write</code>. A misspelled <code>risk.</code> value stops the connection from starting.</p>
       <p>If the server drops its session, the next check reconnects and the tools are fetched again.</p>
       <h3>Writing a connector</h3>
-      <ul>
+      <ol>
         <li>Implement <code>IConnectorDefinition</code>: a <code>ConnectorDescriptor</code> (id, auth kind, allowed hosts, capabilities) and a factory.</li>
         <li>Implement <code>IConnector</code> plus <code>IToolConnector</code>, <code>IEventSourceConnector</code> or both. Build tools with <code>ConnectorTools.Create</code>, which sets the prefixed name and the risk.</li>
         <li>Get credentials from <code>IConnectionContext.GetCredentialAsync</code> and the HTTP client from <code>CreateHttpClient</code>. Return failures as <code>ConnectorTools.Error(code, message)</code>.</li>
         <li>Register with <code>services.AddConnector(definition)</code>.</li>
         <li>Add a test class that derives from <code>ConnectorConformance</code> in <code>tests/AiAgentCanvas.Tests</code>. It checks tool naming, descriptions, declared risk, capability flags, check behavior against a failing service, double disposal and webhook rejection.</li>
-      </ul>
+      </ol>
       <h2>Limits to know</h2>
       <ul>
         <li><strong>Approval list.</strong> <code>Security:ApprovalRequiredTools</code> blocks a tool outright. It does not ask. <code>schedule_task</code>, <code>system_write_file</code>, <code>system_run_script</code> and <code>connect_mcp_server</code> are blocked by default and have no approval path. Connector tools use the approval requirement described above and are not in that list.</li>

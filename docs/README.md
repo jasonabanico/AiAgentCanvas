@@ -1,6 +1,6 @@
 # AI Agent Canvas Documentation
 
-Build intelligent AI agents with .NET 9 and Microsoft Agent Framework. From a single standalone agent to a coordinated multi-agent ecosystem.
+Build intelligent AI agents with .NET 10 and Microsoft Agent Framework. From a single standalone agent to a coordinated multi-agent ecosystem.
 
 ## Guide
 
@@ -14,7 +14,7 @@ Build intelligent AI agents with .NET 9 and Microsoft Agent Framework. From a si
 | 6 | [Context Domains](guide-06-context-domains.md) | Personas, context, entities, guardrails, profiles, workflows |
 | 7 | [MCP and RAG](guide-07-mcp-and-rag.md) | External tool connections and retrieval-augmented generation |
 | 8 | [Multi-Agent Setup](guide-08-multi-agent.md) | Handoff, background delegation, and A2A protocol |
-| 9 | [Architecture](guide-09-architecture.md) | Five-layer architecture and request flow |
+| 9 | [Architecture](guide-09-architecture.md) | Layers, project references, the chat pipeline and request flow |
 | 10 | [Behavior Patterns](guide-10-behavior-patterns.md) | Seven agent behavior patterns with code examples |
 | 11 | [Operations and Connectors](guide-11-operations-and-connectors.md) | Run ledger, spend limits, durable triggers, jobs, stored credentials, OAuth, and connectors |
 | 12 | [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md) | Schema-checked answers, image tools, group chat, handoff and Magentic runs with human sign-off, and serving tools over MCP |

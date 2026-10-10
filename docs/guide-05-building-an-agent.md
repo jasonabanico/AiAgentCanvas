@@ -255,8 +255,9 @@ Everything outside those six pieces is handled by the platform:
 - **HarnessAgent runtime** -- the MAF SDK's `AsHarnessAgent` creates the agent with system prompt assembly, tool routing, and conversation management
 - **AG-UI streaming** -- real-time streaming of agent responses to the frontend via the Agent-User Interaction protocol
 - **Context injection** -- `AIContextProvider` implementations inject personas, guardrails, entities, profiles, and context into the system prompt before every LLM call
-- **Tool deduplication** -- multiple registrations of the same tool are deduplicated automatically
-- **Governance wrapping** -- `GovernedAIFunction` and `GovernedMcpGateway` evaluate every tool call against active guardrails and policies
+- **Chat pipeline** -- all agents, including persona agents, run on the same pipeline: context budget, loop guard, cost tracking, tool deduplication, and optional routing, reflection and audit
+- **Governance wrapping** -- `GovernedAIFunction` and `GovernedMcpGateway` evaluate tool calls against the policy file. Tools registered at startup are wrapped. Tools added at runtime through `connect_mcp_server` are not.
+- **Run records and limits** -- scheduled, triggered and delegated runs are recorded in the run ledger and counted against spend limits
 - **File workspace** -- `FileSystemAgentFileStore` gives the agent sandboxed file read/write access
 - **Background agents** -- long-running tasks execute in background agent threads
 - **Tool approval** -- `ToolApprovalAgentOptions` with configurable auto-approval rules

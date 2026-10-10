@@ -1,146 +1,68 @@
-<svg viewBox="0 0 800 1060" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
-  <defs>
-    <marker id="arrow2" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
-    </marker>
-    <marker id="arrow2g" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/>
-    </marker>
-  </defs>
-
-  <!-- Background -->
-  <rect width="800" height="1060" rx="12" fill="#0f172a"/>
-
-  <!-- Title -->
-  <text x="400" y="36" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="600">Request Flow</text>
-
-  <!-- Step numbers -->
-  <!-- 1. User Browser -->
-  <circle cx="160" cy="76" r="14" fill="#3b82f6"/>
-  <text x="160" y="81" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">1</text>
-  <rect x="190" y="56" width="420" height="44" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="76" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">User Browser</text>
-  <text x="400" y="92" text-anchor="middle" fill="#94a3b8" font-size="11">User types message in chat interface</text>
-
-  <!-- Arrow -->
-  <line x1="400" y1="100" x2="400" y2="130" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-
-  <!-- 2. CopilotKit Frontend -->
-  <circle cx="160" cy="156" r="14" fill="#3b82f6"/>
-  <text x="160" y="161" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">2</text>
-  <rect x="190" y="134" width="420" height="44" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="154" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">CopilotKit Frontend</text>
-  <text x="400" y="170" text-anchor="middle" fill="#94a3b8" font-size="11">Next.js React app with CopilotKit provider</text>
-
-  <!-- Arrow with label -->
-  <line x1="400" y1="178" x2="400" y2="214" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-  <rect x="290" y="186" width="220" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="200" text-anchor="middle" fill="#60a5fa" font-size="10">POST /api/copilotkit</text>
-
-  <!-- 3. AgUiEndpoint -->
-  <circle cx="160" cy="240" r="14" fill="#3b82f6"/>
-  <text x="160" y="245" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">3</text>
-  <rect x="190" y="218" width="420" height="44" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="238" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">AgUiEndpoint</text>
-  <text x="400" y="254" text-anchor="middle" fill="#94a3b8" font-size="11">Opens SSE stream, extracts messages from AG-UI protocol</text>
-
-  <!-- Arrow -->
-  <line x1="400" y1="262" x2="400" y2="298" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-  <rect x="282" y="270" width="236" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="284" text-anchor="middle" fill="#60a5fa" font-size="10">Creates ChatClientAgent session</text>
-
-  <!-- 4. ChatClientAgent -->
-  <circle cx="160" cy="324" r="14" fill="#3b82f6"/>
-  <text x="160" y="329" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">4</text>
-  <rect x="190" y="302" width="420" height="44" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="400" y="322" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">ChatClientAgent (MAF)</text>
-  <text x="400" y="338" text-anchor="middle" fill="#94a3b8" font-size="11">Microsoft Agent Framework orchestration</text>
-
-  <!-- Arrow -->
-  <line x1="400" y1="346" x2="400" y2="382" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-  <rect x="296" y="354" width="208" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="368" text-anchor="middle" fill="#60a5fa" font-size="10">AIContextProviders inject</text>
-
-  <!-- 5. Context Injection -->
-  <circle cx="160" cy="408" r="14" fill="#3b82f6"/>
-  <text x="160" y="413" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">5</text>
-  <rect x="190" y="386" width="420" height="60" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="406" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">AIContextProviders</text>
-  <text x="400" y="422" text-anchor="middle" fill="#94a3b8" font-size="11">System prompt, persona, guardrails, entities,</text>
-  <text x="400" y="436" text-anchor="middle" fill="#94a3b8" font-size="11">context, dynamic tools registered into ChatOptions</text>
-
-  <!-- Arrow -->
-  <line x1="400" y1="446" x2="400" y2="482" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-  <rect x="300" y="454" width="200" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="468" text-anchor="middle" fill="#60a5fa" font-size="10">Sends to LLM with tools</text>
-
-  <!-- 6. Azure AI Foundry -->
-  <circle cx="160" cy="508" r="14" fill="#3b82f6"/>
-  <text x="160" y="513" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">6</text>
-  <rect x="190" y="486" width="420" height="44" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
-  <text x="400" y="506" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Azure AI Foundry (LLM)</text>
-  <text x="400" y="522" text-anchor="middle" fill="#94a3b8" font-size="11">Model decides which tools to call</text>
-
-  <!-- Arrow down to tool calls -->
-  <line x1="400" y1="530" x2="400" y2="566" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-  <rect x="310" y="538" width="180" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="552" text-anchor="middle" fill="#60a5fa" font-size="10">Tool call request</text>
-
-  <!-- 7. Tool Execution -->
-  <circle cx="160" cy="592" r="14" fill="#3b82f6"/>
-  <text x="160" y="597" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">7</text>
-  <rect x="190" y="570" width="420" height="44" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="590" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Tool Execution</text>
-  <text x="400" y="606" text-anchor="middle" fill="#94a3b8" font-size="11">DynamicToolRegistry resolves registered AITools</text>
-
-  <!-- Fan out to tool types -->
-  <line x1="300" y1="614" x2="160" y2="654" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arrow2)"/>
-  <line x1="400" y1="614" x2="400" y2="654" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arrow2)"/>
-  <line x1="500" y1="614" x2="640" y2="654" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arrow2)"/>
-
-  <!-- Tool type boxes -->
-  <rect x="70" y="658" width="180" height="36" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="160" y="681" text-anchor="middle" fill="#c4b5fd" font-size="11">MCP Connections</text>
-
-  <rect x="310" y="658" width="180" height="36" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="400" y="681" text-anchor="middle" fill="#c4b5fd" font-size="11">Skills / AgentData</text>
-
-  <rect x="550" y="658" width="180" height="36" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="640" y="681" text-anchor="middle" fill="#c4b5fd" font-size="11">System Tools</text>
-
-  <!-- Converge back -->
-  <line x1="160" y1="694" x2="300" y2="730" stroke="#8b5cf6" stroke-width="1.2"/>
-  <line x1="400" y1="694" x2="400" y2="730" stroke="#8b5cf6" stroke-width="1.2"/>
-  <line x1="640" y1="694" x2="500" y2="730" stroke="#8b5cf6" stroke-width="1.2"/>
-
-  <!-- Arrow back up label -->
-  <rect x="270" y="722" width="260" height="20" rx="4" fill="#1e3a5f"/>
-  <text x="400" y="736" text-anchor="middle" fill="#60a5fa" font-size="10">Tool results returned to LLM</text>
-
-  <!-- 8. LLM generates response -->
-  <line x1="400" y1="742" x2="400" y2="778" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow2)"/>
-
-  <circle cx="160" cy="804" r="14" fill="#3b82f6"/>
-  <text x="160" y="809" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">8</text>
-  <rect x="190" y="782" width="420" height="44" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="400" y="802" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Streaming Response</text>
-  <text x="400" y="818" text-anchor="middle" fill="#94a3b8" font-size="11">LLM generates text response with tool results</text>
-
-  <!-- Arrow with SSE events -->
-  <line x1="400" y1="826" x2="400" y2="870" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow2g)"/>
-
-  <!-- SSE Events detail -->
-  <rect x="140" y="874" width="520" height="60" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6,3"/>
-  <text x="400" y="896" text-anchor="middle" fill="#4ade80" font-size="12" font-weight="600">SSE Event Stream</text>
-  <text x="400" y="916" text-anchor="middle" fill="#94a3b8" font-size="10">run.started  ->  text.message.start  ->  text.message.content (deltas)  ->  text.message.end  ->  run.finished</text>
-
-  <!-- Arrow back to frontend -->
-  <line x1="400" y1="934" x2="400" y2="966" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow2g)"/>
-
-  <!-- 9. CopilotKit renders -->
-  <circle cx="160" cy="992" r="14" fill="#22c55e"/>
-  <text x="160" y="997" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">9</text>
-  <rect x="190" y="970" width="420" height="44" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
-  <text x="400" y="990" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">CopilotKit Renders Response</text>
-  <text x="400" y="1006" text-anchor="middle" fill="#94a3b8" font-size="11">Streaming text displayed to user in real time</text>
+<svg viewBox="0 0 800 900" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker></defs>
+  <rect width="800" height="900" rx="12" fill="#0f172a"/>
+  <text x="400" y="34" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="600">Request Flow</text>
+  <rect x="150" y="58" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="84.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="88.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">1</text>
+  <text x="400" y="80" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Browser</text>
+  <text x="400" y="98" text-anchor="middle" fill="#94a3b8" font-size="10.5">The user types in the Chat tab</text>
+  <line x1="400" y1="110" x2="400" y2="130" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="132" width="500" height="52" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+  <circle cx="124" cy="158.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="162.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">2</text>
+  <text x="400" y="154" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">POST /api/copilotkit</text>
+  <text x="400" y="172" text-anchor="middle" fill="#94a3b8" font-size="10.5">AG-UI request with messages and state. Endpoint authorization applies.</text>
+  <line x1="400" y1="184" x2="400" y2="204" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="206" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="232.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="236.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">3</text>
+  <text x="400" y="228" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">AG-UI endpoint</text>
+  <text x="400" y="246" text-anchor="middle" fill="#94a3b8" font-size="10.5">Resolves the session and loads chat history from SQLite</text>
+  <line x1="400" y1="258" x2="400" y2="278" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="280" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="306.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="310.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">4</text>
+  <text x="400" y="302" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Context providers</text>
+  <text x="400" y="320" text-anchor="middle" fill="#94a3b8" font-size="10.5">Governance scan, persona, context, guardrails, profile, entities, RAG chunks, memory</text>
+  <line x1="400" y1="332" x2="400" y2="352" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="354" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="380.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="384.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">5</text>
+  <text x="400" y="376" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">HarnessAgent loop</text>
+  <text x="400" y="394" text-anchor="middle" fill="#94a3b8" font-size="10.5">Reason, act, observe. Tools come from every registered provider.</text>
+  <line x1="400" y1="406" x2="400" y2="426" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="428" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="454.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="458.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">6</text>
+  <text x="400" y="450" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Chat pipeline</text>
+  <text x="400" y="468" text-anchor="middle" fill="#94a3b8" font-size="10.5">LoopGuard, Reflection, Audit, ModelRouter, ContextBudget, CostTracking, ToolDedupe</text>
+  <line x1="400" y1="480" x2="400" y2="500" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="502" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="528.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="532.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">7</text>
+  <text x="400" y="524" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">LLM provider</text>
+  <text x="400" y="542" text-anchor="middle" fill="#94a3b8" font-size="10.5">The model answers or asks for a tool call</text>
+  <line x1="400" y1="554" x2="400" y2="574" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="576" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="602.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="606.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">8</text>
+  <text x="400" y="598" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Tool execution</text>
+  <text x="400" y="616" text-anchor="middle" fill="#94a3b8" font-size="10.5">Governance policy, then tracing. Blocked and approval-gated tools stop here.</text>
+  <line x1="400" y1="628" x2="400" y2="648" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="650" width="500" height="52" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+  <circle cx="124" cy="676.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="680.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">9</text>
+  <text x="400" y="672" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">SSE event stream</text>
+  <text x="400" y="690" text-anchor="middle" fill="#94a3b8" font-size="10.5">Text deltas, tool progress, state, interrupts and run lifecycle events</text>
+  <line x1="400" y1="702" x2="400" y2="722" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="150" y="724" width="500" height="52" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <circle cx="124" cy="750.0" r="13" fill="#3b82f6"/>
+  <text x="124" y="754.0" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">10</text>
+  <text x="400" y="746" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Browser renders</text>
+  <text x="400" y="764" text-anchor="middle" fill="#94a3b8" font-size="10.5">Streaming text, tool bar, state panel and approval buttons</text>
+  <rect x="150" y="792" width="500" height="70" rx="8" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="400" y="814" text-anchor="middle" fill="#94a3b8" font-size="11">Unattended runs, such as schedules, triggers and orchestrations,</text>
+  <text x="400" y="831" text-anchor="middle" fill="#94a3b8" font-size="11">use the same pipeline and tool wrapping. Each is recorded in the run ledger</text>
+  <text x="400" y="848" text-anchor="middle" fill="#94a3b8" font-size="11">and counted against spend limits.</text>
 </svg>

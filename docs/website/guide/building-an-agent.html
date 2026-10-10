@@ -252,8 +252,9 @@ public sealed class FinancialAnalystModule : IServiceModule
         <li><strong>HarnessAgent runtime</strong> -- the MAF SDK&#x27;s <code>AsHarnessAgent</code> creates the agent with system prompt assembly, tool routing, and conversation management</li>
         <li><strong>AG-UI streaming</strong> -- real-time streaming of agent responses to the frontend via the Agent-User Interaction protocol</li>
         <li><strong>Context injection</strong> -- <code>AIContextProvider</code> implementations inject personas, guardrails, entities, profiles, and context into the system prompt before every LLM call</li>
-        <li><strong>Tool deduplication</strong> -- multiple registrations of the same tool are deduplicated automatically</li>
-        <li><strong>Governance wrapping</strong> -- <code>GovernedAIFunction</code> and <code>GovernedMcpGateway</code> evaluate every tool call against active guardrails and policies</li>
+        <li><strong>Chat pipeline</strong> -- all agents, including persona agents, run on the same pipeline: context budget, loop guard, cost tracking, tool deduplication, and optional routing, reflection and audit</li>
+        <li><strong>Governance wrapping</strong> -- <code>GovernedAIFunction</code> and <code>GovernedMcpGateway</code> evaluate tool calls against the policy file. Tools registered at startup are wrapped. Tools added at runtime through <code>connect_mcp_server</code> are not.</li>
+        <li><strong>Run records and limits</strong> -- scheduled, triggered and delegated runs are recorded in the run ledger and counted against spend limits</li>
         <li><strong>File workspace</strong> -- <code>FileSystemAgentFileStore</code> gives the agent sandboxed file read/write access</li>
         <li><strong>Background agents</strong> -- long-running tasks execute in background agent threads</li>
         <li><strong>Tool approval</strong> -- <code>ToolApprovalAgentOptions</code> with configurable auto-approval rules</li>

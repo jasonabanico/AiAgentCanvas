@@ -87,7 +87,7 @@ AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
 });
 ```
 
-No additional configuration needed. Register persona and tool seeds, and the agent becomes available for both handoff and background delegation.
+No additional configuration needed. Register persona and tool seeds, and the agent becomes available for both handoff and background delegation. Persona agents run on the same chat pipeline as the default agent, so the context budget, loop guard and cost tracking apply to delegated work.
 
 ### Example: Parallel Research
 
@@ -159,6 +159,10 @@ public void RegisterRemote(string name, string a2aUrl, string? description = nul
 ```
 
 After registration, `handoff_to_agent("compliance-checker", ...)` sends the request over HTTP to the remote host. The calling agent does not need to know whether the target is local or remote.
+
+## Option 4: Orchestration Runs
+
+The first three options let the model decide when to involve another agent. An orchestration run starts several named agents on one task from a tool call, an API call or a person. Three kinds ship: group chat (agents take turns), handoff (a lead passes work to specialists and takes it back) and Magentic (a manager plans, assigns work and replans). Each step is checkpointed to disk, and a Magentic run can stop for a person to approve its plan, then continue after a restart. Orchestrations need `InterAgentCommunication` and the `AgentOrchestration` flag. See [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md).
 
 ## Comparison
 

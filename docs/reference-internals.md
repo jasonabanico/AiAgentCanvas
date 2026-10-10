@@ -6,16 +6,48 @@ Context providers extend `AIContextProvider` (from `Microsoft.Agents.AI`) and ru
 
 | Order | Provider | Source | What It Injects |
 |-------|----------|--------|-----------------|
-| 1 | `GovernanceContextProvider` | AiAgentCanvas.Security | Scans existing instructions for prompt injection; emits audit events if detected (does not modify instructions) |
-| 2 | `PersonaContextProvider` | AiAgentCanvas.AgentData.Personas | Active persona's instructions, or the default system prompt if no persona is active |
-| 3 | `PersistentContextProvider` | AiAgentCanvas.AgentData.Context | All saved context entries (facts, notes, preferences) |
-| 4 | `EntityContextProvider` | AiAgentCanvas.AgentData.Entities | Entity index listing all known entities and their types |
-| 5 | `UserProfileContextProvider` | AiAgentCanvas.AgentData.Profiles | Active user profile context (role, timezone, preferences) |
-| 6 | `GuardrailContextProvider` | AiAgentCanvas.AgentData.Guardrails | All enabled guardrail rules |
-| 7 | `DynamicToolContextProvider` | AiAgentCanvas.Orchestration.Skills | Injects dynamically registered tools into `AIContext.Tools` (the only provider that modifies tools rather than instructions) |
-| 8 | `RagContextProvider` | AiAgentCanvas.Capabilities.Rag | Retrieves relevant document chunks via hybrid search and appends them as numbered citations (only active when RAG is configured) |
+| 1 | `GovernanceContextProvider` | AiAgentCanvas.Security | Scans existing instructions for prompt injection and emits audit events if it finds any. It does not modify instructions. |
+| 2 | `SystemPromptProvider` | AiAgentCanvas.Orchestration | The default system prompt |
+| 3 | `PersonaContextProvider` | AiAgentCanvas.AgentData.Personas | The active persona's instructions |
+| 4 | `PersistentContextProvider` | AiAgentCanvas.AgentData.Context | All saved context entries (facts, notes, preferences) |
+| 5 | `GuardrailContextProvider` | AiAgentCanvas.AgentData.Guardrails | All enabled guardrail rules |
+| 6 | `UserProfileContextProvider` | AiAgentCanvas.AgentData.Profiles | The active user profile (role, timezone, preferences) |
+| 7 | `EntityContextProvider` | AiAgentCanvas.AgentData.Entities | The entity index listing known entities and their types |
+| 8 | `RagContextProvider` | AiAgentCanvas.Capabilities.Rag | Relevant document chunks from hybrid search, as numbered citations. Present only when RAG is configured. |
+| 9 | `EpisodicMemoryContextProvider` | AiAgentCanvas.Capabilities.EpisodicMemory | Recent episodes. Present when `EpisodicMemory` is on. |
 
-The registration order follows the order of `AddAiAgentCanvas*()` calls in `Program.cs`: Security first, then Personas, Context, Entities, Profiles, Guardrails, Skills, and finally RAG.
+The order follows the order of the registration calls in `Program.cs`: Security first, then the core runtime, then Personas, Context, Guardrails, UserProfiles and Entities, then RAG and episodic memory. A provider is present only when its flag is on.
+
+---
+
+## Chat Pipeline
+
+`AgentPipeline` builds the chat client chain and wraps tools. The default agent, each persona agent built by the registry, and the structured responder use it. Listed from the outside in:
+
+| Client | Present when | Notes |
+|--------|--------------|-------|
+| `LoopGuardChatClient` | `Agent:LoopGuard:Enabled` (default true) | Tool-round cap, token budget, optional `MaxRunCost`, repeat and stagnation detection |
+| `ReflectiveChatClient` | `Agent:Reflection:Enabled` | Reflection prompt after consecutive tool rounds |
+| `AuditingChatClient` | `AuditLog` flag | Records each model call |
+| `CostAwareModelRouter` | `Agent:ModelRouter:Enabled` | Needs an economy model |
+| `ContextBudgetChatClient` | `Agent:ContextBudget:Enabled` (default true) | Counts with the tokenizer named in `Agent:TokenizerModel` |
+| `CostTrackingChatClient` | Always on | Prices from `Agent:Pricing`. An unpriced model reports tokens and no cost. |
+| `ToolDeduplicatingChatClient` | Always on | Closest to the provider |
+
+`AgentPipeline.WrapTools` wraps each `AIFunction` in the governance wrapper when one is registered, then in `TracedAIFunction`. Tools that are not functions pass through unchanged.
+
+### Run Tracking
+
+`RunTracking.RunAsync` gives a unit of work an ambient `AgentRunContext` and, when a ledger is registered, a run record. Scheduled agent tasks, trigger events, handoffs, jobs, orchestration runs and outside MCP calls use it. The context collects usage from the cost-tracking client and tool calls from the tracing wrapper, rolls a child's usage up to its parent, and feeds the per-run cost cap in the loop guard. The `BudgetGuard` reads the ledger to decide whether a new unattended run may start.
+
+---
+
+## Known Gaps
+
+These are places where the code does less than its surrounding design suggests. Each has a follow-up task.
+
+- **Runtime tools do not reach agents.** `DynamicToolRegistry` holds tools added at runtime: those from `connect_mcp_server`, and those from connectors. `DynamicToolContextProvider` is written to deliver them but is not registered, and nothing else reads the registry. Tools registered at startup are unaffected.
+- **The rate limiter is not applied.** `Security:RateLimitPerMinute` registers a fixed-window policy named `agent`, and `UseRateLimiter` is in the pipeline, but no endpoint calls `RequireRateLimiting("agent")`.
 
 ---
 
@@ -76,9 +108,9 @@ Seeds provide default data for each agent domain. They are resolved from DI at s
 | `IWorkflowSeed` | `WorkflowSeed` | `Name`, `Description`, `Tags`, `Content` | `./agent-data/orchestrator/agent/workflows/` |
 | `IEntitySeed` | `EntitySeed` | `Name`, `Type`, `Tags`, `Content` | `./agent-data/orchestrator/agent/entities/` |
 | `IGuardrailSeed` | `GuardrailSeed` | `Name`, `Severity`, `Enabled`, `Rule` | `./agent-data/orchestrator/agent/guardrails/` |
-| `ISkillSeed` | `SkillSeed` | `Name`, `Description`, `PromptTemplate` | (via SkillRegistry) |
+| `ISkillSeed` | `SkillSeed` | `Name`, `Description`, `PromptTemplate` | `./agent-data/skills/` |
 | `IUserProfileSeed` | `UserProfileSeed` | `Name`, `Role`, `Timezone`, `Content` | `./agent-data/orchestrator/agent/profiles/` |
-| `IMcpConnectionSeed` | `McpConnectionSeed` | `Name`, `Endpoint`, `Transport` | (via MCP connection manager) |
+| `IMcpConnectionSeed` | `McpConnectionSeed` | `Name`, `Endpoint`, `Transport`, `BearerToken`, `ApiKey`, `ExpectedIssuer`, `AdditionalHeaders` | (via MCP connection manager) |
 | `IAgentToolsSeed` | `AgentToolsSeed` | `AgentName`, `ToolNames` (list) | (in-memory tool assignment) |
 | `IGoalSeed` | `GoalSeed` | `Name`, `Description`, `Priority`, `AcceptanceCriteria`, `AssignedAgent`, `Content` | `./agent-data/orchestrator/agent/goals/` |
 
@@ -95,7 +127,7 @@ Each domain also supports user-created data that persists under the `user/` subt
 
 ## RAG Pipeline Internals
 
-The RAG (Retrieval-Augmented Generation) pipeline is conditionally enabled when `AIFoundry:EmbeddingDeploymentName` is configured. It adds relevant document context to the agent's system prompt before each response.
+The RAG (Retrieval-Augmented Generation) pipeline is enabled when the `Rag` feature flag is on and the active provider has an embedding model: `AIFoundry:EmbeddingDeploymentName` for Azure AI Foundry, or `Databricks:EmbeddingModelName` for Databricks. It adds relevant document context to the agent's system prompt before each response.
 
 ### DocumentChunker
 

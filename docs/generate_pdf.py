@@ -11,9 +11,10 @@ from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle,
-    KeepTogether,
+    KeepTogether, Preformatted, Image,
 )
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+import textwrap
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 
 WIDTH, HEIGHT = letter
 MARGIN = 0.75 * inch
@@ -36,7 +37,7 @@ styles.add(ParagraphStyle('Sub3', parent=styles['Heading3'], fontSize=12, leadin
 styles.add(ParagraphStyle('Sub4', parent=styles['Normal'], fontSize=11, leading=15,
     textColor=HexColor('#4a4a6a'), spaceBefore=8, spaceAfter=6, fontName='Helvetica-Bold'))
 styles.add(ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, leading=14,
-    alignment=TA_JUSTIFY, spaceAfter=8))
+    alignment=TA_LEFT, spaceAfter=8))
 styles.add(ParagraphStyle('CodeBlock', parent=styles['Code'], fontSize=8.5, leading=11,
     backColor=HexColor('#f5f5f5'), borderColor=HexColor('#e0e0e0'),
     borderWidth=0.5, borderPadding=6, spaceAfter=10, leftIndent=12))
@@ -73,8 +74,21 @@ def P(text, style='Body'):
     return Paragraph(text, styles[style])
 
 
+CODE_COLUMNS = 92
+
+
 def code(text):
-    return Paragraph(escape(text), styles['CodeBlock'])
+    """A code block that keeps its line breaks. Long lines wrap at the page width."""
+    wrapped = []
+    for line in text.split('\n'):
+        if len(line) <= CODE_COLUMNS:
+            wrapped.append(line)
+            continue
+        indent = len(line) - len(line.lstrip())
+        wrapped.extend(textwrap.wrap(
+            line, width=CODE_COLUMNS, subsequent_indent=' ' * (indent + 4),
+            break_long_words=True, break_on_hyphens=False) or [''])
+    return Preformatted('\n'.join(wrapped), styles['CodeBlock'])
 
 
 def bullet(text):
@@ -151,6 +165,22 @@ def md_to_story(md_path, is_first=False):
 
     for line in lines:
         stripped = line.strip()
+
+        # An image on its own line. The PDF uses the PNG render next to the SVG.
+        picture = re.match(r'^!\[([^\]]*)\]\(([^)]+)\)$', stripped)
+        if picture and not in_code:
+            flush_table()
+            flush_list()
+            png = os.path.join(DOCS_DIR, os.path.splitext(picture.group(2))[0] + '.png')
+            if os.path.exists(png):
+                max_w = WIDTH - 2 * MARGIN
+                max_h = HEIGHT - 2 * MARGIN - 40
+                image = Image(png)
+                scale = min(max_w / image.imageWidth, max_h / image.imageHeight)
+                image.drawWidth = image.imageWidth * scale
+                image.drawHeight = image.imageHeight * scale
+                elements.append(KeepTogether([image, P(f"<i>{escape(picture.group(1))}</i>", 'TocItem')]))
+            continue
 
         # Code block boundaries
         if stripped.startswith('```'):
@@ -235,6 +265,8 @@ def main():
         ('guide-08-multi-agent.md', '8. Multi-Agent Setup'),
         ('guide-09-architecture.md', '9. Architecture'),
         ('guide-10-behavior-patterns.md', '10. Behavior Patterns'),
+        ('guide-11-operations-and-connectors.md', '11. Operations and Connectors'),
+        ('guide-12-typed-output-vision-orchestration-and-mcp-server.md', '12. Typed Output, Vision, Orchestration and MCP Server'),
         ('appendix-user-guide.md', 'Appendix: User Guide'),
         ('reference-agui-protocol.md', 'Reference: AG-UI Protocol'),
         ('reference-security.md', 'Reference: Security and Governance'),
@@ -248,7 +280,7 @@ def main():
     story.append(P("AI Agent Canvas", 'CoverTitle'))
     story.append(P("Complete Reference Guide", 'CoverSubtitle'))
     story.append(Spacer(1, 0.5 * inch))
-    story.append(P("Build intelligent AI agents with .NET 9 and Microsoft Agent Framework.", 'CoverSubtitle'))
+    story.append(P("Build intelligent AI agents with .NET 10 and Microsoft Agent Framework.", 'CoverSubtitle'))
     story.append(P("From a single standalone agent to a coordinated multi-agent ecosystem.", 'CoverSubtitle'))
     story.append(PageBreak())
 
@@ -256,13 +288,15 @@ def main():
     story.append(P("Table of Contents", 'SectionTitle'))
     story.append(Spacer(1, 12))
     story.append(P("Guide", 'TocSection'))
-    for filename, title in SECTIONS[:10]:
-        story.append(P(title, 'TocItem'))
+    for filename, title in SECTIONS:
+        if filename.startswith('guide-'):
+            story.append(P(title, 'TocItem'))
     story.append(P("Appendix", 'TocSection'))
     story.append(P("User Guide", 'TocItem'))
     story.append(P("Reference", 'TocSection'))
-    for filename, title in SECTIONS[11:]:
-        story.append(P(title.replace('Reference: ', ''), 'TocItem'))
+    for filename, title in SECTIONS:
+        if filename.startswith('reference-'):
+            story.append(P(title.replace('Reference: ', ''), 'TocItem'))
     story.append(PageBreak())
 
     # Process each section

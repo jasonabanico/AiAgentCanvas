@@ -41,6 +41,7 @@ def md_to_html_content(md_text):
     in_code = False
     in_table = False
     in_list = False
+    list_ordered = False
     code_lang = ''
     table_rows = []
     list_items = []
@@ -66,18 +67,26 @@ def md_to_html_content(md_text):
         table_rows = []
 
     def flush_list():
-        nonlocal in_list, list_items
+        nonlocal in_list, list_items, list_ordered
         if not list_items:
             return
-        out.append('      <ul>')
+        tag = 'ol' if list_ordered else 'ul'
+        out.append(f'      <{tag}>')
         for item in list_items:
             out.append(f'        <li>{inline(item)}</li>')
-        out.append('      </ul>')
+        out.append(f'      </{tag}>')
         in_list = False
         list_items = []
+        list_ordered = False
+
+    def image_src(src):
+        # Markdown links images from the docs folder. Pages sit one level below website/.
+        return src.replace('website/images/', '../images/')
 
     def inline(text):
         text = html.escape(text)
+        text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)',
+                      lambda m: f'<img src="{image_src(m.group(2))}" alt="{m.group(1)}">', text)
         text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
         text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
@@ -121,6 +130,15 @@ def md_to_html_content(md_text):
         elif in_table:
             flush_table()
 
+        # A line that is only an image becomes a figure
+        figure = re.match(r'^!\[([^\]]*)\]\(([^)]+)\)$', stripped)
+        if figure:
+            flush_table()
+            flush_list()
+            out.append(f'      <figure><img src="{image_src(figure.group(2))}" alt="{html.escape(figure.group(1))}">'
+                       f'<figcaption>{html.escape(figure.group(1))}</figcaption></figure>')
+            continue
+
         # List items
         if re.match(r'^[-*] ', stripped):
             if not in_list:
@@ -132,6 +150,7 @@ def md_to_html_content(md_text):
             if not in_list:
                 flush_table()
                 in_list = True
+                list_ordered = True
             list_items.append(re.sub(r'^\d+\. ', '', stripped))
             continue
         elif in_list:

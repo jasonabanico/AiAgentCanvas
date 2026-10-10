@@ -35,7 +35,7 @@ services.AddSingleton<IPersonaSeed>(new PersonaSeed(
     2. Use `stock_history` to get the 5-day price history for each
     3. Use `edgar_company_facts` to get the latest quarterly revenue for each
     4. Write a summary report with price trends and revenue comparison
-    5. Save the report using `add_context` with key "daily-report-{date}"
+    5. Save the report using `save_context` with topic "daily-report-{date}"
 
     Do not skip steps. Do not reorder steps.
     """));

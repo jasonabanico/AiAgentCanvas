@@ -1,6 +1,6 @@
 # 1. What Is AI Agent Canvas
 
-AI Agent Canvas is an agent development platform built on .NET 9 and Microsoft Agent Framework. It provides the runtime, orchestration layer, and pre-built capabilities to build AI agents -- from a single standalone agent to a coordinated multi-agent ecosystem.
+AI Agent Canvas is an agent development platform built on .NET 10 and Microsoft Agent Framework. It provides the runtime, orchestration layer, and pre-built capabilities to build AI agents -- from a single standalone agent to a coordinated multi-agent ecosystem.
 
 The platform sits between your business logic and the LLM. You write the pieces that make your agent unique (persona, tools, domain knowledge), and the platform handles the rest: the agent execution loop, context injection, tool governance, streaming, state management, and multi-agent coordination.
 
@@ -23,7 +23,10 @@ The platform handles the infrastructure so you can focus on domain logic:
 - **Tool governance** -- policy-based filtering and approval rules applied before any tool executes
 - **Streaming** -- real-time Server-Sent Events via the AG-UI protocol, delivering text, tool calls, and state updates to the frontend as they happen
 - **State management** -- persistent chat history, entity memory, and scheduled task storage backed by SQLite
-- **Multi-agent coordination** -- handoff, background delegation, async messaging, and workflow orchestration across agents
+- **Multi-agent coordination** -- handoff, background delegation, async messaging, group chat and Magentic runs, and workflow orchestration across agents
+- **Run safety** -- a context budget that counts the prompt with the model's own tokenizer, a loop guard that gives each run an exit condition, and cost tracking on model calls
+- **Unattended operation** -- schedules, event triggers, deterministic jobs, a run ledger and daily spend limits
+- **Outside accounts** -- encrypted credentials, OAuth with token refresh, and connectors whose tools that reach people need approval
 
 ## What You Provide
 

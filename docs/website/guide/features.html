@@ -49,19 +49,19 @@
         </tr>
         <tr>
           <td><strong>Scheduling</strong></td>
-          <td>Agents can schedule tasks for future or recurring execution. Scheduled tasks are persisted in SQLite and executed by a background service, enabling agents to set reminders, run periodic checks, or defer work.</td>
+          <td>Agents can schedule tasks for future or recurring execution. Scheduled tasks are persisted in SQLite and executed by a background service. A task runs an agent, or a deterministic job when it names one.</td>
         </tr>
         <tr>
           <td><strong>MCP connections</strong></td>
-          <td>Agents connect to external data sources and tools through the Model Context Protocol. MCP servers are configured at runtime via <code>McpConnectionManager</code> and their tools appear alongside native agent tools.</td>
+          <td>Agents connect to external data sources and tools through the Model Context Protocol. MCP servers are connected at runtime through <code>McpConnectionManager</code>, or at startup from a seed, and their tools appear alongside native agent tools. The <code>connect_mcp_server</code> tool is blocked by default. The MCP connector is the governed route for an account-backed server.</td>
         </tr>
         <tr>
           <td><strong>RAG pipeline</strong></td>
-          <td>Retrieval-augmented generation backed by a SQLite vector store. Documents are chunked, embedded, and stored locally. At query time, the agent retrieves relevant chunks using cosine similarity with FTS5 hybrid search.</td>
+          <td>Retrieval-augmented generation backed by a SQLite vector store. Documents are chunked, embedded, and stored locally. At query time, the agent retrieves relevant chunks using cosine similarity with FTS5 hybrid search, then reranks them with the model. Needs an embedding model on the Azure AI Foundry or Databricks provider.</td>
         </tr>
         <tr>
           <td><strong>System tools</strong></td>
-          <td>Built-in tools available to every agent: web search, URL reading, file operations, and system utilities. These are registered automatically and subject to the same governance as custom tools.</td>
+          <td>Built-in tools to read, write and list files and to run scripts. Both work inside an allowlist, and an empty allowlist denies everything. They are subject to the same governance as custom tools.</td>
         </tr>
         <tr>
           <td><strong>File workspace</strong></td>
@@ -69,7 +69,7 @@
         </tr>
         <tr>
           <td><strong>Tool governance</strong></td>
-          <td>Policy-based filtering applied before any tool executes. Governance rules can deny, allow, or require approval for specific tools or tool categories, using a deny-overrides evaluation model.</td>
+          <td>Policy-based filtering applied before a tool executes, using a deny-overrides evaluation model. Tools named in <code>Security:ApprovalRequiredTools</code> are blocked until an operator removes them from the list. The defaults are <code>system_write_file</code>, <code>system_run_script</code>, <code>connect_mcp_server</code> and <code>schedule_task</code>.</td>
         </tr>
         <tr>
           <td><strong>Tool approval</strong></td>
@@ -85,7 +85,7 @@
         </tr>
         <tr>
           <td><strong>Event triggers</strong></td>
-          <td>Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Triggers fire agent messages without user interaction, enabling monitoring, alerting, and event-driven automation.</td>
+          <td>Proactive agent engagement through scheduled (cron), file-watch, webhook and connector triggers. Events wait in a durable SQLite queue with deduplication keys, retry with backoff, and a dead-letter state, so a restart loses none.</td>
         </tr>
         <tr>
           <td><strong>Computer use</strong></td>
@@ -93,7 +93,47 @@
         </tr>
         <tr>
           <td><strong>Evaluation</strong></td>
-          <td>Eval cases (a test input plus grading criteria) are stored in SQLite. Running a case sends the input to the raw chat client, independent of the tool pipeline, and grades the response with an LLM-as-judge pass, producing a score, pass/fail, and rationale. Agents can add cases, run a single case or a whole category as a regression suite, and pull pass-rate statistics over time.</td>
+          <td>Cases live in source, not in a database. <code>tests/AiAgentCanvas.EvalTests</code> holds checked-in cases graded by <code>Microsoft.Extensions.AI.Evaluation.Quality</code>, and CI runs them so a regression fails the build. The suite skips itself when no model is configured.</td>
+        </tr>
+        <tr>
+          <td><strong>Context budget</strong></td>
+          <td>Counts each prompt with the model&#x27;s own tokenizer, enforces a ceiling per component, and compacts history with a summarizer before the provider truncates it without warning.</td>
+        </tr>
+        <tr>
+          <td><strong>Loop guard</strong></td>
+          <td>Gives each run an exit condition: a tool-round cap, a token budget, an optional cost cap, repeated-action detection and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has.</td>
+        </tr>
+        <tr>
+          <td><strong>Cost tracking</strong></td>
+          <td>Records tokens and estimated cost for each model call, streaming included, using the rates in <code>Agent:Pricing</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Run ledger</strong></td>
+          <td>One SQLite record per scheduled, triggered, delegated, job, orchestration and external run, with usage, tool calls and outcome. Viewable in the Runs tab.</td>
+        </tr>
+        <tr>
+          <td><strong>Spend limits</strong></td>
+          <td>Daily limits per agent, per trigger and in total, measured from the run ledger. A trigger event over its limit is deferred.</td>
+        </tr>
+        <tr>
+          <td><strong>Jobs</strong></td>
+          <td>Deterministic work that runs without a model, started from a schedule, a trigger or an agent tool.</td>
+        </tr>
+        <tr>
+          <td><strong>Typed output</strong></td>
+          <td>Answers in a fixed JSON shape, checked against a schema and retried with the specific errors until they fit.</td>
+        </tr>
+        <tr>
+          <td><strong>Vision</strong></td>
+          <td>Tools that describe an image or extract typed data from one. Images come only from allowlisted folders and https hosts.</td>
+        </tr>
+        <tr>
+          <td><strong>Connections and connectors</strong></td>
+          <td>Encrypted credentials, OAuth with token refresh, and connectors to outside services. A tool that sends or deletes needs approval.</td>
+        </tr>
+        <tr>
+          <td><strong>Authentication</strong></td>
+          <td>Pluggable schemes (API key and JWT bearer) protect the endpoints. Off by default, with a startup warning while it is off.</td>
         </tr>
         <tr>
           <td><strong>Cost-aware model routing</strong></td>
@@ -144,6 +184,14 @@
         <tr>
           <td><strong>Workflow orchestration</strong></td>
           <td>Multi-agent workflows that coordinate work across agents in sequential, concurrent, or declarative patterns. Workflows can be defined in code or in YAML, specifying which agents handle which steps, how data flows between them, and what happens on failure.</td>
+        </tr>
+        <tr>
+          <td><strong>Orchestration runs</strong></td>
+          <td>Group chat, handoff and Magentic runs with checkpoints on disk. A Magentic run stops for a person to approve its plan and survives a restart. Only a person can answer the review.</td>
+        </tr>
+        <tr>
+          <td><strong>MCP server</strong></td>
+          <td>Serves a chosen set of this host&#x27;s tools to outside clients over MCP. Nothing is exposed until configuration names it.</td>
         </tr>
         </tbody>
       </table>

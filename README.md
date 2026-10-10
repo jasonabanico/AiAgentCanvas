@@ -8,12 +8,13 @@ A multi-agent enterprise copilot platform built with .NET 10, Microsoft Agent Fr
 Frontend (Next.js 15 + React 19, AG-UI client)
         │ AG-UI Protocol (SSE)
         ▼
-Host (ASP.NET Core 9) ─ composition root
-├── Platform ──────────── Abstractions, Orchestration, Security, Storage
+Host (ASP.NET Core 10) ─ composition root
+├── Platform ──────────── Abstractions, Orchestration, Security, Authentication, Connections, Connectors
 ├── Capabilities ──────── opt-in feature modules behind Features:* flags
 ├── AgentData ─────────── personas, context, entities, guardrails, profiles, workflows
-├── Agents ────────────── specialist agents (in-process, separable to out-of-process)
-├── DataConnections ───── tool providers and vector stores
+├── Agents ────────────── specialist agents (plugins, in-process, separable to out-of-process)
+├── Connectors ────────── Twilio SMS and an MCP adapter (Gmail), one instance per stored connection
+├── DataConnections ───── tool providers, storage adapters and vector stores
 └── Providers ─────────── swappable LLM backends selected by the Provider key
         │
         ▼
@@ -23,10 +24,10 @@ Azure AI Foundry | Databricks | Snowflake Cortex
 The runtime wraps the model in a chat-client pipeline before the agent ever sees it:
 
 ```
-LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ ToolDedupe ─ provider
+LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
 ```
 
-`ContextBudget` counts the prompt with the model's own tokenizer and compacts history before the provider truncates it silently. `LoopGuard` holds the run's exit conditions: a tool-round cap, a token budget, repeat detection, and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has, which is what actually ends the loop. Both are configured under `Agent:` in `appsettings.json`.
+`ContextBudget` counts the prompt with the model's own tokenizer and compacts history before the provider truncates it silently. `LoopGuard` holds the run's exit conditions: a tool-round cap, a token budget, repeat detection, and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has, which is what actually ends the loop. Both are configured under `Agent:` in `appsettings.json`. `CostTracking` prices each model call from `Agent:Pricing`. Persona agents, scheduled runs, triggers and orchestrations use the same pipeline and tool wrapping as the default agent, so a limit or a governance rule applies to delegated work too.
 
 ## Project Structure
 
@@ -73,7 +74,7 @@ Agents start **in-process** but are designed to separate into independent servic
 - [.NET SDK 10](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - An Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account
-- No additional API keys needed for the included samples (Yahoo Finance and SEC EDGAR are free)
+- No additional API keys needed for the sample agent's data tools (Yahoo Finance and SEC EDGAR are free)
 
 ### 1. Configure
 
@@ -95,14 +96,36 @@ Two optional deployments are worth setting:
 - `EconomyDeploymentName` gives the cost-aware router a cheaper model for low-complexity turns and gives history compaction a cheap summarizer.
 - `JudgeDeploymentName` gives the evaluation suite in `tests/AiAgentCanvas.EvalTests` a model distinct from the one under test. Without it, the suite skips itself.
 
-### 2. Run the Backend
+### 2. Turn on what you want to try
+
+All capabilities are off by default, so a fresh start is a bare chat agent. Add the flags you want to `appsettings.Development.json`. This set enables the persona, context and guardrail stores, skills, workflows, the run ledger, and the sample financial analyst agent with its market data tools:
+
+```json
+{
+  "Features": {
+    "Personas": true,
+    "Context": true,
+    "Guardrails": true,
+    "Skills": true,
+    "Workflows": true,
+    "InterAgentCommunication": true,
+    "RunLedger": true
+  },
+  "Agents": { "FinancialAnalyst": { "Enabled": true } },
+  "DataConnections": { "MarketData": { "Enabled": true } }
+}
+```
+
+The agent and data connection are plugins. A normal solution build copies them into the Host's `plugins/` folder.
+
+### 3. Run the Backend
 
 ```bash
 cd src/Host/AiAgentCanvas.Host
 dotnet run
 ```
 
-### 3. Run the Frontend
+### 4. Run the Frontend
 
 ```bash
 cd frontend
@@ -110,7 +133,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Try: *"What is the current stock price of AAPL and how has it performed over the last month?"*
+Open `http://localhost:3000`. The backend listens on `http://localhost:5149`, and the dev server forwards `/api` requests to it. Try: *"What is the current stock price of AAPL and how has it performed over the last month?"*
 
 ### Tests
 
@@ -200,8 +223,8 @@ Seeded components are written to disk on first startup and never overwrite manua
 | Agent Framework | Microsoft Agent Framework (MAF) |
 | AI | Azure AI Foundry, Databricks Foundation Model APIs, Snowflake Cortex |
 | Tokenizer | `Microsoft.ML.Tokenizers` (cl100k / o200k) |
-| Data | MCP tool providers (sample: SEC EDGAR, Yahoo Finance) |
-| Storage | SQLite (chat history, vectors, episodes, tasks, audit, evals) |
+| Data | Tool providers and connectors (sample: SEC EDGAR, Yahoo Finance, Twilio SMS, MCP servers) |
+| Storage | SQLite (chat history, vectors, episodes, tasks, audit, triggers, runs, connections, orchestrations) |
 | Scheduling | Hosted `BackgroundService` with a 5-field cron evaluator |
 | Inter-Agent | Agent Registry, in-process mailbox, handoff |
 | Observability | OpenTelemetry, exported through Azure Monitor when configured |
