@@ -275,6 +275,7 @@ if (result.Success) Console.WriteLine(result.Value!.City);
         <li><strong>Approval.</strong> A tool that needs a person&#x27;s approval is not offered, even when named, because an MCP call has no one to ask. The log says so.</li>
         <li><strong>Governance and tracing.</strong> Each exposed tool passes through the same governance wrapper and tracing as when an agent calls it. A governance rule that blocks a tool for an agent blocks it here.</li>
         <li><strong>Audit.</strong> Each outside call is recorded in the run ledger as a run with source <code>External</code>, with the tool name, its arguments (cut to 500 characters) and a preview of the result.</li>
+        <li><strong>Rate limit.</strong> The endpoint carries the per-caller rate limit (<code>Security:RateLimitPerMinute</code>), like the other endpoints that spend model calls.</li>
         <li><strong>Result size.</strong> A result longer than <code>MaxResultChars</code> is cut before it leaves, and the cut is marked.</li>
         <li><strong>Missing names.</strong> A configured name the host does not register is logged and skipped. The rest still load.</li>
         <li><strong>Connector tools.</strong> Tools that come from connections are not exposed, because they appear and disappear as connections change. Only tools registered at start are offered.</li>

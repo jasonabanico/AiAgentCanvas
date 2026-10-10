@@ -140,7 +140,7 @@
         <tr>
           <td><code>Security</code></td>
           <td><code>RateLimitPerMinute</code></td>
-          <td>Requests per minute for the <code>agent</code> rate-limit policy (default 30). See the note in the security reference.</td>
+          <td>Requests per minute for each caller on the endpoints that spend model calls: AG-UI, A2A, structured output, orchestrations and the MCP server. Default 30. Zero or less turns it off.</td>
         </tr>
         <tr>
           <td><code>Authentication</code></td>
@@ -454,6 +454,11 @@ Security__RateLimitPerMinute=60
           <td>Health check failed banner appears</td>
           <td>Backend health endpoint returned an error</td>
           <td>Check backend logs for startup failures; verify database connectivity and API key validity</td>
+        </tr>
+        <tr>
+          <td>Requests return 429</td>
+          <td>The caller passed <code>Security:RateLimitPerMinute</code> on a model-spending endpoint</td>
+          <td>Wait for the <code>Retry-After</code> interval, or raise the limit. Callers who are not signed in share an allowance by address.</td>
         </tr>
         <tr>
           <td>A tool call is refused and the tool is on the default list</td>

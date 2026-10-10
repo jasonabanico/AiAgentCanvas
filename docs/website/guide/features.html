@@ -53,7 +53,7 @@
         </tr>
         <tr>
           <td><strong>MCP connections</strong></td>
-          <td>Agents connect to external data sources and tools through the Model Context Protocol. MCP servers are connected at runtime through <code>McpConnectionManager</code>, or at startup from a seed, and their tools appear alongside native agent tools. The <code>connect_mcp_server</code> tool is blocked by default. The MCP connector is the governed route for an account-backed server.</td>
+          <td>Agents connect to external data sources and tools through the Model Context Protocol. MCP servers are connected at runtime through <code>McpConnectionManager</code>, or at startup from a seed, and their tools appear alongside native agent tools. Tools from a connected server pass the governance policy and tracing. The <code>connect_mcp_server</code> tool is blocked by default, because it takes secrets as arguments the model can see. The MCP connector is the route for an account-backed server.</td>
         </tr>
         <tr>
           <td><strong>RAG pipeline</strong></td>

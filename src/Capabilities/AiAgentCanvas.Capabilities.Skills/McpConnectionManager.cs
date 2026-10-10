@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Text.Json;
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Orchestration.Services;
 using AiAgentCanvas.Orchestration.Skills;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ namespace AiAgentCanvas.Capabilities.Skills;
 public sealed class McpConnectionManager : IAsyncDisposable
 {
     private readonly DynamicToolRegistry _registry;
+    private readonly IServiceProvider? _services;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, McpConnection> _connections = new();
@@ -20,9 +22,14 @@ public sealed class McpConnectionManager : IAsyncDisposable
 
     private static readonly TimeSpan HealthCheckInterval = TimeSpan.FromMinutes(2);
 
-    public McpConnectionManager(DynamicToolRegistry registry, ILoggerFactory loggerFactory)
+    /// <param name="services">
+    /// Used to put the governance policy and tracing around each tool a server offers, as for
+    /// tools registered at startup. Without it the tools are registered as they come.
+    /// </param>
+    public McpConnectionManager(DynamicToolRegistry registry, ILoggerFactory loggerFactory, IServiceProvider? services = null)
     {
         _registry = registry;
+        _services = services;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<McpConnectionManager>();
         _healthTimer = new Timer(OnHealthCheck, null, HealthCheckInterval, HealthCheckInterval);
@@ -118,7 +125,9 @@ public sealed class McpConnectionManager : IAsyncDisposable
         };
 
         _connections[name] = connection;
-        _registry.Register($"mcp:{name}", aiTools);
+        // A server's tools are not trusted more than ours: they pass the same governance
+        // policy and tracing wrapper as a tool registered at startup.
+        _registry.Register($"mcp:{name}", _services is null ? aiTools : AgentPipeline.WrapTools(_services, aiTools));
 
         _logger.LogInformation(
             "Connected to MCP server {Name} at {Endpoint}, {ToolCount} tools registered, auth={AuthType}",

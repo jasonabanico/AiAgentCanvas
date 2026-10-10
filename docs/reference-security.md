@@ -26,9 +26,9 @@ This registers the following components as singletons:
 | `GovernanceContextProvider` | Scans system instructions for prompt injection |
 | `GovernedMcpGateway` | Evaluates tool calls against MCP gateway rules |
 | `GovernanceToolWrapper` | Wraps all `AIFunction` instances with governance checks |
-| Rate limiter | Fixed-window rate limiter (ASP.NET built-in) |
+| Rate limiter | Per-caller fixed-window rate limiter (ASP.NET built-in) |
 
-On the middleware side, `UseAiAgentCanvasSecurity()` enables the rate limiter, applies security headers, and subscribes to governance audit events for logging.
+On the middleware side, `UseAiAgentCanvasSecurity()` applies security headers and subscribes to governance audit events for logging. `UseAiAgentCanvasRateLimiting()` enables the rate limiter and must run after authentication, so a limit can tell callers apart.
 
 ---
 
@@ -62,10 +62,7 @@ Every tool call passes through a five-step governance pipeline:
 
 `GovernanceToolWrapper` implements `IToolGovernanceWrapper`. `AgentPipeline.WrapTools` calls `Wrap()` on each `AIFunction` and wraps the result in `TracedAIFunction`. The default agent, persona agents, the tools served by the MCP server, and connector tools are wrapped this way.
 
-Three kinds of tool are not wrapped by the governance policy:
-
-- Tools that `connect_mcp_server` registers at runtime go into the dynamic tool registry as they are. The default list blocks `connect_mcp_server` for this reason.
-- Tools that skills register at runtime follow the same path.
+Tools that arrive at runtime are wrapped as they are registered. That covers tools from a server connected with `connect_mcp_server`, which `McpConnectionManager` wraps, and tools from connectors, which the connector host wraps. The governance policy sees their calls, and the approval-required list applies to their names.
 
 ### Approval-Required Tools
 
@@ -159,15 +156,17 @@ When multiple rules match a tool call, `ConflictResolutionStrategy.DenyOverrides
 
 ## Rate Limiting
 
-The platform registers ASP.NET's fixed-window rate limiter with a policy named `"agent"`. No endpoint applies the policy yet (see Known Gaps in [Platform Internals](reference-internals.md)), so it does not limit any request today.
+The platform registers ASP.NET's fixed-window rate limiter with a policy named `"agent"`. The Host attaches it to the endpoints that spend model calls: AG-UI, A2A, structured output, orchestrations and the MCP server. Health, run history, connection management, notifications, webhooks and the OAuth callback are not limited.
+
+Each caller has an allowance of its own. The key is the authenticated identity when there is one, and the remote address otherwise. Callers who are not signed in share an allowance by address. Behind a reverse proxy, every request shares the proxy's address unless forwarded headers are configured. All callers who use one API key share an identity, set by `Authentication:ApiKey:PrincipalName`.
 
 | Parameter | Value |
 |-----------|-------|
 | Window | 1 minute |
-| Permit limit | Configurable via `Security:RateLimitPerMinute` (default: 30) |
+| Permit limit | `Security:RateLimitPerMinute` for each caller (default 30). Zero or less turns the limit off. |
 | Queue limit | 0 (no queuing; excess requests are rejected immediately) |
 
-When the policy rejects a request, the server returns HTTP 429 with a JSON body:
+When the policy rejects a request, the server returns HTTP 429 with a `Retry-After` header in seconds and a JSON body:
 
 ```json
 {

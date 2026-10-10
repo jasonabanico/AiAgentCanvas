@@ -217,6 +217,6 @@ If the server drops its session, the next check reconnects and the tools are fet
 ## Limits to know
 
 - **Approval list.** `Security:ApprovalRequiredTools` blocks a tool outright. It does not ask. `schedule_task`, `system_write_file`, `system_run_script` and `connect_mcp_server` are blocked by default and have no approval path. Connector tools use the approval requirement described above and are not in that list.
-- **Dynamic tools.** Tools from `connect_mcp_server` and from skills bypass the governance wrapper and tracing. Connector tools do not.
+- **Runtime tools.** Tools that arrive while the host runs, from connectors and from servers connected with `connect_mcp_server`, are wrapped for governance and tracing and reach agents on their next call. An agent with a tool seed sees only the runtime tools its seed names.
 - **Chat runs.** The ledger and the daily budgets cover unattended work. A chat session is not recorded and not limited by `Agent:Budgets`.
 - **Approval channel.** Only the default interactive agent has an approval channel. A persona agent that calls a send tool does not execute it.

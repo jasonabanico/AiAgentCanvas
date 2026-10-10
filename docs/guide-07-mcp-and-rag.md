@@ -18,7 +18,7 @@ disconnect_mcp_server(name)                                          -- disconne
 list_mcp_connections()                                               -- list active connections
 ```
 
-`connect_mcp_server` is on the default `Security:ApprovalRequiredTools` list, so governance blocks it until an operator removes it from that list. Two reasons support the default. The `bearerToken` and `apiKey` arguments are visible to the model, so a secret typed into the chat passes through it. And tools registered this way are not wrapped by the governance policy or the tracing wrapper (see Governance below).
+`connect_mcp_server` is on the default `Security:ApprovalRequiredTools` list, so governance blocks it until an operator removes it from that list. The default exists because the `bearerToken` and `apiKey` arguments are visible to the model, so a secret typed into the chat passes through it, and because a connection to an outside server widens what the agent can do.
 
 Once an operator has allowed it, a user can connect through conversation:
 
@@ -36,7 +36,7 @@ The `McpConnectionManager` handles the full connection lifecycle:
 4. Discovered tools are registered into the `DynamicToolRegistry` under the key `mcp:{name}`
 5. A health ping runs every two minutes. A failed ping triggers a reconnect, and the tools are registered again
 
-The registry holds the tools, but nothing in the runtime yet delivers registry tools to an agent. See Known Gaps in [Platform Internals](reference-internals.md).
+Agents see the registry's tools on their next call. The default agent and each persona agent add them to their own tools, limited by the agent's tool seed when it has one. A tool removed from the registry stops being offered.
 
 ```csharp
 private async Task<string> ConnectMcpServer(string name, string endpoint,
@@ -63,7 +63,7 @@ Once connected, MCP tools appear alongside built-in tools with no distinction fr
 
 ### Governance
 
-The `GovernedMcpGateway` evaluates a tool call against the policy file and the approval-required list. It applies to tools the host wraps at startup, and to the `connect_mcp_server` call itself. The default policy has a rule that denies `connect_mcp_server` when the `endpoint` argument points at a private or internal address, which blocks the connection before it is made:
+The `GovernedMcpGateway` evaluates a tool call against the policy file and the approval-required list. It applies to each tool the host wraps: tools registered at startup, tools a connected server contributes, and the `connect_mcp_server` call itself. The default policy has a rule that denies `connect_mcp_server` when the `endpoint` argument points at a private or internal address, which blocks the connection before it is made:
 
 ```csharp
 public McpGatewayDecision Evaluate(string agentId, string toolName, string? payload = null)
@@ -88,7 +88,7 @@ public McpGatewayDecision Evaluate(string agentId, string toolName, string? payl
 }
 ```
 
-Tools that an MCP server contributes at runtime are registered raw in the dynamic tool registry. They are not wrapped, so a guardrail policy does not see their calls. Tools that come from a connector are different: the connector host wraps each one for governance and tracing, and wraps any tool with risk `Send` or `Destructive` in an approval requirement.
+Tools that an MCP server contributes at runtime are wrapped when they are registered, in the same governance wrapper and tracing as a tool registered at startup. A guardrail policy sees their calls, and the approval-required list applies to their names. Tools from a connector are wrapped by the connector host, which also puts any tool with risk `Send` or `Destructive` behind an approval requirement.
 
 ### Building an MCP Connection Seed
 

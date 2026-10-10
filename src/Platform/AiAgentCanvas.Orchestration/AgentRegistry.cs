@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using A2A;
 using AiAgentCanvas.Abstractions;
+using AiAgentCanvas.Orchestration.Skills;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.A2A;
 using Microsoft.Extensions.AI;
@@ -23,6 +24,7 @@ public sealed class AgentRegistry : IAgentRegistry
     private readonly ILoggerFactory _loggerFactory;
     private Func<AIAgent>? _defaultAgentFactory;
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly DynamicToolRegistry? _dynamicTools;
 
     public AgentRegistry(
         IChatClient chatClient,
@@ -32,7 +34,8 @@ public sealed class AgentRegistry : IAgentRegistry
         Func<IEnumerable<AgentPersonaInfo>> personaListAll,
         IReadOnlyDictionary<string, IAgentToolsSeed> toolSeeds,
         ILoggerFactory loggerFactory,
-        IHttpClientFactory? httpClientFactory = null)
+        IHttpClientFactory? httpClientFactory = null,
+        DynamicToolRegistry? dynamicTools = null)
     {
         _chatClient = chatClient;
         _toolsFactory = toolsFactory;
@@ -42,6 +45,7 @@ public sealed class AgentRegistry : IAgentRegistry
         _toolSeeds = toolSeeds;
         _loggerFactory = loggerFactory;
         _httpClientFactory = httpClientFactory;
+        _dynamicTools = dynamicTools;
     }
 
     public void RegisterDefault(AIAgent agent)
@@ -152,6 +156,15 @@ public sealed class AgentRegistry : IAgentRegistry
             ? allTools.Where(t => seed.ToolNames.Contains(t.Name)).ToList()
             : allTools;
         var contextProviders = _contextProvidersFactory().ToList();
+
+        // Runtime tools reach a persona agent the way startup tools do: all of them, or only
+        // those its tool seed names.
+        if (_dynamicTools is not null)
+        {
+            contextProviders.Add(new DynamicToolContextProvider(
+                _dynamicTools,
+                seed is null ? null : name => seed.ToolNames.Contains(name)));
+        }
 
         var agentOptions = new ChatClientAgentOptions
         {

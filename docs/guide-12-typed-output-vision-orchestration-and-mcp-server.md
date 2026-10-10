@@ -151,6 +151,7 @@ Nothing is exposed until `Agent:McpServer:ExposedTools` names it. A name matches
 - **Approval.** A tool that needs a person's approval is not offered, even when named, because an MCP call has no one to ask. The log says so.
 - **Governance and tracing.** Each exposed tool passes through the same governance wrapper and tracing as when an agent calls it. A governance rule that blocks a tool for an agent blocks it here.
 - **Audit.** Each outside call is recorded in the run ledger as a run with source `External`, with the tool name, its arguments (cut to 500 characters) and a preview of the result.
+- **Rate limit.** The endpoint carries the per-caller rate limit (`Security:RateLimitPerMinute`), like the other endpoints that spend model calls.
 - **Result size.** A result longer than `MaxResultChars` is cut before it leaves, and the cut is marked.
 - **Missing names.** A configured name the host does not register is logged and skipped. The rest still load.
 - **Connector tools.** Tools that come from connections are not exposed, because they appear and disappear as connections change. Only tools registered at start are offered.

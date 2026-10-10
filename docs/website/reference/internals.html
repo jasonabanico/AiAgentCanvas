@@ -75,9 +75,15 @@
           <td>AiAgentCanvas.Capabilities.EpisodicMemory</td>
           <td>Recent episodes. Present when <code>EpisodicMemory</code> is on.</td>
         </tr>
+        <tr>
+          <td>10</td>
+          <td><code>DynamicToolContextProvider</code></td>
+          <td>AiAgentCanvas.Orchestration.Skills</td>
+          <td>Adds tools registered at runtime, such as those from connectors and connected MCP servers, to the agent&#x27;s tools. It is the only provider that changes tools and not instructions. The runtime gives each agent its own instance, filtered by that agent&#x27;s tool seed.</td>
+        </tr>
         </tbody>
       </table>
-      <p>The order follows the order of the registration calls in <code>Program.cs</code>: Security first, then the core runtime, then Personas, Context, Guardrails, UserProfiles and Entities, then RAG and episodic memory. A provider is present only when its flag is on.</p>
+      <p>The order follows the order of the registration calls in <code>Program.cs</code>: Security first, then the core runtime, then Personas, Context, Guardrails, UserProfiles and Entities, then RAG and episodic memory. A provider is present only when its flag is on. The dynamic tool provider is the exception: the runtime adds it to the default agent and to each persona agent as it builds them, and it does not come from the DI list.</p>
       <hr>
       <h2>Chat Pipeline</h2>
       <p><code>AgentPipeline</code> builds the chat client chain and wraps tools. The default agent, each persona agent built by the registry, and the structured responder use it. Listed from the outside in:</p>
@@ -128,13 +134,6 @@
       <p><code>AgentPipeline.WrapTools</code> wraps each <code>AIFunction</code> in the governance wrapper when one is registered, then in <code>TracedAIFunction</code>. Tools that are not functions pass through unchanged.</p>
       <h3>Run Tracking</h3>
       <p><code>RunTracking.RunAsync</code> gives a unit of work an ambient <code>AgentRunContext</code> and, when a ledger is registered, a run record. Scheduled agent tasks, trigger events, handoffs, jobs, orchestration runs and outside MCP calls use it. The context collects usage from the cost-tracking client and tool calls from the tracing wrapper, rolls a child&#x27;s usage up to its parent, and feeds the per-run cost cap in the loop guard. The <code>BudgetGuard</code> reads the ledger to decide whether a new unattended run may start.</p>
-      <hr>
-      <h2>Known Gaps</h2>
-      <p>These are places where the code does less than its surrounding design suggests. Each has a follow-up task.</p>
-      <ul>
-        <li><strong>Runtime tools do not reach agents.</strong> <code>DynamicToolRegistry</code> holds tools added at runtime: those from <code>connect_mcp_server</code>, and those from connectors. <code>DynamicToolContextProvider</code> is written to deliver them but is not registered, and nothing else reads the registry. Tools registered at startup are unaffected.</li>
-        <li><strong>The rate limiter is not applied.</strong> <code>Security:RateLimitPerMinute</code> registers a fixed-window policy named <code>agent</code>, and <code>UseRateLimiter</code> is in the pipeline, but no endpoint calls <code>RequireRateLimiting(&quot;agent&quot;)</code>.</li>
-      </ul>
       <hr>
       <h2>MarkdownFile Utility</h2>
       <p><code>MarkdownFile</code> (<code>AiAgentCanvas.Abstractions</code> namespace) is a utility for reading and writing markdown files with YAML frontmatter. All agent data domains use it for persistence.</p>

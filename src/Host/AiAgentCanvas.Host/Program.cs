@@ -272,12 +272,21 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAiAgentCanvasAuthentication();
 
-app.UseAiAgentCanvas(configureEndpoint: (endpoint, key) => endpoint.RequireAgentAuthorization(auth, key));
+// After authentication, so a limit belongs to a caller and not to the whole host.
+app.UseAiAgentCanvasRateLimiting();
+
+// The AG-UI endpoint spends model calls, so it carries the per-caller rate limit.
+app.UseAiAgentCanvas(configureEndpoint: (endpoint, key) =>
+{
+    endpoint.RequireAgentAuthorization(auth, key);
+    if (key == "agui")
+        endpoint.RequireAgentRateLimit();
+});
 
 // The A2A server is registered by AddAiAgentCanvasInterAgentCommunication, so mapping
 // its endpoints unconditionally crashes startup whenever that feature is off.
 if (features.InterAgentCommunication)
-    app.MapA2AEndpoints().RequireAgentAuthorization(auth, "a2a");
+    app.MapA2AEndpoints().RequireAgentAuthorization(auth, "a2a").RequireAgentRateLimit();
 
 app.MapDevUI().RequireAgentAuthorization(auth, "devui");
 
@@ -309,14 +318,14 @@ if (features.Connectors)
 }
 
 if (features.StructuredOutput)
-    app.MapStructuredEndpoints().RequireAgentAuthorization(auth, "structured");
+    app.MapStructuredEndpoints().RequireAgentAuthorization(auth, "structured").RequireAgentRateLimit();
 
 // Answering a run that waits for a person is possible only here. No agent tool does it.
 if (features.AgentOrchestration)
-    app.MapOrchestrationEndpoints().RequireAgentAuthorization(auth, "orchestrations");
+    app.MapOrchestrationEndpoints().RequireAgentAuthorization(auth, "orchestrations").RequireAgentRateLimit();
 
 if (features.McpServer)
-    app.MapAiAgentCanvasMcp(mcpServer).RequireAgentAuthorization(auth, "mcp");
+    app.MapAiAgentCanvasMcp(mcpServer).RequireAgentAuthorization(auth, "mcp").RequireAgentRateLimit();
 
 app.MapFallbackToFile("index.html");
 
