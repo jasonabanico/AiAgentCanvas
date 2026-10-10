@@ -18,16 +18,16 @@ Host (ASP.NET Core 10) ─ composition root
 └── Providers ─────────── swappable LLM backends selected by the Provider key
         │
         ▼
-Azure AI Foundry | Databricks | Snowflake Cortex
+Azure AI Foundry | Databricks | Snowflake Cortex | a local model server
 ```
 
 The runtime wraps the model in a chat-client pipeline before the agent ever sees it:
 
 ```
-LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
+LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ToolSelection ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
 ```
 
-`ContextBudget` counts the prompt with the model's own tokenizer and compacts history before the provider truncates it silently. `LoopGuard` holds the run's exit conditions: a tool-round cap, a token budget, repeat detection, and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has, which is what actually ends the loop. Both are configured under `Agent:` in `appsettings.json`. `CostTracking` prices each model call from `Agent:Pricing`. Persona agents, scheduled runs, triggers and orchestrations use the same pipeline and tool wrapping as the default agent, so a limit or a governance rule applies to delegated work too.
+`ContextBudget` counts the prompt with the model's own tokenizer and compacts history before the provider truncates it silently. `LoopGuard` holds the run's exit conditions: a tool-round cap, a token budget, repeat detection, and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has, which is what actually ends the loop. Both are configured under `Agent:` in `appsettings.json`. `CostTracking` prices each model call from `Agent:Pricing`. `ToolSelection` is off by default. Turned on, it narrows a long tool list to the tools that fit the user's message, and a cap on the size of one tool result keeps a single large answer from filling the prompt. Persona agents, scheduled runs, triggers and orchestrations use the same pipeline and tool wrapping as the default agent, so a limit or a governance rule applies to delegated work too.
 
 ## Project Structure
 
@@ -53,7 +53,7 @@ src/
 │   ├── DataConnection.VectorSearch.Databricks/
 │   ├── DataConnection.VectorSearch.Snowflake/
 │   └── DataConnection.Storage.Sqlite/ # scheduled task store
-├── Providers/                        # AzureAIFoundry, Databricks, Snowflake
+├── Providers/                        # AzureAIFoundry, Databricks, Snowflake, Local
 └── Host/
     └── AiAgentCanvas.Host/           # composition root (Program.cs)
 
@@ -73,7 +73,7 @@ Agents start **in-process** but are designed to separate into independent servic
 
 - [.NET SDK 10](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
-- An Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account
+- An Azure OpenAI deployment, a Databricks serving endpoint, a Snowflake Cortex account, or a local model server such as Ollama (see [Running Fully Local](docs/guide-13-running-fully-local.md))
 - No additional API keys needed for the sample agent's data tools (Yahoo Finance and SEC EDGAR are free)
 
 ### 1. Configure
@@ -195,8 +195,8 @@ Seeded components are written to disk on first startup and never overwrite manua
 - **Personas** — switch agent behavior with custom system prompts
 - **Workflows** — sequential, concurrent, and declarative (YAML) multi-agent workflows through MAF
 - **Guardrails** — policy rules that constrain agent behavior
-- **Episodic memory** — importance-gated writes, embedding-ranked recall, importance-weighted decay
-- **RAG** — hybrid retrieval, chunk overlap, LLM reranking, cited sources
+- **Episodic memory** — importance-gated writes, embedding-ranked recall, importance-weighted decay, merging of near-duplicate episodes, a refresh when an episode is recalled, and endpoints and a tool to list and delete what is stored
+- **RAG** — document ingestion with versions and expiry, hybrid retrieval fused by rank, LLM reranking, cited sources, and a `rag_search` tool that lets the agent decide when and what to look up
 - **MCP connections** — connect to external MCP servers at runtime, with auth, issuer checks, health pings, and reconnect
 - **Scheduled tasks** — cron-scheduled agent runs executed by a hosted runner, with per-task timeouts
 - **Event triggers** — cron, file-watch, webhook and connector triggers held in a durable SQLite queue with deduplication, retry with backoff, and a dead-letter state
@@ -205,7 +205,8 @@ Seeded components are written to disk on first startup and never overwrite manua
 - **Jobs** — deterministic scheduled work that runs without a model
 - **Typed output** — answers checked against a JSON Schema and retried with the specific errors until they fit
 - **Vision** — image tools with allowlisted folders and hosts, and typed extraction from an image
-- **Orchestration** — group chat, handoff and Magentic runs with checkpoints, and a human sign-off step that only a person can answer
+- **Orchestration** — group chat, handoff, Magentic, sequential, concurrent and maker-checker review runs, with checkpoints and a human sign-off step that only a person can answer
+- **Local models** — an OpenAI-compatible provider for Ollama, llama.cpp, LM Studio and vLLM, with a guard that refuses a public endpoint
 - **MCP server** — serves a chosen set of tools to outside clients, with approval-gated tools excluded and every call recorded
 - **Connections and connectors** — encrypted credentials, OAuth with refresh, and connectors with risk-tagged tools, approval for sends, signed webhooks and events (Twilio SMS and Gmail through MCP ship in the box)
 - **Inter-agent communication** — agent registry with A2A agent cards, mailbox messaging, synchronous handoff
@@ -221,7 +222,7 @@ Seeded components are written to disk on first startup and never overwrite manua
 | Protocol | AG-UI (Server-Sent Events), A2A (JSON over HTTP) |
 | Backend | ASP.NET Core 10, Minimal APIs |
 | Agent Framework | Microsoft Agent Framework (MAF) |
-| AI | Azure AI Foundry, Databricks Foundation Model APIs, Snowflake Cortex |
+| AI | Azure AI Foundry, Databricks Foundation Model APIs, Snowflake Cortex, local OpenAI-compatible servers |
 | Tokenizer | `Microsoft.ML.Tokenizers` (cl100k / o200k) |
 | Data | Tool providers and connectors (sample: SEC EDGAR, Yahoo Finance, Twilio SMS, MCP servers) |
 | Storage | SQLite (chat history, vectors, episodes, tasks, audit, triggers, runs, connections, orchestrations) |

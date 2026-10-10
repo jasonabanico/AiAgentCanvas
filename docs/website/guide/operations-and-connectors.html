@@ -318,6 +318,39 @@ create_connector_trigger(name: &quot;reply to texts&quot;, connectionId: &quot;t
         <li><strong>Chat runs.</strong> The ledger and the daily budgets cover unattended work. A chat session is not recorded and not limited by <code>Agent:Budgets</code>.</li>
         <li><strong>Approval channel.</strong> Only the default interactive agent has an approval channel. A persona agent that calls a send tool does not execute it.</li>
       </ul>
+      <h2>Managing What the Agents Remember</h2>
+      <p>Episodic memory can hold details a user shared, so a person can see it and delete it. The endpoints use endpoint key <code>memory</code>.</p>
+      <table>
+        <thead><tr>
+          <th>Request</th>
+          <th>Effect</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>GET /api/memory/episodes</code> (<code>agent</code>, <code>limit</code>, <code>offset</code>)</td>
+          <td>Lists stored episodes, newest first, including ones that have decayed out of recall. The embedding vector is not sent.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/memory/episodes/{id}</code></td>
+          <td>One episode</td>
+        </tr>
+        <tr>
+          <td><code>DELETE /api/memory/episodes/{id}</code></td>
+          <td>Forgets one episode</td>
+        </tr>
+        <tr>
+          <td><code>DELETE /api/memory/episodes?confirm=true</code> (<code>agent</code>)</td>
+          <td>Forgets every episode, or every episode of one agent. Without <code>confirm=true</code> the request is refused.</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The agent has a <code>forget_memory</code> tool that deletes one episode by id, for the case where a user asks it to forget something.</p>
+      <p>Three rules shape what is stored.</p>
+      <ul>
+        <li><strong>Importance.</strong> An episode scoring below the store&#x27;s threshold is not written.</li>
+        <li><strong>Repeats merge.</strong> A new episode whose embedding is within <code>DuplicateThreshold</code> (0.95 cosine) of an earlier episode by the same agent updates that episode: the newer summary and outcome replace the older ones, the higher importance is kept, and relevance returns to full. Recall then returns one lesson and not three copies. Episodes saved without an embedding cannot be compared, so they are kept.</li>
+        <li><strong>Recall refreshes.</strong> <code>search_memory</code> raises the relevance of the episodes it returns by <code>RecallBoost</code> (0.1, capped at 1). Decay lowers relevance every six hours, slower for important episodes, so an episode that keeps being useful stays and one nothing asks about fades and is pruned.</li>
+      </ul>
     </main>
   </div>
 </body>

@@ -2,7 +2,9 @@
 
 ## Context Provider Chain
 
-Context providers extend `AIContextProvider` (from `Microsoft.Agents.AI`) and run in DI registration order. Each provider's `ProvideAIContextAsync` method appends content to `AIContext.Instructions`, building up the system prompt that the agent receives.
+Context providers extend `AIContextProvider` (from `Microsoft.Agents.AI`) and run in DI registration order. Each provider's `ProvideAIContextAsync` method returns the content it adds to the instructions (or the tools it adds), and the agent merges it into what it already holds to build the system prompt.
+
+**A provider returns only its addition.** The merge appends the returned context to the incoming one. A provider that returns the incoming `AIContext` after modifying it, which already holds everything the earlier providers added, adds all of that a second time. With N providers the prompt grew by about 2 to the power of N. `ContextProviderCompositionTests` holds the real providers to this.
 
 | Order | Provider | Source | What It Injects |
 |-------|----------|--------|-----------------|
@@ -31,11 +33,12 @@ The order follows the order of the registration calls in `Program.cs`: Security 
 | `ReflectiveChatClient` | `Agent:Reflection:Enabled` | Reflection prompt after consecutive tool rounds |
 | `AuditingChatClient` | `AuditLog` flag | Records each model call |
 | `CostAwareModelRouter` | `Agent:ModelRouter:Enabled` | Needs an economy model |
+| `ToolSelectingChatClient` | `Agent:ToolSelection:Enabled` (default false) | Keeps the `MaxTools` tools most relevant to the user's message, plus `AlwaysInclude` names and tools the run has called. Ranks by keyword, and by embedding as well when a model is registered. Works on a copy of the options, so the agent keeps its full list. |
 | `ContextBudgetChatClient` | `Agent:ContextBudget:Enabled` (default true) | Counts with the tokenizer named in `Agent:TokenizerModel` |
 | `CostTrackingChatClient` | Always on | Prices from `Agent:Pricing`. An unpriced model reports tokens and no cost. |
 | `ToolDeduplicatingChatClient` | Always on | Closest to the provider |
 
-`AgentPipeline.WrapTools` wraps each `AIFunction` in the governance wrapper when one is registered, then in `TracedAIFunction`. Tools that are not functions pass through unchanged.
+`AgentPipeline.WrapTools` wraps each `AIFunction` in the governance wrapper when one is registered, then in `BoundedOutputAIFunction` (a result longer than `Agent:ToolOutput:MaxChars`, default 24000, is cut and marked), then in `TracedAIFunction`. Tools that are not functions pass through unchanged.
 
 ### Run Tracking
 
@@ -119,7 +122,7 @@ Each domain also supports user-created data that persists under the `user/` subt
 
 ## RAG Pipeline Internals
 
-The RAG (Retrieval-Augmented Generation) pipeline is enabled when the `Rag` feature flag is on and the active provider has an embedding model: `AIFoundry:EmbeddingDeploymentName` for Azure AI Foundry, or `Databricks:EmbeddingModelName` for Databricks. It adds relevant document context to the agent's system prompt before each response.
+The RAG (Retrieval-Augmented Generation) pipeline is enabled when the `Rag` feature flag is on and the active provider has an embedding model: `AIFoundry:EmbeddingDeploymentName` for Azure AI Foundry, `Databricks:EmbeddingModelName` for Databricks, or `Local:EmbeddingModelName` for the Local provider. It adds relevant document context to the agent's system prompt before each response.
 
 ### DocumentChunker
 
@@ -140,12 +143,14 @@ The chunking algorithm:
 
 ### Hybrid Search
 
-Hybrid search combines vector similarity with keyword matching. The weights are configurable via `RagSearchOptions`:
+Hybrid search combines vector similarity with keyword matching. `RagSearchOptions.Fusion` picks how:
 
-| Component | Weight | Method |
-|-----------|--------|--------|
-| Vector search | 0.7 (default) | Cosine similarity against stored embeddings |
-| Keyword search | 0.3 (default) | SQLite FTS5 BM25 ranking |
+| Mode | Method |
+|------|--------|
+| `ReciprocalRank` (default) | Each ranking contributes `1 / (k + rank)`, with `k` = `RankConstant` (60). Only the top `max(3 x top, 30)` of each ranking contribute. |
+| `WeightedScore` | `VectorWeight` (0.7) times the cosine similarity plus `KeywordWeight` (0.3) times `1 / keyword rank` |
+
+The vector ranking covers the chunks that pass the filters. The keyword ranking comes from SQLite FTS5 ordered by BM25.
 
 The `IHybridSearchable` interface:
 
@@ -160,9 +165,7 @@ public interface IHybridSearchable
 }
 ```
 
-`RagSearchOptions` fields: `SourceFilter`, `TagFilter`, `KeywordQuery`, `KeywordWeight` (default 0.3f), `VectorWeight` (default 0.7f).
-
-The final score for each document is: `(VectorWeight * vectorScore) + (KeywordWeight * keywordScore)`.
+`RagSearchOptions` fields: `SourceFilter`, `TagFilter`, `KeywordQuery`, `Fusion`, `RankConstant`, `KeywordWeight` and `VectorWeight`.
 
 ### FTS5 Schema
 
@@ -170,14 +173,14 @@ The SQLite FTS5 virtual table is created alongside the main documents table:
 
 ```sql
 CREATE VIRTUAL TABLE IF NOT EXISTS [{collection}_fts]
-USING fts5(id UNINDEXED, text, content=[{collection}], content_rowid=rowid)
+USING fts5(id UNINDEXED, text)
 ```
 
 - `id` is stored but not indexed (marked `UNINDEXED`).
 - `text` is the searchable column.
-- The FTS table is a content-sync table that mirrors the main documents table.
+- The table stands alone. The store writes to it when it writes a chunk and deletes from it when it deletes one.
 
-Keyword scores are normalized as `1.0 / (1.0 + |rank|)` where `rank` is the FTS5 BM25 score.
+Earlier versions declared the table as an external-content table over the documents but wrote to it directly, which left deletes unable to find their rows. A database in that form is detected on open, and the table is dropped and rebuilt from the documents.
 
 ### LLM Reranking
 
@@ -211,9 +214,29 @@ public sealed class DocumentRecord
     [VectorStoreData]
     public string? MetadataJson { get; set; }
 
+    [VectorStoreData]
+    public DateTimeOffset? IndexedAt { get; set; }
+
+    [VectorStoreData]
+    public int Version { get; set; } = 1;
+
     [VectorStoreVector(1536, DistanceFunction = CosineSimilarity)]
     public ReadOnlyMemory<float> Embedding { get; set; }
 }
 ```
 
-The embedding dimension is 1536 (compatible with OpenAI text-embedding-ada-002 and similar models). The `VectorStoreVector` attribute specifies cosine similarity as the distance function.
+The `1536` in the attribute is a declaration, and the SQLite store does not enforce it. A model with 768 or 1024 dimensions works as long as one model produced every vector, since vectors of different lengths score zero against each other.
+
+### IDocumentIndex
+
+A vector store keys its records by chunk, and a person thinks in documents. `IDocumentIndex` (in `AiAgentCanvas.Abstractions`) carries the document-level operations, and the SQLite collection implements it.
+
+| Method | Purpose |
+|---|---|
+| `ListDocumentsAsync` | One entry per source: chunk count, newest version, time, tags |
+| `LatestVersionAsync` | The version a new ingest of the source will follow |
+| `DeleteDocumentAsync` | Removes every chunk of a source |
+| `DeleteOlderVersionsAsync` | Removes chunks of a source older than a version |
+| `DeleteIndexedBeforeAsync` | Removes chunks indexed before a cutoff, for expiry |
+
+`RagIngestionService` uses them. It takes one ingest at a time, so two requests for one source cannot choose the same version.

@@ -24,7 +24,7 @@ Agents are loaded as plugins at runtime, so the Host holds no compile-time refer
 | **Capabilities** | Opt-in feature modules, each behind a `Features:*` flag. |
 | **AgentData** | Six context domains that store and provide agent knowledge: personas, context, entities, guardrails, profiles and workflows. |
 | **DataConnections** | Tool providers and storage adapters: SQLite stores, the vector store, vector search and market data. |
-| **Providers** | The LLM backend, chosen by the `Provider` key: Azure AI Foundry, Databricks or Snowflake. |
+| **Providers** | The LLM backend, chosen by the `Provider` key: Azure AI Foundry, Databricks, Snowflake, or a local model server. |
 
 Ports belong in `AiAgentCanvas.Abstractions`, including the ones a capability owns, such as `IAgentMessaging`, `IScheduledTaskStore`, `IRunLedger`, `ICredentialProvider` and `IStructuredResponder`. A capability that defined an interface in its own project would force its storage adapter to depend upward on the capability, which breaks the layering.
 
@@ -49,7 +49,7 @@ Each project and what it references, taken from the project files.
 | AgentData | `Workflows` | Abstractions, Orchestration |
 | Connectors | `Connector.TwilioSms`, `Connector.Mcp` | Platform.Connectors |
 | DataConnections | `MarketData`, `Storage.Sqlite`, `VectorStore.Sqlite`, `VectorSearch.Databricks`, `VectorSearch.Snowflake` | Abstractions |
-| Providers | `AzureAIFoundry`, `Databricks`, `Snowflake` | Abstractions |
+| Providers | `AzureAIFoundry`, `Databricks`, `Snowflake`, `Local` | Abstractions |
 | Agents | `Agent.FinancialAnalyst` | Abstractions |
 
 The Host references all the projects above except `Agent.FinancialAnalyst` and `DataConnection.MarketData`, which are plugins loaded from the `plugins/` folder (see Service Modules below).
@@ -60,8 +60,8 @@ The Host references all the projects above except `Agent.FinancialAnalyst` and `
 
 | Project | Purpose | Key Types |
 |---|---|---|
-| **Abstractions** | Interfaces and contracts. All other projects reference this. | `IServiceModule`, `IAgentRegistry`, `IAgentHandoff`, `IAgentMessaging`, the seed interfaces (`IPersonaSeed`, `IAgentToolsSeed`, `IContextSeed`, `IWorkflowSeed`, `IEntitySeed`, `IGuardrailSeed`, `ISkillSeed`, `IUserProfileSeed`, `IGoalSeed`, `IMcpConnectionSeed`), `IRunLedger`, `RunTracking`, `AgentRunContext`, `IBudgetGuard`, `IAgentJob`, `ICredentialProvider`, `IConnectorEventSink`, `IStructuredResponder`, `ToolStateMapping` |
-| **Orchestration** | Agent runtime and coordination. Builds agents from seeds, runs the AG-UI and A2A servers, and owns the chat pipeline. | `AgentRegistry`, `AgentPipeline`, `InProcessAgentHandoff`, `InProcessAgentMessaging`, `HandoffToolProvider`, `ContextBudgetChatClient`, `LoopGuardChatClient`, `CostTrackingChatClient`, `BudgetGuard`, `CoreServiceExtensions` |
+| **Abstractions** | Interfaces and contracts. All other projects reference this. | `IServiceModule`, `IAgentRegistry`, `IAgentHandoff`, `IAgentMessaging`, the seed interfaces (`IPersonaSeed`, `IAgentToolsSeed`, `IContextSeed`, `IWorkflowSeed`, `IEntitySeed`, `IGuardrailSeed`, `ISkillSeed`, `IUserProfileSeed`, `IGoalSeed`, `IMcpConnectionSeed`), `IRunLedger`, `RunTracking`, `AgentRunContext`, `IBudgetGuard`, `IAgentJob`, `ICredentialProvider`, `IConnectorEventSink`, `IStructuredResponder`, `IDocumentIndex`, `ToolStateMapping` |
+| **Orchestration** | Agent runtime and coordination. Builds agents from seeds, runs the AG-UI and A2A servers, and owns the chat pipeline. | `AgentRegistry`, `AgentPipeline`, `InProcessAgentHandoff`, `InProcessAgentMessaging`, `HandoffToolProvider`, `ContextBudgetChatClient`, `LoopGuardChatClient`, `ToolSelectingChatClient`, `BoundedOutputAIFunction`, `CostTrackingChatClient`, `BudgetGuard`, `CoreServiceExtensions` |
 | **Security** | Governance and policy enforcement. Wraps tool calls with policy checks and injects security context. | `GovernedAIFunction`, `GovernanceToolWrapper`, `GovernedMcpGateway`, `GovernanceContextProvider` |
 | **Authentication** | Pluggable endpoint authentication. Schemes are picked by name from `Authentication:Schemes`. | `IAgentAuthenticationScheme`, `ApiKeyScheme`, `RequireAgentAuthorization` |
 | **Connections** | Encrypted credential store, the OAuth authorization code flow with PKCE, and token refresh. | `ConnectionStore`, `CredentialProvider`, `OAuthService`, `ConnectionEndpoints` |
@@ -72,7 +72,7 @@ The Host references all the projects above except `Agent.FinancialAnalyst` and `
 The model is wrapped in a chain of delegating chat clients before an agent sees it. `AgentPipeline` builds the chain, and the default agent and the persona agents use it. From the outside in:
 
 ```
-LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
+LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ToolSelection ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
 ```
 
 | Client | Job |
@@ -81,11 +81,12 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
 | `ReflectiveChatClient` | Optional. Injects a reflection prompt after a number of consecutive tool rounds. |
 | `AuditingChatClient` | Present when `AuditLog` is on. Records each model call. |
 | `CostAwareModelRouter` | Optional. Sends simple turns to the economy model. |
+| `ToolSelectingChatClient` | Optional. When a request carries more tools than `Agent:ToolSelection:MaxTools`, keeps the tools most relevant to the user's message, plus any the run has already called. Runs outside the budget, which would otherwise drop tools by their position in the list. |
 | `ContextBudgetChatClient` | Counts the prompt with the model's tokenizer, enforces a ceiling per component and compacts history with a summarizer. |
 | `CostTrackingChatClient` | Records tokens and estimated cost for each call, streaming included. |
 | `ToolDeduplicatingChatClient` | Removes duplicate tool definitions. |
 
-Tools get the same treatment from `AgentPipeline.WrapTools`: the governance wrapper first, then `TracedAIFunction`, which records a span and the call in the ambient run record.
+Tools get the same treatment from `AgentPipeline.WrapTools`: the governance wrapper first, then `BoundedOutputAIFunction`, which cuts a result longer than `Agent:ToolOutput:MaxChars` and says so, then `TracedAIFunction`, which records a span and the call in the ambient run record.
 
 ### AgentData Layer
 
@@ -110,8 +111,8 @@ Features that agents use but that are not specific to any single domain. Each is
 | **Scheduling** | Cron-based and one-time scheduled tasks that run an agent or a job | `ScheduledTaskRunner`, `ScheduledAgentJob`, `SchedulerToolProvider` |
 | **Notifications** | Agent-to-user notification delivery over SSE | `InMemoryNotificationSink`, `NotificationEndpoint` |
 | **SystemTools** | File read, write and list and script execution inside allowlists | `SystemToolProvider`, `SystemToolOptions` |
-| **RAG** | Chunking, hybrid retrieval, LLM reranking and cited context | `DocumentChunker`, `LlmReranker`, `RagContextProvider` |
-| **EpisodicMemory** | Cross-session memory with relevance decay, search and context injection | `EpisodicMemoryStore`, `EpisodicMemoryToolProvider`, `EpisodicMemoryContextProvider`, `MemoryDecayService` |
+| **RAG** | Document ingestion with versions and expiry, hybrid retrieval fused by rank, LLM reranking, cited context, and search tools | `RagIngestionService`, `RagSearcher`, `DocumentChunker`, `LlmReranker`, `RagContextProvider`, `RagToolProvider`, `RagEndpoints` |
+| **EpisodicMemory** | Cross-session memory with relevance decay, near-duplicate merging, recall refresh, search, deletion and context injection | `EpisodicMemoryStore`, `EpisodicMemoryToolProvider`, `EpisodicMemoryContextProvider`, `MemoryDecayService`, `EpisodicMemoryEndpoints` |
 | **AuditLog** | Model call and tool call audit trail with sensitive parameter redaction | `AuditLogStore`, `AuditingChatClient`, `AuditLogToolProvider` |
 | **EventTriggers** | Scheduled, file-watch, webhook and connector triggers held in a durable queue | `TriggerRegistry`, `TriggerStore`, `TriggerEventQueue`, `TriggerDispatchService`, `ConnectorEventBridge` |
 | **ComputerUse** | Browser automation through headless Chromium (Playwright) | `BrowserSession`, `ComputerUseToolProvider` |
@@ -119,7 +120,7 @@ Features that agents use but that are not specific to any single domain. Each is
 | **Jobs** | Deterministic work that runs without a model | `JobRunner`, `JobToolProvider` |
 | **StructuredOutput** | Schema-checked answers with retry | `StructuredResponder`, `JsonSchemaValidator`, `SchemaCatalog` |
 | **Vision** | Image tools with allowlisted sources | `ImageLoader`, `VisionToolProvider` |
-| **AgentOrchestration** | Group chat, handoff and Magentic runs with checkpoints and human sign-off | `OrchestrationRunner`, `OrchestrationStore`, `OrchestrationEndpoints` |
+| **AgentOrchestration** | Group chat, handoff, Magentic, sequential, concurrent and review runs with checkpoints and human sign-off | `OrchestrationRunner`, `ReviewLoop`, `OrchestrationStore`, `OrchestrationEndpoints` |
 | **McpServer** | Serves chosen tools over MCP | `ExposedToolSet`, `McpServerExtensions` |
 
 Connections and connectors sit in the Platform layer because other projects depend on them. `Platform.Connections` stores credentials and runs OAuth. `Platform.Connectors` defines the connector contracts and runs one connector per stored connection. See [Operations and Connectors](guide-11-operations-and-connectors.md).
@@ -133,7 +134,7 @@ Storage backends and external data sources. These projects implement the persist
 | Project | Purpose | Key Types |
 |---|---|---|
 | **Storage.Sqlite** | SQLite store for scheduled tasks | `SqliteScheduledTaskStore`, `SqliteStoreBase` |
-| **VectorStore.Sqlite** | SQLite vector store for RAG embeddings, and the chat history provider | `SqliteVectorStore`, `SqliteChatHistoryProvider` |
+| **VectorStore.Sqlite** | SQLite vector store for RAG embeddings with document-level operations, and the chat history provider | `SqliteVectorStore`, `SqliteChatHistoryProvider` |
 | **MarketData** | Stock quotes, price history and SEC EDGAR company facts. A plugin. | `MarketDataToolProvider` |
 | **VectorSearch.Databricks** | Databricks Vector Search index queries for grounding | `DatabricksVectorSearchToolProvider` |
 | **VectorSearch.Snowflake** | Snowflake Cortex Search queries for grounding | `SnowflakeCortexSearchToolProvider` |
@@ -145,6 +146,7 @@ Storage backends and external data sources. These projects implement the persist
 | **Providers.AzureAIFoundry** | LLM client for Azure AI Foundry (Azure OpenAI) endpoints |
 | **Providers.Databricks** | LLM client for Databricks Foundation Model APIs (OpenAI-compatible) |
 | **Providers.Snowflake** | LLM client for Snowflake Cortex |
+| **Providers.Local** | LLM and embedding client for an OpenAI-compatible server on this machine or network, with a guard against public endpoints |
 
 Each provider registers its chat client and, where configured, embeddings plus keyed `economy` and `judge` clients.
 
@@ -164,7 +166,7 @@ A user message travels through the system in this sequence:
 
 2. **AG-UI server resolves the session**, identifies the user, loads conversation history and prepares the agent context.
 
-3. **Context providers inject data.** Each registered `AIContextProvider` appends its knowledge to the system prompt: the governance scan, the default prompt, persona instructions, context entries, guardrail rules, the user profile, the entity index, and RAG results and episodic memory when those capabilities are on.
+3. **Context providers inject data.** Each registered `AIContextProvider` contributes a block to the system prompt: the governance scan, the default prompt, persona instructions, context entries, guardrail rules, the user profile, the entity index, and RAG results and episodic memory when those capabilities are on. A provider returns only what it adds. The agent merges that into what it already holds, so each block appears once.
 
 4. **HarnessAgent runs the agent loop.** The agent built through `AsHarnessAgent` executes the reason-act-observe cycle. Each model call goes through the chat pipeline described above.
 

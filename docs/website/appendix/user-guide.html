@@ -16,7 +16,7 @@
       <ul>
         <li>.NET 10 SDK</li>
         <li>Node.js 22 or later</li>
-        <li>A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account</li>
+        <li>A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, a Snowflake Cortex account, or a local model server (see <a href="guide-13-running-fully-local.md">Running Fully Local</a>)</li>
       </ul>
       <h3>Setup Steps</h3>
       <ol>
@@ -39,7 +39,7 @@
      }
    }
 </code></pre>
-      <p>To use Databricks or Snowflake, set <code>Provider</code> to <code>Databricks</code> or <code>Snowflake</code> and fill in that provider&#x27;s section.</p>
+      <p>To use Databricks, Snowflake or a local model server, set <code>Provider</code> to <code>Databricks</code>, <code>Snowflake</code> or <code>Local</code> and fill in that provider&#x27;s section.</p>
       <ol>
         <li>Turn on the capabilities you want. All flags default to <code>false</code>, so a fresh start is a bare chat agent. This set matches the examples below:</li>
       </ol>
@@ -100,7 +100,7 @@
         <tr>
           <td>(root)</td>
           <td><code>Provider</code></td>
-          <td>The LLM backend: <code>AzureAIFoundry</code> (default), <code>Databricks</code> or <code>Snowflake</code></td>
+          <td>The LLM backend: <code>AzureAIFoundry</code> (default), <code>Databricks</code>, <code>Snowflake</code> or <code>Local</code></td>
         </tr>
         <tr>
           <td><code>AIFoundry</code></td>
@@ -128,6 +128,11 @@
           <td>The same settings for those providers, with <code>EmbeddingModelName</code>, <code>EconomyModelName</code> and <code>JudgeModelName</code></td>
         </tr>
         <tr>
+          <td><code>Local</code></td>
+          <td><code>Endpoint</code>, <code>ModelName</code>, <code>EmbeddingModelName</code>, <code>EconomyModelName</code>, <code>JudgeModelName</code>, <code>AllowNonLocalEndpoint</code>, <code>RequestTimeoutSeconds</code></td>
+          <td>A model server on this machine or network. See Running Fully Local.</td>
+        </tr>
+        <tr>
           <td><code>Security</code></td>
           <td><code>PolicyPath</code></td>
           <td>Path to the governance policy YAML file</td>
@@ -149,8 +154,13 @@
         </tr>
         <tr>
           <td><code>Agent</code></td>
-          <td><code>ContextBudget</code>, <code>LoopGuard</code>, <code>Pricing</code>, <code>Reflection</code>, <code>ModelRouter</code></td>
+          <td><code>ContextBudget</code>, <code>LoopGuard</code>, <code>Pricing</code>, <code>Reflection</code>, <code>ModelRouter</code>, <code>ToolSelection</code>, <code>ToolOutput</code></td>
           <td>The chat pipeline. See Platform Internals.</td>
+        </tr>
+        <tr>
+          <td><code>Agent</code></td>
+          <td><code>Rag</code></td>
+          <td>Retrieval settings: <code>TopK</code>, <code>RetrieveK</code>, <code>AutoInject</code>, <code>Rerank</code>, chunk size and overlap, <code>MaxDocumentChars</code>, <code>TimeToLiveDays</code>. See MCP and RAG.</td>
         </tr>
         <tr>
           <td><code>Agent</code></td>
@@ -289,7 +299,7 @@
         </tr>
         <tr>
           <td><code>Rag</code></td>
-          <td>Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Needs an embedding model on the Azure AI Foundry or Databricks provider.</td>
+          <td>Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Documents are indexed through <code>POST /api/rag/documents</code>, and the agent gets <code>rag_search</code> and <code>rag_list_documents</code> tools. Needs an embedding model on the Azure AI Foundry, Databricks or Local provider.</td>
         </tr>
         <tr>
           <td><code>InterAgentCommunication</code></td>
@@ -297,7 +307,7 @@
         </tr>
         <tr>
           <td><code>EpisodicMemory</code></td>
-          <td>Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context.</td>
+          <td>Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. Repeats merge, recalls refresh, and <code>/api/memory/episodes</code> lists and deletes what is stored.</td>
         </tr>
         <tr>
           <td><code>AuditLog</code></td>
@@ -337,7 +347,7 @@
         </tr>
         <tr>
           <td><code>AgentOrchestration</code></td>
-          <td>Group chat, handoff and Magentic runs with checkpoints and a human sign-off step. Needs <code>InterAgentCommunication</code>. Adds the <code>/api/orchestrations</code> endpoints and the Orchestrations tab.</td>
+          <td>Group chat, handoff, Magentic, sequential, concurrent and maker-checker review runs, with a human sign-off step for Magentic. Needs <code>InterAgentCommunication</code>. Adds the <code>/api/orchestrations</code> endpoints and the Orchestrations tab.</td>
         </tr>
         <tr>
           <td><code>McpServer</code></td>
@@ -479,6 +489,21 @@ Security__RateLimitPerMinute=60
           <td>A connection shows <code>NeedsReauth</code></td>
           <td>The provider refused the stored credential</td>
           <td>Choose <strong>Reconnect</strong> on the Connections tab</td>
+        </tr>
+        <tr>
+          <td>The Host stops at startup with a message about <code>Local:Endpoint</code></td>
+          <td>The endpoint is outside the machine and the private networks</td>
+          <td>Point it at a local server, or set <code>Local:AllowNonLocalEndpoint</code> if a public endpoint is intended</td>
+        </tr>
+        <tr>
+          <td>The model answers slowly or times out on a local server</td>
+          <td>A long prompt on a machine with slow memory</td>
+          <td>Raise <code>Local:RequestTimeoutSeconds</code>, shorten the prompt by turning off features, and set the server&#x27;s context length to match <code>Agent:ContextBudget:MaxContextTokens</code></td>
+        </tr>
+        <tr>
+          <td>A document is indexed but a question about it finds nothing</td>
+          <td>The embedding model changed after indexing, or the question shares no words and the vectors are far apart</td>
+          <td>Delete the document and index it again with the current model, or search with other words through <code>rag_search</code></td>
         </tr>
         <tr>
           <td>An orchestration run is <code>WaitingForInput</code></td>

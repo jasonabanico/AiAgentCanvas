@@ -57,7 +57,7 @@ Platform ──&gt; nothing else in the solution
         </tr>
         <tr>
           <td><strong>Providers</strong></td>
-          <td>The LLM backend, chosen by the <code>Provider</code> key: Azure AI Foundry, Databricks or Snowflake.</td>
+          <td>The LLM backend, chosen by the <code>Provider</code> key: Azure AI Foundry, Databricks, Snowflake, or a local model server.</td>
         </tr>
         </tbody>
       </table>
@@ -139,7 +139,7 @@ Platform ──&gt; nothing else in the solution
         </tr>
         <tr>
           <td>Providers</td>
-          <td><code>AzureAIFoundry</code>, <code>Databricks</code>, <code>Snowflake</code></td>
+          <td><code>AzureAIFoundry</code>, <code>Databricks</code>, <code>Snowflake</code>, <code>Local</code></td>
           <td>Abstractions</td>
         </tr>
         <tr>
@@ -162,12 +162,12 @@ Platform ──&gt; nothing else in the solution
         <tr>
           <td><strong>Abstractions</strong></td>
           <td>Interfaces and contracts. All other projects reference this.</td>
-          <td><code>IServiceModule</code>, <code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, the seed interfaces (<code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>), <code>IRunLedger</code>, <code>RunTracking</code>, <code>AgentRunContext</code>, <code>IBudgetGuard</code>, <code>IAgentJob</code>, <code>ICredentialProvider</code>, <code>IConnectorEventSink</code>, <code>IStructuredResponder</code>, <code>ToolStateMapping</code></td>
+          <td><code>IServiceModule</code>, <code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, the seed interfaces (<code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>), <code>IRunLedger</code>, <code>RunTracking</code>, <code>AgentRunContext</code>, <code>IBudgetGuard</code>, <code>IAgentJob</code>, <code>ICredentialProvider</code>, <code>IConnectorEventSink</code>, <code>IStructuredResponder</code>, <code>IDocumentIndex</code>, <code>ToolStateMapping</code></td>
         </tr>
         <tr>
           <td><strong>Orchestration</strong></td>
           <td>Agent runtime and coordination. Builds agents from seeds, runs the AG-UI and A2A servers, and owns the chat pipeline.</td>
-          <td><code>AgentRegistry</code>, <code>AgentPipeline</code>, <code>InProcessAgentHandoff</code>, <code>InProcessAgentMessaging</code>, <code>HandoffToolProvider</code>, <code>ContextBudgetChatClient</code>, <code>LoopGuardChatClient</code>, <code>CostTrackingChatClient</code>, <code>BudgetGuard</code>, <code>CoreServiceExtensions</code></td>
+          <td><code>AgentRegistry</code>, <code>AgentPipeline</code>, <code>InProcessAgentHandoff</code>, <code>InProcessAgentMessaging</code>, <code>HandoffToolProvider</code>, <code>ContextBudgetChatClient</code>, <code>LoopGuardChatClient</code>, <code>ToolSelectingChatClient</code>, <code>BoundedOutputAIFunction</code>, <code>CostTrackingChatClient</code>, <code>BudgetGuard</code>, <code>CoreServiceExtensions</code></td>
         </tr>
         <tr>
           <td><strong>Security</strong></td>
@@ -194,7 +194,7 @@ Platform ──&gt; nothing else in the solution
       <h3>The Chat Pipeline</h3>
       <p>The model is wrapped in a chain of delegating chat clients before an agent sees it. <code>AgentPipeline</code> builds the chain, and the default agent and the persona agents use it. From the outside in:</p>
       <pre><code>
-LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
+LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ToolSelection ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
 </code></pre>
       <table>
         <thead><tr>
@@ -219,6 +219,10 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
           <td>Optional. Sends simple turns to the economy model.</td>
         </tr>
         <tr>
+          <td><code>ToolSelectingChatClient</code></td>
+          <td>Optional. When a request carries more tools than <code>Agent:ToolSelection:MaxTools</code>, keeps the tools most relevant to the user&#x27;s message, plus any the run has already called. Runs outside the budget, which would otherwise drop tools by their position in the list.</td>
+        </tr>
+        <tr>
           <td><code>ContextBudgetChatClient</code></td>
           <td>Counts the prompt with the model&#x27;s tokenizer, enforces a ceiling per component and compacts history with a summarizer.</td>
         </tr>
@@ -232,7 +236,7 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
         </tr>
         </tbody>
       </table>
-      <p>Tools get the same treatment from <code>AgentPipeline.WrapTools</code>: the governance wrapper first, then <code>TracedAIFunction</code>, which records a span and the call in the ambient run record.</p>
+      <p>Tools get the same treatment from <code>AgentPipeline.WrapTools</code>: the governance wrapper first, then <code>BoundedOutputAIFunction</code>, which cuts a result longer than <code>Agent:ToolOutput:MaxChars</code> and says so, then <code>TracedAIFunction</code>, which records a span and the call in the ambient run record.</p>
       <h3>AgentData Layer</h3>
       <p>Six domain-specific projects that store and provide agent knowledge. Each follows the same pattern: a store for persistence, tools for LLM access, and a context provider for automatic injection.</p>
       <table>
@@ -312,13 +316,13 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
         </tr>
         <tr>
           <td><strong>RAG</strong></td>
-          <td>Chunking, hybrid retrieval, LLM reranking and cited context</td>
-          <td><code>DocumentChunker</code>, <code>LlmReranker</code>, <code>RagContextProvider</code></td>
+          <td>Document ingestion with versions and expiry, hybrid retrieval fused by rank, LLM reranking, cited context, and search tools</td>
+          <td><code>RagIngestionService</code>, <code>RagSearcher</code>, <code>DocumentChunker</code>, <code>LlmReranker</code>, <code>RagContextProvider</code>, <code>RagToolProvider</code>, <code>RagEndpoints</code></td>
         </tr>
         <tr>
           <td><strong>EpisodicMemory</strong></td>
-          <td>Cross-session memory with relevance decay, search and context injection</td>
-          <td><code>EpisodicMemoryStore</code>, <code>EpisodicMemoryToolProvider</code>, <code>EpisodicMemoryContextProvider</code>, <code>MemoryDecayService</code></td>
+          <td>Cross-session memory with relevance decay, near-duplicate merging, recall refresh, search, deletion and context injection</td>
+          <td><code>EpisodicMemoryStore</code>, <code>EpisodicMemoryToolProvider</code>, <code>EpisodicMemoryContextProvider</code>, <code>MemoryDecayService</code>, <code>EpisodicMemoryEndpoints</code></td>
         </tr>
         <tr>
           <td><strong>AuditLog</strong></td>
@@ -357,8 +361,8 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
         </tr>
         <tr>
           <td><strong>AgentOrchestration</strong></td>
-          <td>Group chat, handoff and Magentic runs with checkpoints and human sign-off</td>
-          <td><code>OrchestrationRunner</code>, <code>OrchestrationStore</code>, <code>OrchestrationEndpoints</code></td>
+          <td>Group chat, handoff, Magentic, sequential, concurrent and review runs with checkpoints and human sign-off</td>
+          <td><code>OrchestrationRunner</code>, <code>ReviewLoop</code>, <code>OrchestrationStore</code>, <code>OrchestrationEndpoints</code></td>
         </tr>
         <tr>
           <td><strong>McpServer</strong></td>
@@ -385,7 +389,7 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
         </tr>
         <tr>
           <td><strong>VectorStore.Sqlite</strong></td>
-          <td>SQLite vector store for RAG embeddings, and the chat history provider</td>
+          <td>SQLite vector store for RAG embeddings with document-level operations, and the chat history provider</td>
           <td><code>SqliteVectorStore</code>, <code>SqliteChatHistoryProvider</code></td>
         </tr>
         <tr>
@@ -424,6 +428,10 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
           <td><strong>Providers.Snowflake</strong></td>
           <td>LLM client for Snowflake Cortex</td>
         </tr>
+        <tr>
+          <td><strong>Providers.Local</strong></td>
+          <td>LLM and embedding client for an OpenAI-compatible server on this machine or network, with a guard against public endpoints</td>
+        </tr>
         </tbody>
       </table>
       <p>Each provider registers its chat client and, where configured, embeddings plus keyed <code>economy</code> and <code>judge</code> clients.</p>
@@ -440,7 +448,7 @@ LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTra
         <li><strong>AG-UI server resolves the session</strong>, identifies the user, loads conversation history and prepares the agent context.</li>
       </ol>
       <ol>
-        <li><strong>Context providers inject data.</strong> Each registered <code>AIContextProvider</code> appends its knowledge to the system prompt: the governance scan, the default prompt, persona instructions, context entries, guardrail rules, the user profile, the entity index, and RAG results and episodic memory when those capabilities are on.</li>
+        <li><strong>Context providers inject data.</strong> Each registered <code>AIContextProvider</code> contributes a block to the system prompt: the governance scan, the default prompt, persona instructions, context entries, guardrail rules, the user profile, the entity index, and RAG results and episodic memory when those capabilities are on. A provider returns only what it adds. The agent merges that into what it already holds, so each block appears once.</li>
       </ol>
       <ol>
         <li><strong>HarnessAgent runs the agent loop.</strong> The agent built through <code>AsHarnessAgent</code> executes the reason-act-observe cycle. Each model call goes through the chat pipeline described above.</li>

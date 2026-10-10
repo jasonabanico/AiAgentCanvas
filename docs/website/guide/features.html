@@ -57,7 +57,7 @@
         </tr>
         <tr>
           <td><strong>RAG pipeline</strong></td>
-          <td>Retrieval-augmented generation backed by a SQLite vector store. Documents are chunked, embedded, and stored locally. At query time, the agent retrieves relevant chunks using cosine similarity with FTS5 hybrid search, then reranks them with the model. Needs an embedding model on the Azure AI Foundry or Databricks provider.</td>
+          <td>Retrieval-augmented generation backed by a SQLite vector store. Documents are chunked, embedded, and stored locally. At query time, the agent retrieves relevant chunks using cosine similarity with FTS5 hybrid search, then reranks them with the model. Documents are indexed through an authorized endpoint, and indexing a source again replaces its earlier version. A <code>rag_search</code> tool lets the agent decide when to look something up. Needs an embedding model on the Azure AI Foundry, Databricks or Local provider.</td>
         </tr>
         <tr>
           <td><strong>System tools</strong></td>
@@ -77,7 +77,7 @@
         </tr>
         <tr>
           <td><strong>Episodic memory</strong></td>
-          <td>Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay and injected into the system prompt as context, giving agents the ability to learn from experience.</td>
+          <td>Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay and injected into the system prompt as context, giving agents the ability to learn from experience. A repeat of an earlier episode updates it, a recall refreshes it, and a person can list and delete what is stored.</td>
         </tr>
         <tr>
           <td><strong>Audit log</strong></td>
@@ -102,6 +102,14 @@
         <tr>
           <td><strong>Loop guard</strong></td>
           <td>Gives each run an exit condition: a tool-round cap, a token budget, an optional cost cap, repeated-action detection and stagnation detection. When one trips it withdraws the tools and asks the model to report what it has.</td>
+        </tr>
+        <tr>
+          <td><strong>Tool output cap and tool selection</strong></td>
+          <td>A cap on the size of one tool result, so a single large answer cannot fill the prompt, and an optional step that offers only the tools relevant to the user&#x27;s message when a host registers many.</td>
+        </tr>
+        <tr>
+          <td><strong>Local models</strong></td>
+          <td>A provider for any OpenAI-compatible server on this machine or network, with a guard that refuses a public endpoint. See <a href="guide-13-running-fully-local.md">Running Fully Local</a>.</td>
         </tr>
         <tr>
           <td><strong>Cost tracking</strong></td>
@@ -187,7 +195,7 @@
         </tr>
         <tr>
           <td><strong>Orchestration runs</strong></td>
-          <td>Group chat, handoff and Magentic runs with checkpoints on disk. A Magentic run stops for a person to approve its plan and survives a restart. Only a person can answer the review.</td>
+          <td>Group chat, handoff, Magentic, sequential, concurrent and maker-checker review runs. Workflow runs keep checkpoints on disk. A Magentic run stops for a person to approve its plan and survives a restart. Only a person can answer the review.</td>
         </tr>
         <tr>
           <td><strong>MCP server</strong></td>

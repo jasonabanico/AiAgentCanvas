@@ -12,7 +12,8 @@
     <main class="main-content">
       <h1>Reference: Platform Internals</h1>
       <h2>Context Provider Chain</h2>
-      <p>Context providers extend <code>AIContextProvider</code> (from <code>Microsoft.Agents.AI</code>) and run in DI registration order. Each provider&#x27;s <code>ProvideAIContextAsync</code> method appends content to <code>AIContext.Instructions</code>, building up the system prompt that the agent receives.</p>
+      <p>Context providers extend <code>AIContextProvider</code> (from <code>Microsoft.Agents.AI</code>) and run in DI registration order. Each provider&#x27;s <code>ProvideAIContextAsync</code> method returns the content it adds to the instructions (or the tools it adds), and the agent merges it into what it already holds to build the system prompt.</p>
+      <p><strong>A provider returns only its addition.</strong> The merge appends the returned context to the incoming one. A provider that returns the incoming <code>AIContext</code> after modifying it, which already holds everything the earlier providers added, adds all of that a second time. With N providers the prompt grew by about 2 to the power of N. <code>ContextProviderCompositionTests</code> holds the real providers to this.</p>
       <table>
         <thead><tr>
           <th>Order</th>
@@ -115,6 +116,11 @@
           <td>Needs an economy model</td>
         </tr>
         <tr>
+          <td><code>ToolSelectingChatClient</code></td>
+          <td><code>Agent:ToolSelection:Enabled</code> (default false)</td>
+          <td>Keeps the <code>MaxTools</code> tools most relevant to the user&#x27;s message, plus <code>AlwaysInclude</code> names and tools the run has called. Ranks by keyword, and by embedding as well when a model is registered. Works on a copy of the options, so the agent keeps its full list.</td>
+        </tr>
+        <tr>
           <td><code>ContextBudgetChatClient</code></td>
           <td><code>Agent:ContextBudget:Enabled</code> (default true)</td>
           <td>Counts with the tokenizer named in <code>Agent:TokenizerModel</code></td>
@@ -131,7 +137,7 @@
         </tr>
         </tbody>
       </table>
-      <p><code>AgentPipeline.WrapTools</code> wraps each <code>AIFunction</code> in the governance wrapper when one is registered, then in <code>TracedAIFunction</code>. Tools that are not functions pass through unchanged.</p>
+      <p><code>AgentPipeline.WrapTools</code> wraps each <code>AIFunction</code> in the governance wrapper when one is registered, then in <code>BoundedOutputAIFunction</code> (a result longer than <code>Agent:ToolOutput:MaxChars</code>, default 24000, is cut and marked), then in <code>TracedAIFunction</code>. Tools that are not functions pass through unchanged.</p>
       <h3>Run Tracking</h3>
       <p><code>RunTracking.RunAsync</code> gives a unit of work an ambient <code>AgentRunContext</code> and, when a ledger is registered, a run record. Scheduled agent tasks, trigger events, handoffs, jobs, orchestration runs and outside MCP calls use it. The context collects usage from the cost-tracking client and tool calls from the tracing wrapper, rolls a child&#x27;s usage up to its parent, and feeds the per-run cost cap in the loop guard. The <code>BudgetGuard</code> reads the ledger to decide whether a new unattended run may start.</p>
       <hr>
@@ -314,7 +320,7 @@
       </ol>
       <hr>
       <h2>RAG Pipeline Internals</h2>
-      <p>The RAG (Retrieval-Augmented Generation) pipeline is enabled when the <code>Rag</code> feature flag is on and the active provider has an embedding model: <code>AIFoundry:EmbeddingDeploymentName</code> for Azure AI Foundry, or <code>Databricks:EmbeddingModelName</code> for Databricks. It adds relevant document context to the agent&#x27;s system prompt before each response.</p>
+      <p>The RAG (Retrieval-Augmented Generation) pipeline is enabled when the <code>Rag</code> feature flag is on and the active provider has an embedding model: <code>AIFoundry:EmbeddingDeploymentName</code> for Azure AI Foundry, <code>Databricks:EmbeddingModelName</code> for Databricks, or <code>Local:EmbeddingModelName</code> for the Local provider. It adds relevant document context to the agent&#x27;s system prompt before each response.</p>
       <h3>DocumentChunker</h3>
       <p>The <code>DocumentChunker</code> class splits text into overlapping chunks for ingestion.</p>
       <table>
@@ -345,26 +351,24 @@
         <li>Discard chunks shorter than 20 characters.</li>
       </ol>
       <h3>Hybrid Search</h3>
-      <p>Hybrid search combines vector similarity with keyword matching. The weights are configurable via <code>RagSearchOptions</code>:</p>
+      <p>Hybrid search combines vector similarity with keyword matching. <code>RagSearchOptions.Fusion</code> picks how:</p>
       <table>
         <thead><tr>
-          <th>Component</th>
-          <th>Weight</th>
+          <th>Mode</th>
           <th>Method</th>
         </tr></thead>
         <tbody>
         <tr>
-          <td>Vector search</td>
-          <td>0.7 (default)</td>
-          <td>Cosine similarity against stored embeddings</td>
+          <td><code>ReciprocalRank</code> (default)</td>
+          <td>Each ranking contributes <code>1 / (k + rank)</code>, with <code>k</code> = <code>RankConstant</code> (60). Only the top <code>max(3 x top, 30)</code> of each ranking contribute.</td>
         </tr>
         <tr>
-          <td>Keyword search</td>
-          <td>0.3 (default)</td>
-          <td>SQLite FTS5 BM25 ranking</td>
+          <td><code>WeightedScore</code></td>
+          <td><code>VectorWeight</code> (0.7) times the cosine similarity plus <code>KeywordWeight</code> (0.3) times <code>1 / keyword rank</code></td>
         </tr>
         </tbody>
       </table>
+      <p>The vector ranking covers the chunks that pass the filters. The keyword ranking comes from SQLite FTS5 ordered by BM25.</p>
       <p>The <code>IHybridSearchable</code> interface:</p>
       <pre><code class="language-csharp">
 public interface IHybridSearchable
@@ -376,20 +380,19 @@ public interface IHybridSearchable
         CancellationToken ct = default);
 }
 </code></pre>
-      <p><code>RagSearchOptions</code> fields: <code>SourceFilter</code>, <code>TagFilter</code>, <code>KeywordQuery</code>, <code>KeywordWeight</code> (default 0.3f), <code>VectorWeight</code> (default 0.7f).</p>
-      <p>The final score for each document is: <code>(VectorWeight * vectorScore) + (KeywordWeight * keywordScore)</code>.</p>
+      <p><code>RagSearchOptions</code> fields: <code>SourceFilter</code>, <code>TagFilter</code>, <code>KeywordQuery</code>, <code>Fusion</code>, <code>RankConstant</code>, <code>KeywordWeight</code> and <code>VectorWeight</code>.</p>
       <h3>FTS5 Schema</h3>
       <p>The SQLite FTS5 virtual table is created alongside the main documents table:</p>
       <pre><code class="language-sql">
 CREATE VIRTUAL TABLE IF NOT EXISTS [{collection}_fts]
-USING fts5(id UNINDEXED, text, content=[{collection}], content_rowid=rowid)
+USING fts5(id UNINDEXED, text)
 </code></pre>
       <ul>
         <li><code>id</code> is stored but not indexed (marked <code>UNINDEXED</code>).</li>
         <li><code>text</code> is the searchable column.</li>
-        <li>The FTS table is a content-sync table that mirrors the main documents table.</li>
+        <li>The table stands alone. The store writes to it when it writes a chunk and deletes from it when it deletes one.</li>
       </ul>
-      <p>Keyword scores are normalized as <code>1.0 / (1.0 + |rank|)</code> where <code>rank</code> is the FTS5 BM25 score.</p>
+      <p>Earlier versions declared the table as an external-content table over the documents but wrote to it directly, which left deletes unable to find their rows. A database in that form is detected on open, and the table is dropped and rebuilt from the documents.</p>
       <h3>LLM Reranking</h3>
       <p>After hybrid search retrieves the top candidates, an LLM reranker narrows the results:</p>
       <ol>
@@ -419,11 +422,48 @@ public sealed class DocumentRecord
     [VectorStoreData]
     public string? MetadataJson { get; set; }
 
+    [VectorStoreData]
+    public DateTimeOffset? IndexedAt { get; set; }
+
+    [VectorStoreData]
+    public int Version { get; set; } = 1;
+
     [VectorStoreVector(1536, DistanceFunction = CosineSimilarity)]
     public ReadOnlyMemory&lt;float&gt; Embedding { get; set; }
 }
 </code></pre>
-      <p>The embedding dimension is 1536 (compatible with OpenAI text-embedding-ada-002 and similar models). The <code>VectorStoreVector</code> attribute specifies cosine similarity as the distance function.</p>
+      <p>The <code>1536</code> in the attribute is a declaration, and the SQLite store does not enforce it. A model with 768 or 1024 dimensions works as long as one model produced every vector, since vectors of different lengths score zero against each other.</p>
+      <h3>IDocumentIndex</h3>
+      <p>A vector store keys its records by chunk, and a person thinks in documents. <code>IDocumentIndex</code> (in <code>AiAgentCanvas.Abstractions</code>) carries the document-level operations, and the SQLite collection implements it.</p>
+      <table>
+        <thead><tr>
+          <th>Method</th>
+          <th>Purpose</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>ListDocumentsAsync</code></td>
+          <td>One entry per source: chunk count, newest version, time, tags</td>
+        </tr>
+        <tr>
+          <td><code>LatestVersionAsync</code></td>
+          <td>The version a new ingest of the source will follow</td>
+        </tr>
+        <tr>
+          <td><code>DeleteDocumentAsync</code></td>
+          <td>Removes every chunk of a source</td>
+        </tr>
+        <tr>
+          <td><code>DeleteOlderVersionsAsync</code></td>
+          <td>Removes chunks of a source older than a version</td>
+        </tr>
+        <tr>
+          <td><code>DeleteIndexedBeforeAsync</code></td>
+          <td>Removes chunks indexed before a cutoff, for expiry</td>
+        </tr>
+        </tbody>
+      </table>
+      <p><code>RagIngestionService</code> uses them. It takes one ingest at a time, so two requests for one source cannot choose the same version.</p>
     </main>
   </div>
 </body>

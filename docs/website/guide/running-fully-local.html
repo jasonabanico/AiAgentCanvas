@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Fully Local - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>13. Running Fully Local</h1>
+      <p>AI Agent Canvas can run with no outside service at all. The model, the embedding model, the vector store, the chat history and every other piece of state live on your machine or on your network. This guide covers the <code>Local</code> provider, the models that call tools well enough to run an agent, the machine to run them on, and the settings that keep the host isolated.</p>
+      <h2>What fully local means here</h2>
+      <table>
+        <thead><tr>
+          <th>Piece</th>
+          <th>Where it runs</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Chat model</td>
+          <td>A model server on this machine or this network: Ollama, llama.cpp&#x27;s <code>llama-server</code>, LM Studio or vLLM</td>
+        </tr>
+        <tr>
+          <td>Embedding model</td>
+          <td>The same server, a second model</td>
+        </tr>
+        <tr>
+          <td>Vector store, chat history, memory, run ledger, audit log</td>
+          <td>SQLite files next to the host</td>
+        </tr>
+        <tr>
+          <td>Frontend</td>
+          <td>The static export the host serves, or <code>npm run dev</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The <code>Local</code> provider speaks the OpenAI wire protocol, as the Databricks provider does. Any server that exposes <code>/v1/chat/completions</code> and <code>/v1/embeddings</code> works.</p>
+      <p><strong>What can still leave the machine.</strong> The model is the only default dependency. These features reach outside when you turn them on, so leave them off for an isolated host:</p>
+      <table>
+        <thead><tr>
+          <th>Feature</th>
+          <th>What it contacts</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>DataConnections:MarketData</code></td>
+          <td>Yahoo Finance and SEC EDGAR</td>
+        </tr>
+        <tr>
+          <td><code>Databricks</code> and <code>Snowflake</code> vector search tools</td>
+          <td>The workspace or account you configure</td>
+        </tr>
+        <tr>
+          <td><code>ComputerUse</code></td>
+          <td>Whatever sites the agent browses</td>
+        </tr>
+        <tr>
+          <td><code>Connectors</code> (Twilio SMS, Gmail, other MCP servers)</td>
+          <td>The connected service</td>
+        </tr>
+        <tr>
+          <td><code>Mcp</code> with an HTTP server you name</td>
+          <td>That server</td>
+        </tr>
+        <tr>
+          <td><code>ApplicationInsights:ConnectionString</code></td>
+          <td>Azure Monitor</td>
+        </tr>
+        <tr>
+          <td>Purview</td>
+          <td>Microsoft Purview</td>
+        </tr>
+        <tr>
+          <td><code>Vision</code> with <code>AllowedUrlHosts</code></td>
+          <td>The hosts you list</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>Set it up</h2>
+      <ol>
+        <li>Install a model server. With Ollama:</li>
+      </ol>
+      <pre><code class="language-bash">
+   ollama pull gpt-oss:120b
+   ollama pull nomic-embed-text
+</code></pre>
+      <ol>
+        <li>Point the host at it in <code>appsettings.json</code> (or <code>appsettings.Development.json</code>):</li>
+      </ol>
+      <pre><code class="language-json">
+   {
+     &quot;Provider&quot;: &quot;Local&quot;,
+     &quot;Local&quot;: {
+       &quot;Endpoint&quot;: &quot;http://localhost:11434/v1&quot;,
+       &quot;ModelName&quot;: &quot;gpt-oss:120b&quot;,
+       &quot;EmbeddingModelName&quot;: &quot;nomic-embed-text&quot;
+     },
+     &quot;Features&quot;: { &quot;Rag&quot;: true, &quot;EpisodicMemory&quot;: true }
+   }
+</code></pre>
+      <ol>
+        <li>Start the host. The log line <code>Creating local chat client</code> names the endpoint and model, and the health endpoint at <code>/api/health</code> confirms the model answers.</li>
+      </ol>
+      <table>
+        <thead><tr>
+          <th>Server</th>
+          <th>Default endpoint</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Ollama</td>
+          <td><code>http://localhost:11434/v1</code></td>
+        </tr>
+        <tr>
+          <td>LM Studio</td>
+          <td><code>http://localhost:1234/v1</code></td>
+        </tr>
+        <tr>
+          <td>llama.cpp <code>llama-server</code></td>
+          <td><code>http://localhost:8080/v1</code></td>
+        </tr>
+        <tr>
+          <td>vLLM</td>
+          <td><code>http://localhost:8000/v1</code></td>
+        </tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Local</code>)</th>
+          <th>Default</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Endpoint</code></td>
+          <td><code>http://localhost:11434/v1</code></td>
+          <td>Base URL, including <code>/v1</code></td>
+        </tr>
+        <tr>
+          <td><code>ApiKey</code></td>
+          <td><code>not-needed</code></td>
+          <td>Most local servers ignore it. The client requires a value.</td>
+        </tr>
+        <tr>
+          <td><code>ModelName</code></td>
+          <td>none</td>
+          <td>The model tag the server knows. Required.</td>
+        </tr>
+        <tr>
+          <td><code>EmbeddingModelName</code></td>
+          <td>none</td>
+          <td>Turns on embeddings for RAG and episodic memory</td>
+        </tr>
+        <tr>
+          <td><code>EconomyModelName</code></td>
+          <td>none</td>
+          <td>A smaller model for the cost router and history summaries</td>
+        </tr>
+        <tr>
+          <td><code>JudgeModelName</code></td>
+          <td>none</td>
+          <td>A different model that grades the evaluation suite</td>
+        </tr>
+        <tr>
+          <td><code>AllowNonLocalEndpoint</code></td>
+          <td>false</td>
+          <td>See the next section</td>
+        </tr>
+        <tr>
+          <td><code>RequestTimeoutSeconds</code></td>
+          <td>300</td>
+          <td>Local models answer slowly on long prompts</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>The isolation guard</h2>
+      <p>The provider refuses an endpoint outside the machine and the private networks. A typo that points an isolated host at a public address would otherwise send prompts, tool results and documents across the internet. These count as local: loopback, the private ranges <code>10.0.0.0/8</code>, <code>172.16.0.0/12</code> and <code>192.168.0.0/16</code>, link-local addresses, the carrier-grade NAT range <code>100.64.0.0/10</code> that Tailscale uses, IPv6 unique-local addresses, single-label host names such as <code>mac-studio</code>, and the suffixes <code>.local</code>, <code>.lan</code>, <code>.internal</code> and <code>.home.arpa</code>.</p>
+      <p>A model server on another machine in your office is allowed. A hosted API is refused with a message that names the setting. Set <code>Local:AllowNonLocalEndpoint</code> to true if you mean to use one.</p>
+      <h2>Choosing a model</h2>
+      <p>The host runs the model in a tool loop, so the model has to call tools reliably over many rounds. A small model that answers questions well can still fail there. The figures below are the ones the model makers and roundup articles report, so test any candidate on your own tasks before you buy hardware.</p>
+      <table>
+        <thead><tr>
+          <th>Memory available</th>
+          <th>Model</th>
+          <th>Notes</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>128 GB</td>
+          <td>gpt-oss-120b</td>
+          <td>Native function calling and structured output. The weights take about 65 GB, which leaves room for a long context. Qwen3.5-122B-A10B and Nemotron 3 Super 120B-A12B are the alternatives at this size.</td>
+        </tr>
+        <tr>
+          <td>64 GB</td>
+          <td>Qwen3-Coder-Next</td>
+          <td>80B total and 3B active parameters, 262K context, Apache 2.0, native tool calling</td>
+        </tr>
+        <tr>
+          <td>24 to 32 GB</td>
+          <td>Qwen3.6-35B-A3B, or GLM-4.7-Flash</td>
+          <td>A small active parameter count gives usable speed</td>
+        </tr>
+        <tr>
+          <td>16 GB</td>
+          <td>gpt-oss-20b</td>
+          <td>The smallest model worth trusting with a multi-step tool loop</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Run two small models beside the main one: an embedding model such as <code>nomic-embed-text</code> or <code>bge-m3</code>, and a 9B model for <code>EconomyModelName</code>.</p>
+      <p>Mixture-of-experts models suit machines with large, slow memory. Only a few billion parameters are active for each token, so a 120B model decodes at a usable rate on a unified-memory box.</p>
+      <h2>The machine</h2>
+      <table>
+        <thead><tr>
+          <th>Part</th>
+          <th>Specification</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Memory</td>
+          <td>128 GB unified, or 48 GB or more of GPU memory. The weights, a 64K to 128K context cache, the embedding model and the operating system all have to fit.</td>
+        </tr>
+        <tr>
+          <td>Memory bandwidth</td>
+          <td>250 GB/s or more. Decoding speed rises with bandwidth.</td>
+        </tr>
+        <tr>
+          <td>CPU</td>
+          <td>16 cores</td>
+        </tr>
+        <tr>
+          <td>Storage</td>
+          <td>2 TB NVMe. Each model is 20 to 70 GB.</td>
+        </tr>
+        <tr>
+          <td>Power</td>
+          <td>About 120 to 140 W under load</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The smallest useful machine has a 32 GB GPU and 64 GB of system memory, which runs the 30B-class models.</p>
+      <p>Checked on 11 October 2026 at amazon.com. Prices vary with the delivery location, stock changes quickly, and the memory shortage has pushed GPU prices well above list.</p>
+      <table>
+        <thead><tr>
+          <th>Machine</th>
+          <th>Memory and bandwidth</th>
+          <th>Price seen</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><a href="https://www.amazon.com/GMKtec-ryzen_ai_mini_pc_evo_x2/dp/B0F53MLYQ6">GMKtec EVO-X2</a>, Ryzen AI Max+ 395, 2 TB</td>
+          <td>128 GB, about 256 GB/s</td>
+          <td>$3,649.99, in stock</td>
+        </tr>
+        <tr>
+          <td><a href="https://www.amazon.com/Supercomputer-Superchip-Supports-OpenClaw-Stackable/dp/B0H9YVH6LL">ASUS Ascent GX10</a>, NVIDIA GB10, 1 TB</td>
+          <td>128 GB, 273 GB/s</td>
+          <td>$8,990 from a third party, unavailable</td>
+        </tr>
+        <tr>
+          <td><a href="https://www.amazon.com/NVIDIA-DGX-SparkTM-Supercomputer-Blackwell/dp/B0FWJ16CCH">NVIDIA DGX Spark</a></td>
+          <td>128 GB, 273 GB/s</td>
+          <td>Unavailable on Amazon. Buying guides give $4,699 to $6,950.</td>
+        </tr>
+        <tr>
+          <td><a href="https://www.amazon.com/Apple-Studio-16-Core-40-Core-Unified/dp/B0FMFZ5SXS">Mac Studio M4 Max</a>, 128 GB</td>
+          <td>128 GB, 546 GB/s</td>
+          <td>Unavailable on Amazon</td>
+        </tr>
+        <tr>
+          <td><a href="https://www.amazon.com/Apple-2026-Studio-Desktop-Computer/dp/B0HGKSQMX6">Mac Studio M5 Max</a></td>
+          <td>Up to 128 GB, 460 to 614 GB/s</td>
+          <td>Amazon lists only the 36 GB model. A buying guide gives about $5,100 for 128 GB.</td>
+        </tr>
+        <tr>
+          <td><a href="https://www.amazon.com/PNY-GeForce-Overclocked-Graphics-3-5-Slot/dp/B0DTJF8YT4">PNY RTX 5090</a>, GPU only</td>
+          <td>32 GB, 1,792 GB/s</td>
+          <td>$6,199 against a $1,999 list price, plus a PC around it</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The Ryzen AI Max+ 395 box is the lowest-cost route to 128 GB. A Mac Studio decodes faster. A GB10 machine is the choice when you need CUDA. The RTX 5090 is the fastest card, but its 32 GB limits you to the 30B-class models.</p>
+      <h2>Tuning for a local model</h2>
+      <ul>
+        <li><strong>Set the context window.</strong> Servers load a model with a context length of their own, and some default to a few thousand tokens. Set it on the server (for Ollama, the <code>OLLAMA_CONTEXT_LENGTH</code> variable or <code>num_ctx</code> in a Modelfile) and set <code>Agent:ContextBudget:MaxContextTokens</code> to the same number. The budget counts tokens against that figure.</li>
+        <li><strong>Keep the tool list short.</strong> A small model picks the wrong tool more often as the list grows. Give each agent only the tools it needs with an <code>IAgentToolsSeed</code>, or turn on <code>Agent:ToolSelection</code> when the host registers many.</li>
+        <li><strong>Lower the round cap.</strong> <code>Agent:LoopGuard:MaxToolRounds</code> defaults to 25. A local model that is going to fail usually fails sooner, so 10 to 15 returns control faster.</li>
+        <li><strong>Price the model at zero.</strong> An unpriced model reports tokens and no cost. Add the model to <code>Agent:Pricing:Models</code> with <code>InputPer1M</code> and <code>OutputPer1M</code> set to 0 if you want the run ledger and the budgets to treat the cost as nothing.</li>
+        <li><strong>Use the economy model.</strong> <code>Local:EconomyModelName</code> takes the history summaries off the large model, and the simple turns too when <code>Agent:ModelRouter</code> is on.</li>
+        <li><strong>Plan for slow prompts.</strong> Prompt processing on unified-memory machines is slow for the first token of a long prompt. A shorter system prompt, fewer enabled features and a smaller <code>Agent:Rag:TopK</code> all help.</li>
+        <li><strong>Keep one embedding model.</strong> Vectors from different embedding models cannot be compared. Changing <code>EmbeddingModelName</code> means deleting the indexed documents and indexing them again. The <code>1536</code> in the vector attribute is not enforced, so models with 768 or 1024 dimensions work as long as one model produced every vector.</li>
+      </ul>
+      <h2>Check it</h2>
+      <ol>
+        <li><code>curl http://localhost:5149/api/health</code> returns <code>Healthy</code> and shows the pipeline check passed.</li>
+        <li>Send a message in the chat. The model server&#x27;s own log shows the request.</li>
+        <li>With <code>Rag</code> on, index a document with <code>POST /api/rag/documents</code> and ask about it. The server log shows an embeddings request and then a chat request.</li>
+        <li>To prove nothing leaves the host, run it with outbound traffic blocked at the firewall. A chat, RAG and memory still work.</li>
+      </ol>
+      <h2>Limits</h2>
+      <ul>
+        <li>A local model calls tools less reliably than a large hosted one. Test the tasks you care about, and keep unattended work on the <code>Review</code> orchestration kind or behind approvals until you trust the results.</li>
+        <li>The MCP client supports HTTP servers. It does not start a local process over stdio, so a stdio-only MCP server needs an HTTP wrapper.</li>
+        <li>A local server handles a few requests at a time, a setting on most of them. Concurrent orchestration runs queue behind each other.</li>
+        <li>Prompt caching, a hosted-API feature, is not used.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

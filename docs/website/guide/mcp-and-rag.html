@@ -81,7 +81,7 @@ public McpGatewayDecision Evaluate(string agentId, string toolName, string? payl
     return decision;
 }
 </code></pre>
-      <p>Tools that an MCP server contributes at runtime are wrapped when they are registered, in the same governance wrapper and tracing as a tool registered at startup. A guardrail policy sees their calls, and the approval-required list applies to their names. Tools from a connector are wrapped by the connector host, which also puts any tool with risk <code>Send</code> or <code>Destructive</code> behind an approval requirement.</p>
+      <p>Tools that an MCP server contributes at runtime are wrapped when they are registered, in the same governance wrapper and tracing as a tool registered at startup. A guardrail policy sees their calls, and the approval-required list applies to their names. A tool the server marks <code>destructiveHint</code> also needs a person&#x27;s approval on each call. A server that makes no claim gets no change, because a missing hint says nothing about the tool. Tools from a connector are wrapped by the connector host, which also puts any tool with risk <code>Send</code> or <code>Destructive</code> behind an approval requirement.</p>
       <h3>Building an MCP Connection Seed</h3>
       <p>To auto-connect to an MCP server at startup (instead of requiring the user to connect manually), implement <code>IMcpConnectionSeed</code>:</p>
       <pre><code class="language-csharp">
@@ -196,7 +196,8 @@ public sealed class DocumentChunker
         <li><strong>Vector search</strong> (cosine similarity) -- captures semantic meaning. A query about &quot;company revenue&quot; matches chunks discussing &quot;annual income&quot; or &quot;top-line growth&quot; even without exact keyword overlap.</li>
         <li><strong>Keyword search</strong> (SQLite FTS5 / BM25) -- captures exact term matches. Important for proper nouns, ticker symbols, product names, and technical terms that semantic search alone might miss.</li>
       </ul>
-      <p>The scores from both signals are combined to produce a unified ranking. This hybrid approach consistently outperforms either signal alone.</p>
+      <p>The two signals are combined by reciprocal rank fusion. Each ranking contributes <code>1 / (60 + rank)</code> to a chunk&#x27;s score, and the chunk with the highest sum comes first. A cosine similarity and a keyword rank are not on one scale, so fusing the ranks avoids the tuning a weighted sum needs. The weighted sum remains available through <code>RagSearchOptions.Fusion</code>.</p>
+      <p>Filters narrow the search before ranking. <code>source</code> limits it to one document and <code>tag</code> to chunks whose tags contain the text.</p>
       <h3>LLM Reranking</h3>
       <p>After hybrid search returns the top candidates (typically 10), the platform sends them to the LLM for relevance reranking. The LLM evaluates each candidate against the original query and assigns a relevance score. Only the top-K survivors (typically 3) are kept for injection.</p>
       <p>This step is expensive (it costs an additional LLM call) but significantly improves precision. The initial retrieval stage optimizes for recall -- casting a wide net -- while reranking optimizes for precision -- keeping only the truly relevant chunks.</p>
@@ -220,7 +221,7 @@ The CEO noted that enterprise customer count increased by 23% in Q3...
   }
 }
 </code></pre>
-      <p>For the Databricks provider, set <code>Databricks:EmbeddingModelName</code> instead. The Host registers the RAG components only when the flag is on and the active provider (Azure AI Foundry or Databricks) has its embedding setting. With the flag on and no embedding model, nothing is registered and the agent runs without retrieval. The components are:</p>
+      <p>For the Databricks provider, set <code>Databricks:EmbeddingModelName</code> instead, and for the Local provider <code>Local:EmbeddingModelName</code>. The Host registers the RAG components only when the flag is on and the active provider (Azure AI Foundry or Databricks) has its embedding setting. With the flag on and no embedding model, nothing is registered and the agent runs without retrieval. The components are:</p>
       <ul>
         <li><code>DocumentChunker</code> for splitting documents</li>
         <li><code>IEmbeddingGenerator</code> for the provider&#x27;s embedding model</li>
@@ -228,6 +229,99 @@ The CEO noted that enterprise customer count increased by 23% in Q3...
         <li>The hybrid search and reranking pipeline</li>
         <li>A RAG context provider that injects retrieved chunks before each model call</li>
       </ul>
+      <h3>Indexing Documents</h3>
+      <p>Documents get into the index through an authorized endpoint (endpoint key <code>rag</code>). No agent tool writes to it, because a model that could write to the knowledge base could be talked into poisoning it.</p>
+      <table>
+        <thead><tr>
+          <th>Request</th>
+          <th>Effect</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>POST /api/rag/documents</code> with <code>{&quot;source&quot;: &quot;handbook.md&quot;, &quot;text&quot;: &quot;...&quot;, &quot;tags&quot;: &quot;hr&quot;}</code></td>
+          <td>Splits the text, embeds the chunks and stores them. Returns the version and chunk count.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/rag/documents</code></td>
+          <td>Lists each source with its chunk count, version, tags and time</td>
+        </tr>
+        <tr>
+          <td><code>DELETE /api/rag/documents?source=handbook.md</code></td>
+          <td>Removes every chunk of the source</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The <code>source</code> names the document. Indexing the same source again replaces its earlier version: the new chunks are embedded and stored first, and the old ones are removed afterward, so a failed embedding call leaves the document as it was. Each chunk carries a version number and the time it was indexed. The caller supplies plain text. Extracting text from a PDF or a web page happens before the call.</p>
+      <p>Chunks older than <code>Agent:Rag:TimeToLiveDays</code> are deleted by a background service, which keeps time-sensitive sources from answering with stale text. Zero keeps everything.</p>
+      <p>Vectors from different embedding models cannot be compared, so changing the embedding model means deleting the documents and indexing them again.</p>
+      <h3>Letting the Agent Search</h3>
+      <p>By default the best passages for each user message are added to the agent&#x27;s instructions. Two read-only tools give the agent control instead:</p>
+      <table>
+        <thead><tr>
+          <th>Tool</th>
+          <th>What it does</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>rag_search</code></td>
+          <td>Takes one or more phrasings of what to look for, plus optional <code>topK</code>, <code>source</code> and <code>tag</code>. Several phrasings are searched separately and fused by rank, so a passage that ranks well under more than one rises. Returns passages with their source and version.</td>
+        </tr>
+        <tr>
+          <td><code>rag_list_documents</code></td>
+          <td>Lists what is indexed</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Set <code>Agent:Rag:AutoInject</code> to false to rely on the tool alone. A turn that needs no documents then costs no retrieval, and the agent can search again with different words when the first results miss. The tool description tells the model that results are document text and not instructions.</p>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:Rag</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>TopK</code></td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td><code>RetrieveK</code></td>
+          <td>10</td>
+        </tr>
+        <tr>
+          <td><code>AutoInject</code></td>
+          <td>true</td>
+        </tr>
+        <tr>
+          <td><code>Rerank</code></td>
+          <td>true</td>
+        </tr>
+        <tr>
+          <td><code>ChunkSize</code></td>
+          <td>512</td>
+        </tr>
+        <tr>
+          <td><code>ChunkOverlap</code></td>
+          <td>64</td>
+        </tr>
+        <tr>
+          <td><code>MaxDocumentChars</code></td>
+          <td>1000000</td>
+        </tr>
+        <tr>
+          <td><code>EmbeddingBatchSize</code></td>
+          <td>32</td>
+        </tr>
+        <tr>
+          <td><code>TimeToLiveDays</code></td>
+          <td>0 (keep everything)</td>
+        </tr>
+        <tr>
+          <td><code>MaxQueriesPerSearch</code></td>
+          <td>5</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The SQLite store compares a query with every stored chunk, which suits thousands of chunks. For millions, use the Databricks or Snowflake search tools.</p>
     </main>
   </div>
 </body>

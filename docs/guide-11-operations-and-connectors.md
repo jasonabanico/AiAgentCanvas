@@ -220,3 +220,22 @@ If the server drops its session, the next check reconnects and the tools are fet
 - **Runtime tools.** Tools that arrive while the host runs, from connectors and from servers connected with `connect_mcp_server`, are wrapped for governance and tracing and reach agents on their next call. An agent with a tool seed sees only the runtime tools its seed names.
 - **Chat runs.** The ledger and the daily budgets cover unattended work. A chat session is not recorded and not limited by `Agent:Budgets`.
 - **Approval channel.** Only the default interactive agent has an approval channel. A persona agent that calls a send tool does not execute it.
+
+## Managing What the Agents Remember
+
+Episodic memory can hold details a user shared, so a person can see it and delete it. The endpoints use endpoint key `memory`.
+
+| Request | Effect |
+|---|---|
+| `GET /api/memory/episodes` (`agent`, `limit`, `offset`) | Lists stored episodes, newest first, including ones that have decayed out of recall. The embedding vector is not sent. |
+| `GET /api/memory/episodes/{id}` | One episode |
+| `DELETE /api/memory/episodes/{id}` | Forgets one episode |
+| `DELETE /api/memory/episodes?confirm=true` (`agent`) | Forgets every episode, or every episode of one agent. Without `confirm=true` the request is refused. |
+
+The agent has a `forget_memory` tool that deletes one episode by id, for the case where a user asks it to forget something.
+
+Three rules shape what is stored.
+
+- **Importance.** An episode scoring below the store's threshold is not written.
+- **Repeats merge.** A new episode whose embedding is within `DuplicateThreshold` (0.95 cosine) of an earlier episode by the same agent updates that episode: the newer summary and outcome replace the older ones, the higher importance is kept, and relevance returns to full. Recall then returns one lesson and not three copies. Episodes saved without an embedding cannot be compared, so they are kept.
+- **Recall refreshes.** `search_memory` raises the relevance of the episodes it returns by `RecallBoost` (0.1, capped at 1). Decay lowers relevance every six hours, slower for important episodes, so an episode that keeps being useful stays and one nothing asks about fades and is pruned.

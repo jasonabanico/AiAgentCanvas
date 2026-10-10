@@ -23,7 +23,7 @@ The platform handles the infrastructure so you can focus on domain logic:
 - **Tool governance** -- policy-based filtering and approval rules applied before any tool executes
 - **Streaming** -- real-time Server-Sent Events via the AG-UI protocol, delivering text, tool calls, and state updates to the frontend as they happen
 - **State management** -- persistent chat history, entity memory, and scheduled task storage backed by SQLite
-- **Multi-agent coordination** -- handoff, background delegation, async messaging, group chat and Magentic runs, and workflow orchestration across agents
+- **Multi-agent coordination** -- handoff, background delegation, async messaging, six kinds of orchestration run (group chat, handoff, Magentic, sequential, concurrent and maker-checker review), and workflow orchestration across agents
 - **Run safety** -- a context budget that counts the prompt with the model's own tokenizer, a loop guard that gives each run an exit condition, and cost tracking on model calls
 - **Unattended operation** -- schedules, event triggers, deterministic jobs, a run ledger and daily spend limits
 - **Outside accounts** -- encrypted credentials, OAuth with token refresh, and connectors whose tools that reach people need approval

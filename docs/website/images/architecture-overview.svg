@@ -110,8 +110,10 @@
   <text x="209.39999999999998" y="930.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Databricks</text>
   <rect x="260.4" y="912" width="79.4" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
   <text x="300.09999999999997" y="930.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Snowflake</text>
+  <rect x="347.79999999999995" y="912" width="60" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="377.79999999999995" y="930.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Local</text>
   <line x1="400" y1="960" x2="400" y2="982" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow)"/>
   <rect x="190" y="986" width="420" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
   <text x="400.0" y="1006.0" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">LLM</text>
-  <text x="400.0" y="1021.0" text-anchor="middle" fill="#94a3b8" font-size="10">Azure OpenAI, Databricks Foundation Models, Snowflake Cortex</text>
+  <text x="400.0" y="1021.0" text-anchor="middle" fill="#94a3b8" font-size="10">Azure OpenAI, Databricks, Snowflake Cortex, or a local model server</text>
 </svg>
