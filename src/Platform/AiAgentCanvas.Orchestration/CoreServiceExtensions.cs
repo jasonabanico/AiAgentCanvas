@@ -83,6 +83,15 @@ public static class ServiceCollectionExtensions
                 ? tools.Where(t => defaultSeed.ToolNames.Contains(t.Name)).ToList()
                 : tools;
 
+            // Tools registered while the host runs (connectors, servers connected in chat) reach
+            // the agent through this provider. A tool seed limits them as it limits the others.
+            var dynamicTools = sp.GetRequiredService<DynamicToolRegistry>();
+            contextProviders.Add(new DynamicToolContextProvider(
+                dynamicTools,
+                agentToolSeeds.TryGetValue(options.AgentName, out var dynamicSeed)
+                    ? name => dynamicSeed.ToolNames.Contains(name)
+                    : null));
+
             var registry = sp.GetService<AgentRegistry>();
             List<AIAgent>? backgroundAgents = null;
             if (registry is not null)

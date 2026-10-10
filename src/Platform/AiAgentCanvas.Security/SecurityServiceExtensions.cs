@@ -10,6 +10,7 @@ using Microsoft.Agents.AI.Purview;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,9 @@ namespace AiAgentCanvas.Security;
 
 public static class SecurityServiceExtensions
 {
+    /// <summary>The name of the rate-limit policy the Host attaches to endpoints that spend model calls.</summary>
+    public const string RateLimitPolicy = "agent";
+
     /// <summary>
     /// Side-effecting tools the platform ships. Override with
     /// <c>Security:ApprovalRequiredTools</c> when a deployment adds its own.
@@ -90,21 +94,32 @@ public static class SecurityServiceExtensions
         services.AddSingleton<GovernedMcpGateway>();
         services.AddSingleton<IToolGovernanceWrapper, GovernanceToolWrapper>();
 
-        var rateLimitWindow = configuration.GetValue("Security:RateLimitPerMinute", 30);
+        // Requests per minute for each caller. Zero or less turns the limit off.
+        var rateLimitPerMinute = configuration.GetValue("Security:RateLimitPerMinute", 30);
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.AddFixedWindowLimiter("agent", limiter =>
-            {
-                limiter.PermitLimit = rateLimitWindow;
-                limiter.Window = TimeSpan.FromMinutes(1);
-                limiter.QueueLimit = 0;
-            });
+
+            // One bucket for each caller. A single shared bucket would let one client use up
+            // everyone's allowance.
+            options.AddPolicy(RateLimitPolicy, context =>
+                rateLimitPerMinute <= 0
+                    ? RateLimitPartition.GetNoLimiter("unlimited")
+                    : RateLimitPartition.GetFixedWindowLimiter(CallerKey(context), _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rateLimitPerMinute,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
             options.OnRejected = async (context, ct) =>
             {
                 var logger = context.HttpContext.RequestServices.GetService<ILogger<GovernanceKernel>>();
-                logger?.LogWarning("[GOVERNANCE:RATE_LIMIT] Request rejected from {IP}",
-                    context.HttpContext.Connection.RemoteIpAddress);
+                logger?.LogWarning("[GOVERNANCE:RATE_LIMIT] Request rejected for {Caller}",
+                    CallerKey(context.HttpContext));
+
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
 
                 context.HttpContext.Response.ContentType = "application/json";
                 await context.HttpContext.Response.WriteAsync(
@@ -139,10 +154,32 @@ public static class SecurityServiceExtensions
         return services;
     }
 
-    public static WebApplication UseAiAgentCanvasSecurity(this WebApplication app)
+    /// <summary>
+    /// The caller an allowance belongs to: the authenticated identity when there is one, and
+    /// the remote address otherwise. Behind a reverse proxy every request shares the proxy's
+    /// address unless forwarded headers are configured, so configure them there.
+    /// </summary>
+    internal static string CallerKey(HttpContext context) =>
+        context.User.Identity is { IsAuthenticated: true, Name: { Length: > 0 } name }
+            ? $"user:{name}"
+            : $"ip:{context.Connection.RemoteIpAddress}";
+
+    /// <summary>
+    /// Limits the endpoints that carry the <see cref="RateLimitPolicy"/> policy. It must run
+    /// after authentication so the limit can tell callers apart.
+    /// </summary>
+    public static WebApplication UseAiAgentCanvasRateLimiting(this WebApplication app)
     {
         app.UseRateLimiter();
+        return app;
+    }
 
+    /// <summary>Attaches the per-caller rate limit to an endpoint that spends model calls.</summary>
+    public static TBuilder RequireAgentRateLimit<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
+        builder.RequireRateLimiting(RateLimitPolicy);
+
+    public static WebApplication UseAiAgentCanvasSecurity(this WebApplication app)
+    {
         app.Use(async (context, next) =>
         {
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";

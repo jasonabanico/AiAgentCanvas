@@ -86,7 +86,7 @@ The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.js
 | `Databricks`, `Snowflake` | `WorkspaceUrl` or `AccountUrl`, token, `ModelName` | The same settings for those providers, with `EmbeddingModelName`, `EconomyModelName` and `JudgeModelName` |
 | `Security` | `PolicyPath` | Path to the governance policy YAML file |
 | `Security` | `ApprovalRequiredTools` | Tool names that governance blocks. Defaults to `system_write_file`, `system_run_script`, `connect_mcp_server`, `schedule_task` |
-| `Security` | `RateLimitPerMinute` | Requests per minute for the `agent` rate-limit policy (default 30). See the note in the security reference. |
+| `Security` | `RateLimitPerMinute` | Requests per minute for each caller on the endpoints that spend model calls: AG-UI, A2A, structured output, orchestrations and the MCP server. Default 30. Zero or less turns it off. |
 | `Authentication` | `Enabled`, `Schemes`, `AllowAnonymous`, `AllowedOrigins`, `ApiKey`, `JwtBearer` | Endpoint authentication. Off by default. |
 | `Agent` | `ContextBudget`, `LoopGuard`, `Pricing`, `Reflection`, `ModelRouter` | The chat pipeline. See Platform Internals. |
 | `Agent` | `Scheduler`, `EventTriggers`, `Budgets`, `RunLedger`, `Jobs` | Unattended work, run records and spend limits. See Operations and Connectors. |
@@ -274,6 +274,7 @@ A production build is a static export. The Host serves it from `wwwroot`, so the
 | Tool call shows "blocked by governance policy" | Governance policy denied the tool call | Review `governance-policy.yaml` for deny rules matching the tool; adjust the policy or use a different approach |
 | State panel stays blank | The tool does not have a `ToolStateMapping` registered | Only tools with a registered `ToolStateMapping` emit state events; check if the tool is mapped in its service extensions |
 | Health check failed banner appears | Backend health endpoint returned an error | Check backend logs for startup failures; verify database connectivity and API key validity |
+| Requests return 429 | The caller passed `Security:RateLimitPerMinute` on a model-spending endpoint | Wait for the `Retry-After` interval, or raise the limit. Callers who are not signed in share an allowance by address. |
 | A tool call is refused and the tool is on the default list | `Security:ApprovalRequiredTools` blocks `system_write_file`, `system_run_script`, `connect_mcp_server` and `schedule_task` | Remove the name from the list only if you accept what the tool can do |
 | API calls return 401 | `Authentication:Enabled` is true and the request carries no credentials | Send the `X-API-Key` header, or a bearer token for the configured authority |
 | The Host stops at startup with a message about `Features:McpServer` | The MCP server is on and authentication is off | Turn authentication on, or set `Agent:McpServer:AllowUnauthenticated` for a trusted network |

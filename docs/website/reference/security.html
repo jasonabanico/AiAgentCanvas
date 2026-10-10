@@ -56,11 +56,11 @@ builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
         </tr>
         <tr>
           <td>Rate limiter</td>
-          <td>Fixed-window rate limiter (ASP.NET built-in)</td>
+          <td>Per-caller fixed-window rate limiter (ASP.NET built-in)</td>
         </tr>
         </tbody>
       </table>
-      <p>On the middleware side, <code>UseAiAgentCanvasSecurity()</code> enables the rate limiter, applies security headers, and subscribes to governance audit events for logging.</p>
+      <p>On the middleware side, <code>UseAiAgentCanvasSecurity()</code> applies security headers and subscribes to governance audit events for logging. <code>UseAiAgentCanvasRateLimiting()</code> enables the rate limiter and must run after authentication, so a limit can tell callers apart.</p>
       <hr>
       <h2>Tool-Call Governance Pipeline</h2>
       <p>Every tool call passes through a five-step governance pipeline:</p>
@@ -86,11 +86,7 @@ builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
       </ol>
       <h3>GovernanceToolWrapper</h3>
       <p><code>GovernanceToolWrapper</code> implements <code>IToolGovernanceWrapper</code>. <code>AgentPipeline.WrapTools</code> calls <code>Wrap()</code> on each <code>AIFunction</code> and wraps the result in <code>TracedAIFunction</code>. The default agent, persona agents, the tools served by the MCP server, and connector tools are wrapped this way.</p>
-      <p>Three kinds of tool are not wrapped by the governance policy:</p>
-      <ul>
-        <li>Tools that <code>connect_mcp_server</code> registers at runtime go into the dynamic tool registry as they are. The default list blocks <code>connect_mcp_server</code> for this reason.</li>
-        <li>Tools that skills register at runtime follow the same path.</li>
-      </ul>
+      <p>Tools that arrive at runtime are wrapped as they are registered. That covers tools from a server connected with <code>connect_mcp_server</code>, which <code>McpConnectionManager</code> wraps, and tools from connectors, which the connector host wraps. The governance policy sees their calls, and the approval-required list applies to their names.</p>
       <h3>Approval-Required Tools</h3>
       <p><code>Security:ApprovalRequiredTools</code> lists tool names that the governance gateway treats as needing approval. The list is a hard block: there is no approval prompt for these tools, and a call is refused until an operator removes the name from the list. The default is:</p>
       <pre><code class="language-json">
@@ -205,7 +201,8 @@ rules:
       <p>When multiple rules match a tool call, <code>ConflictResolutionStrategy.DenyOverrides</code> applies: any matching <code>deny</code> rule wins regardless of <code>allow</code> rules. This is the default and recommended setting.</p>
       <hr>
       <h2>Rate Limiting</h2>
-      <p>The platform registers ASP.NET&#x27;s fixed-window rate limiter with a policy named <code>&quot;agent&quot;</code>. No endpoint applies the policy yet (see Known Gaps in <a href="reference-internals.md">Platform Internals</a>), so it does not limit any request today.</p>
+      <p>The platform registers ASP.NET&#x27;s fixed-window rate limiter with a policy named <code>&quot;agent&quot;</code>. The Host attaches it to the endpoints that spend model calls: AG-UI, A2A, structured output, orchestrations and the MCP server. Health, run history, connection management, notifications, webhooks and the OAuth callback are not limited.</p>
+      <p>Each caller has an allowance of its own. The key is the authenticated identity when there is one, and the remote address otherwise. Callers who are not signed in share an allowance by address. Behind a reverse proxy, every request shares the proxy&#x27;s address unless forwarded headers are configured. All callers who use one API key share an identity, set by <code>Authentication:ApiKey:PrincipalName</code>.</p>
       <table>
         <thead><tr>
           <th>Parameter</th>
@@ -218,7 +215,7 @@ rules:
         </tr>
         <tr>
           <td>Permit limit</td>
-          <td>Configurable via <code>Security:RateLimitPerMinute</code> (default: 30)</td>
+          <td><code>Security:RateLimitPerMinute</code> for each caller (default 30). Zero or less turns the limit off.</td>
         </tr>
         <tr>
           <td>Queue limit</td>
@@ -226,7 +223,7 @@ rules:
         </tr>
         </tbody>
       </table>
-      <p>When the policy rejects a request, the server returns HTTP 429 with a JSON body:</p>
+      <p>When the policy rejects a request, the server returns HTTP 429 with a <code>Retry-After</code> header in seconds and a JSON body:</p>
       <pre><code class="language-json">
 {
   &quot;error&quot;: &quot;Rate limit exceeded. Try again later.&quot;

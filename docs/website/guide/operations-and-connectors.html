@@ -314,7 +314,7 @@ create_connector_trigger(name: &quot;reply to texts&quot;, connectionId: &quot;t
       <h2>Limits to know</h2>
       <ul>
         <li><strong>Approval list.</strong> <code>Security:ApprovalRequiredTools</code> blocks a tool outright. It does not ask. <code>schedule_task</code>, <code>system_write_file</code>, <code>system_run_script</code> and <code>connect_mcp_server</code> are blocked by default and have no approval path. Connector tools use the approval requirement described above and are not in that list.</li>
-        <li><strong>Dynamic tools.</strong> Tools from <code>connect_mcp_server</code> and from skills bypass the governance wrapper and tracing. Connector tools do not.</li>
+        <li><strong>Runtime tools.</strong> Tools that arrive while the host runs, from connectors and from servers connected with <code>connect_mcp_server</code>, are wrapped for governance and tracing and reach agents on their next call. An agent with a tool seed sees only the runtime tools its seed names.</li>
         <li><strong>Chat runs.</strong> The ledger and the daily budgets cover unattended work. A chat session is not recorded and not limited by <code>Agent:Budgets</code>.</li>
         <li><strong>Approval channel.</strong> Only the default interactive agent has an approval channel. A persona agent that calls a send tool does not execute it.</li>
       </ul>

@@ -15,8 +15,9 @@ Context providers extend `AIContextProvider` (from `Microsoft.Agents.AI`) and ru
 | 7 | `EntityContextProvider` | AiAgentCanvas.AgentData.Entities | The entity index listing known entities and their types |
 | 8 | `RagContextProvider` | AiAgentCanvas.Capabilities.Rag | Relevant document chunks from hybrid search, as numbered citations. Present only when RAG is configured. |
 | 9 | `EpisodicMemoryContextProvider` | AiAgentCanvas.Capabilities.EpisodicMemory | Recent episodes. Present when `EpisodicMemory` is on. |
+| 10 | `DynamicToolContextProvider` | AiAgentCanvas.Orchestration.Skills | Adds tools registered at runtime, such as those from connectors and connected MCP servers, to the agent's tools. It is the only provider that changes tools and not instructions. The runtime gives each agent its own instance, filtered by that agent's tool seed. |
 
-The order follows the order of the registration calls in `Program.cs`: Security first, then the core runtime, then Personas, Context, Guardrails, UserProfiles and Entities, then RAG and episodic memory. A provider is present only when its flag is on.
+The order follows the order of the registration calls in `Program.cs`: Security first, then the core runtime, then Personas, Context, Guardrails, UserProfiles and Entities, then RAG and episodic memory. A provider is present only when its flag is on. The dynamic tool provider is the exception: the runtime adds it to the default agent and to each persona agent as it builds them, and it does not come from the DI list.
 
 ---
 
@@ -39,15 +40,6 @@ The order follows the order of the registration calls in `Program.cs`: Security 
 ### Run Tracking
 
 `RunTracking.RunAsync` gives a unit of work an ambient `AgentRunContext` and, when a ledger is registered, a run record. Scheduled agent tasks, trigger events, handoffs, jobs, orchestration runs and outside MCP calls use it. The context collects usage from the cost-tracking client and tool calls from the tracing wrapper, rolls a child's usage up to its parent, and feeds the per-run cost cap in the loop guard. The `BudgetGuard` reads the ledger to decide whether a new unattended run may start.
-
----
-
-## Known Gaps
-
-These are places where the code does less than its surrounding design suggests. Each has a follow-up task.
-
-- **Runtime tools do not reach agents.** `DynamicToolRegistry` holds tools added at runtime: those from `connect_mcp_server`, and those from connectors. `DynamicToolContextProvider` is written to deliver them but is not registered, and nothing else reads the registry. Tools registered at startup are unaffected.
-- **The rate limiter is not applied.** `Security:RateLimitPerMinute` registers a fixed-window policy named `agent`, and `UseRateLimiter` is in the pipeline, but no endpoint calls `RequireRateLimiting("agent")`.
 
 ---
 

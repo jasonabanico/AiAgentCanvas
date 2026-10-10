@@ -256,7 +256,7 @@ Everything outside those six pieces is handled by the platform:
 - **AG-UI streaming** -- real-time streaming of agent responses to the frontend via the Agent-User Interaction protocol
 - **Context injection** -- `AIContextProvider` implementations inject personas, guardrails, entities, profiles, and context into the system prompt before every LLM call
 - **Chat pipeline** -- all agents, including persona agents, run on the same pipeline: context budget, loop guard, cost tracking, tool deduplication, and optional routing, reflection and audit
-- **Governance wrapping** -- `GovernedAIFunction` and `GovernedMcpGateway` evaluate tool calls against the policy file. Tools registered at startup are wrapped. Tools added at runtime through `connect_mcp_server` are not.
+- **Governance wrapping** -- `GovernedAIFunction` and `GovernedMcpGateway` evaluate tool calls against the policy file. Tools registered at startup are wrapped, and so are tools added at runtime, such as those from a connected MCP server or a connector.
 - **Run records and limits** -- scheduled, triggered and delegated runs are recorded in the run ledger and counted against spend limits
 - **File workspace** -- `FileSystemAgentFileStore` gives the agent sandboxed file read/write access
 - **Background agents** -- long-running tasks execute in background agent threads

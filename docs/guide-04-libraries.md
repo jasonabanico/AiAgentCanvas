@@ -44,7 +44,7 @@ Once registered, a remote agent is called through the same handoff and messaging
 
 A standard protocol for connecting agents to external data sources and tools. MCP servers expose tools (functions the agent can call) and resources (data the agent can read) over a defined interface. The platform uses the `ModelContextProtocol` C# SDK (1.4) in three ways:
 
-- **Client through the connection manager.** `McpConnectionManager` connects to a server at runtime or at startup from a seed, over HTTP or SSE, and reconnects after a failed health ping. Tools it registers at runtime join the dynamic tool registry. They are not wrapped by the governance policy or the tracing wrapper, so the `connect_mcp_server` tool is blocked by default.
+- **Client through the connection manager.** `McpConnectionManager` connects to a server at runtime or at startup from a seed, over HTTP or SSE, and reconnects after a failed health ping. Tools it registers at runtime join the dynamic tool registry and reach agents on their next call. They pass the governance policy and the tracing wrapper like tools registered at startup. The `connect_mcp_server` tool is blocked by default, because its secret arguments are visible to the model.
 - **Client through a connector.** The MCP connector runs a client over a stored connection's guarded HTTP client, so credentials, host restrictions and OAuth refresh come from the credential store. Tools from connectors are wrapped for governance and tracing, and tools that send or delete need approval. Gmail uses this route.
 - **Server.** The `McpServer` capability serves a chosen set of this host's own tools to outside clients through `ModelContextProtocol.AspNetCore`.
 

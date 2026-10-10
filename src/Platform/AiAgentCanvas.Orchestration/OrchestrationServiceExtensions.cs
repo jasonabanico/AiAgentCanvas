@@ -3,6 +3,7 @@
 
 using AiAgentCanvas.Abstractions;
 using AiAgentCanvas.Orchestration.Services;
+using AiAgentCanvas.Orchestration.Skills;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
@@ -38,7 +39,8 @@ public static class OrchestrationServiceExtensions
 
             var httpClientFactory = sp.GetService<IHttpClientFactory>();
             var registry = new AgentRegistry(chatClient, toolsFactory, contextProvidersFactory,
-                personaLookup, personaListAll, toolSeeds, loggerFactory, httpClientFactory);
+                personaLookup, personaListAll, toolSeeds, loggerFactory, httpClientFactory,
+                sp.GetService<DynamicToolRegistry>());
 
             registry.SetDefaultAgentFactory(() => sp.GetRequiredService<AIAgent>());
             return registry;
