@@ -21,14 +21,14 @@ Host holds no compile-time reference to them.
   - `AiAgentCanvas.Abstractions` — shared interfaces (`IServiceModule`, seed contracts, `IAgentMessaging`, `IAgentRegistry`, `IAgentHandoff`, `INotificationSink`), plus `CronSchedule`, `AgentTelemetry`, and `AgentClientKeys`
   - `AiAgentCanvas.Connections` — encrypted credential store (Data Protection), OAuth authorization code flow with PKCE, single-flight token refresh, `ICredentialProvider`
   - `AiAgentCanvas.Connectors` — connector contracts (`IConnectorDefinition`, `IToolConnector`, `IEventSourceConnector`), `ConnectorHost`, the guarded per-connection HTTP client, and the webhook route
-  - `AiAgentCanvas.Orchestration` — MAF agent wiring, AG-UI endpoint, agent registry/handoff, inter-agent messaging, and the chat-client pipeline (context budget, loop guard, model router, reflection, tool dedupe, tool tracing)
+  - `AiAgentCanvas.Orchestration` — MAF agent wiring, AG-UI endpoint, agent registry/handoff, inter-agent messaging, and the chat-client pipeline (context budget, loop guard, model router, reflection, tool selection, tool dedupe, tool tracing, tool output cap)
   - `AiAgentCanvas.Security` — Microsoft Agent Governance Toolkit + Purview integration
 - **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation), `RunLedger`, `Jobs`, `Connections`, `Connectors` (needs `Connections`), `StructuredOutput`, `Vision`, `AgentOrchestration` (needs `InterAgentCommunication`), `McpServer`
 - **Connectors** (`src/Connectors/`) — `AiAgentCanvas.Connector.TwilioSms` and `AiAgentCanvas.Connector.Mcp` (Gmail and any MCP server). A connector is a definition plus one instance per stored connection; see `docs/design/connectors.md`
 - **AgentData** — MD-persisted agent state: `Personas`, `Context`, `Entities`, `Guardrails`, `Profiles`, `Workflows`
 - **Agents** — specialist agent projects, e.g. `Agent.FinancialAnalyst` (sample: financial analysis persona + tools)
 - **DataConnections** — tool providers and storage adapters: `DataConnection.MarketData` (Yahoo Finance + SEC EDGAR), `DataConnection.VectorSearch.Databricks`, `DataConnection.VectorSearch.Snowflake`, `DataConnection.VectorStore.Sqlite` (vectors + chat history), `DataConnection.Storage.Sqlite` (scheduled tasks)
-- **Providers** — swappable LLM/data backends selected by the `Provider` config key: `AiAgentCanvas.Providers.AzureAIFoundry`, `AiAgentCanvas.Providers.Databricks`, `AiAgentCanvas.Providers.Snowflake`
+- **Providers** — swappable LLM/data backends selected by the `Provider` config key: `AiAgentCanvas.Providers.AzureAIFoundry`, `AiAgentCanvas.Providers.Databricks`, `AiAgentCanvas.Providers.Snowflake`, `AiAgentCanvas.Providers.Local` (any OpenAI-compatible server on this machine or network)
 - **Host** — `AiAgentCanvas.Host`, the composition root (`Program.cs`)
 - **tests/AiAgentCanvas.Tests** — xUnit coverage of the deterministic runtime pieces
 - **tests/AiAgentCanvas.EvalTests** — checked-in model evaluations, run in CI
@@ -69,9 +69,9 @@ nuget.org with source mapping.
 - `Program.cs` wires built-in capabilities directly behind flags in `FeatureFlags` (`Features:*` config section). External agent/data-connection plugins are discovered at runtime by `ServiceModuleExtensions.AddServiceModules`: one subfolder per plugin under `plugins/`, loaded into its own `PluginLoadContext`, scanned by reflection for `IServiceModule` types. The Host never references a plugin assembly directly.
 - Agents seed their behavior via typed seed interfaces (`IPersonaSeed`, `IContextSeed`, `IWorkflowSeed`, `IEntitySeed`, `IGuardrailSeed`, `ISkillSeed`, `IUserProfileSeed`, `IAgentToolsSeed`, `IMcpConnectionSeed`) rather than code — see `Agent.FinancialAnalyst/FinancialAnalystServiceExtensions.cs` for the canonical example. Seeds are saved to disk on first run and never overwrite manual edits.
 - **Agents and data connections are separate projects.** Agents define *how* the LLM behaves (personas, context, workflows, guardrails); data connections define *what* it can do (tools). An agent's persona references tools by name only — multiple agents can share the same `DataConnection.*` project.
-- LLM/data backend is selected by the `Provider` config value (`AzureAIFoundry` | `Databricks` | `Snowflake`); each `Providers.*` project registers its own chat client and, where configured, embeddings plus keyed `economy` and `judge` clients.
+- LLM/data backend is selected by the `Provider` config value (`AzureAIFoundry` | `Databricks` | `Snowflake` | `Local`); each `Providers.*` project registers its own chat client and, where configured, embeddings plus keyed `economy` and `judge` clients.
 - AG-UI protocol (SSE) endpoint and agent orchestration live in `AiAgentCanvas.Orchestration`; Host calls `builder.Services.AddAiAgentCanvas(config, options)` + `app.UseAiAgentCanvas()`.
-- Provider config lives under `AIFoundry` / `Databricks` / `Snowflake` sections in `appsettings.json`; capability flags live under `Features`; runtime limits live under `Agent`.
+- Provider config lives under `AIFoundry` / `Databricks` / `Snowflake` / `Local` sections in `appsettings.json`; capability flags live under `Features`; runtime limits live under `Agent`.
 
 ## Authentication
 
@@ -89,7 +89,7 @@ capability that references it.
 Endpoints are protected with `RequireAgentAuthorization(auth, key)` rather than
 `RequireAuthorization`, so the `Authentication:AllowAnonymous` list is honoured in
 one place. Keys in use: `agui`, `a2a`, `devui`, `notifications`, `webhooks`,
-`health`, `runs`, `connections`, `connectors`, `structured`, `orchestrations`, `mcp`. Two routes carry no endpoint
+`health`, `runs`, `connections`, `connectors`, `structured`, `orchestrations`, `mcp`, `rag`, `memory`. Two routes carry no endpoint
 authorization on purpose, because the caller is another service and not one of ours: the
 OAuth callback (`MapConnectionCallback`, protected by encrypted time-limited state) and
 the connector webhook (`MapConnectorWebhook`, protected by the sender's own signature). Authentication is off by default and the Host logs a prominent warning
@@ -115,4 +115,9 @@ These exist because an agent without them fails in ways that produce no error:
 - **Images and answers are checked at the door.** `Vision` reads only from `AllowedPaths` and `AllowedUrlHosts` (empty means deny), decides the type from the bytes, and refuses private addresses at connect time. `StructuredOutput` validates every answer against its schema and returns a failure as a result.
 - **Tools added at runtime reach the agents, scoped like the rest.** `DynamicToolContextProvider` offers the contents of `DynamicToolRegistry` to the default agent and to each persona agent on every call, filtered by the agent's `IAgentToolsSeed` when it has one. Tools from connectors and from `connect_mcp_server` are wrapped for governance and tracing before they are registered.
 - **Rate limits belong to a caller.** The `agent` policy partitions by identity, then by address, and the Host attaches it (`RequireAgentRateLimit`) to the endpoints that spend model calls. `UseAiAgentCanvasRateLimiting` runs after authentication.
+- **A context provider returns only what it adds.** The agent merges each provider's `AIContext` into the instructions, messages and tools it already holds. A provider that returns the incoming context, which holds everything earlier providers added, adds all of it a second time, and the prompt grows by about 2 to the power of the provider count. `ContextProviderCompositionTests` pins this.
+- **The document index is written through an authorized endpoint.** `rag_search` and `rag_list_documents` read it. No agent tool indexes or deletes a document, because a model that could write to the knowledge base could be talked into poisoning it. Indexing a source again replaces its earlier version, and the new chunks are embedded before the old ones are removed.
+- **One tool result cannot fill the prompt.** `BoundedOutputAIFunction` cuts a result over `Agent:ToolOutput:MaxChars` and says so. `ToolSelectingChatClient` (off by default) narrows a long tool list by relevance before the budget would drop tools by position.
+- **A maker does not grade its own work.** The `Review` orchestration kind takes exactly two different agents. It ends on approval, on the draft limit, or when a revision changes nothing, and it records which.
+- **A local endpoint stays local.** `Providers.Local` refuses an endpoint outside loopback and the private networks unless `Local:AllowNonLocalEndpoint` is set.
 - **Tools that reach people need approval.** A connector tool with risk `Send` or `Destructive` is wrapped in `ApprovalRequiredAIFunction` unless `Connectors:ApprovalMode` is `Audit`. `Security:ApprovalRequiredTools` is a separate mechanism and blocks the tool without asking.

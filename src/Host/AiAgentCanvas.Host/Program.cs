@@ -33,6 +33,7 @@ using AiAgentCanvas.Orchestration.Services;
 using DataConnection.Storage.Sqlite;
 using AiAgentCanvas.Providers.AzureAIFoundry;
 using AiAgentCanvas.Providers.Databricks;
+using AiAgentCanvas.Providers.Local;
 using AiAgentCanvas.Providers.Snowflake;
 using AiAgentCanvas.Security;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
@@ -65,6 +66,11 @@ if (string.Equals(llmProvider, "Databricks", StringComparison.OrdinalIgnoreCase)
 else if (string.Equals(llmProvider, "Snowflake", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSnowflake(builder.Configuration);
+}
+else if (string.Equals(llmProvider, "Local", StringComparison.OrdinalIgnoreCase))
+{
+    // A model server on this machine or this network (Ollama, llama.cpp, LM Studio, vLLM).
+    builder.Services.AddLocalModel(builder.Configuration);
 }
 else
 {
@@ -150,18 +156,26 @@ if (features.Rag)
         && !string.IsNullOrEmpty(builder.Configuration["Databricks:EmbeddingModelName"]);
     var azureEmbeddings = string.Equals(llmProvider, "AzureAIFoundry", StringComparison.OrdinalIgnoreCase)
         && !string.IsNullOrEmpty(builder.Configuration["AIFoundry:EmbeddingDeploymentName"]);
+    var localEmbeddings = string.Equals(llmProvider, "Local", StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrEmpty(builder.Configuration["Local:EmbeddingModelName"]);
 
-    if (databricksEmbeddings)
+    if (localEmbeddings)
+    {
+        builder.Services.AddLocalEmbeddings();
+        builder.Services.AddSqliteVectorStore(builder.Configuration);
+        builder.Services.AddAiAgentCanvasRag(builder.Configuration);
+    }
+    else if (databricksEmbeddings)
     {
         builder.Services.AddDatabricksEmbeddings();
         builder.Services.AddSqliteVectorStore(builder.Configuration);
-        builder.Services.AddAiAgentCanvasRag();
+        builder.Services.AddAiAgentCanvasRag(builder.Configuration);
     }
     else if (azureEmbeddings)
     {
         builder.Services.AddAzureAIFoundryEmbeddings();
         builder.Services.AddSqliteVectorStore(builder.Configuration);
-        builder.Services.AddAiAgentCanvasRag();
+        builder.Services.AddAiAgentCanvasRag(builder.Configuration);
     }
 }
 
@@ -299,6 +313,10 @@ if (features.EventTriggers)
 if (features.RunLedger)
     app.MapRunLedgerEndpoints().RequireAgentAuthorization(auth, "runs");
 
+// What the agents remember can be read and deleted here.
+if (features.EpisodicMemory)
+    app.MapEpisodicMemoryEndpoints().RequireAgentAuthorization(auth, "memory");
+
 if (features.Connections)
 {
     app.MapConnectionEndpoints().RequireAgentAuthorization(auth, "connections");
@@ -316,6 +334,10 @@ if (features.Connectors)
     // sender's own signature before anything is read.
     app.MapConnectorWebhook();
 }
+
+// Documents get into the index here and nowhere else. No agent tool writes to it.
+if (features.Rag && app.Services.GetService<RagIngestionService>() is not null)
+    app.MapRagEndpoints().RequireAgentAuthorization(auth, "rag").RequireAgentRateLimit();
 
 if (features.StructuredOutput)
     app.MapStructuredEndpoints().RequireAgentAuthorization(auth, "structured").RequireAgentRateLimit();

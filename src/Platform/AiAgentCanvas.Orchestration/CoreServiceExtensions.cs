@@ -43,6 +43,8 @@ public static class ServiceCollectionExtensions
         var pricing = BindSection(configuration, ModelPricingOptions.SectionName, new ModelPricingOptions());
 
         services.AddSingleton(contextBudget);
+        services.AddSingleton(BindSection(configuration, ToolSelectionOptions.SectionName, new ToolSelectionOptions()));
+        services.AddSingleton(BindSection(configuration, ToolOutputOptions.SectionName, new ToolOutputOptions()));
         services.AddSingleton(pricing);
         services.AddSingleton(loopGuard);
         if (reflection.Enabled) services.AddSingleton(reflection);
@@ -293,10 +295,13 @@ internal sealed class SystemPromptProvider : AIContextProvider
 
     public SystemPromptProvider(string systemPrompt) => _systemPrompt = systemPrompt;
 
+    // The agent merges what this returns into the instructions it already has. Returning only
+    // the addition keeps each block in the prompt once. Returning the incoming context, which
+    // already holds everything earlier providers added, would add all of it a second time.
     protected override ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(context.AIContext.Instructions))
-            context.AIContext.Instructions = _systemPrompt;
-        return new ValueTask<AIContext>(context.AIContext);
+        return new ValueTask<AIContext>(string.IsNullOrEmpty(context.AIContext.Instructions)
+            ? new AIContext { Instructions = _systemPrompt }
+            : new AIContext());
     }
 }

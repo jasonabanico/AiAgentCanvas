@@ -40,7 +40,7 @@ public static class OrchestrationEndpoints
         group.MapPost("/", async (StartOrchestrationBody body, OrchestrationRunner runner, CancellationToken ct) =>
         {
             if (!Enum.TryParse<OrchestrationKind>(body.Kind, true, out var kind))
-                return Results.BadRequest(new { error = "kind must be GroupChat, Handoff or Magentic." });
+                return Results.BadRequest(new { error = "kind must be GroupChat, Handoff, Magentic, Sequential, Concurrent or Review." });
 
             try
             {

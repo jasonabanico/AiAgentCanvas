@@ -267,6 +267,7 @@ def main():
         ('guide-10-behavior-patterns.md', '10. Behavior Patterns'),
         ('guide-11-operations-and-connectors.md', '11. Operations and Connectors'),
         ('guide-12-typed-output-vision-orchestration-and-mcp-server.md', '12. Typed Output, Vision, Orchestration and MCP Server'),
+        ('guide-13-running-fully-local.md', '13. Running Fully Local'),
         ('appendix-user-guide.md', 'Appendix: User Guide'),
         ('reference-agui-protocol.md', 'Reference: AG-UI Protocol'),
         ('reference-security.md', 'Reference: Security and Governance'),

@@ -110,7 +110,7 @@ public sealed class McpConnectionManager : IAsyncDisposable
         }
 
         var mcpTools = await client.ListToolsAsync(cancellationToken: ct);
-        var aiTools = mcpTools.Cast<AITool>().ToList();
+        var aiTools = mcpTools.Select(RequireApprovalWhenDestructive).ToList();
 
         var connection = new McpConnection
         {
@@ -133,6 +133,18 @@ public sealed class McpConnectionManager : IAsyncDisposable
             "Connected to MCP server {Name} at {Endpoint}, {ToolCount} tools registered, auth={AuthType}",
             name, endpoint, aiTools.Count, GetAuthType(bearerToken, apiKey));
     }
+
+    /// <summary>
+    /// A server that marks a tool <c>destructiveHint</c> is saying its changes cannot be undone,
+    /// so a person approves each call. A server that makes no claim gets no change, because the
+    /// absence of a hint says nothing about the tool.
+    /// </summary>
+#pragma warning disable MEAI001
+    private static AITool RequireApprovalWhenDestructive(McpClientTool tool) =>
+        tool.ProtocolTool.Annotations?.DestructiveHint == true
+            ? new ApprovalRequiredAIFunction(tool)
+            : tool;
+#pragma warning restore MEAI001
 
     [Description("Connect to an MCP server and register its tools")]
     private async Task<string> ConnectMcpServer(

@@ -33,18 +33,14 @@ public sealed class DynamicToolContextProvider : AIContextProvider
             .ToList();
 
         if (offered.Count == 0)
-            return new ValueTask<AIContext>(context.AIContext);
+            return new ValueTask<AIContext>(new AIContext());
 
-        var existing = context.AIContext.Tools?.ToList() ?? [];
-        var names = new HashSet<string>(existing.Select(t => t.Name), StringComparer.Ordinal);
+        // The agent merges what is returned into the tools it already has, so return only the
+        // tools that are new to it.
+        var names = new HashSet<string>(
+            context.AIContext.Tools?.Select(t => t.Name) ?? [], StringComparer.Ordinal);
 
-        foreach (var tool in offered)
-        {
-            if (names.Add(tool.Name))
-                existing.Add(tool);
-        }
-
-        context.AIContext.Tools = existing;
-        return new ValueTask<AIContext>(context.AIContext);
+        var added = offered.Where(t => names.Add(t.Name)).ToList();
+        return new ValueTask<AIContext>(new AIContext { Tools = added });
     }
 }

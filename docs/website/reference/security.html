@@ -271,7 +271,7 @@ rules:
   }
 }
 </code></pre>
-      <p>Endpoints are protected with <code>RequireAgentAuthorization(auth, key)</code>, and <code>AllowAnonymous</code> lists the keys that stay open. The keys in use are <code>agui</code>, <code>a2a</code>, <code>devui</code>, <code>notifications</code>, <code>webhooks</code>, <code>health</code>, <code>runs</code>, <code>connections</code>, <code>connectors</code>, <code>structured</code>, <code>orchestrations</code> and <code>mcp</code>. API keys are compared in fixed time. Setting <code>AllowedOrigins</code> switches CORS from any origin to the named origins with credentials.</p>
+      <p>Endpoints are protected with <code>RequireAgentAuthorization(auth, key)</code>, and <code>AllowAnonymous</code> lists the keys that stay open. The keys in use are <code>agui</code>, <code>a2a</code>, <code>devui</code>, <code>notifications</code>, <code>webhooks</code>, <code>health</code>, <code>runs</code>, <code>connections</code>, <code>connectors</code>, <code>structured</code>, <code>orchestrations</code>, <code>mcp</code>, <code>rag</code> and <code>memory</code>. API keys are compared in fixed time. Setting <code>AllowedOrigins</code> switches CORS from any origin to the named origins with credentials.</p>
       <p>Two routes carry no endpoint authorization on purpose, because the caller is another service and sends none of our credentials:</p>
       <ul>
         <li>The <strong>OAuth callback</strong> (<code>/api/connections/oauth/callback</code>). The provider redirects the browser here. An encrypted, time-limited <code>state</code> value proves this host started the flow.</li>
@@ -303,7 +303,27 @@ rules:
         </tr>
         <tr>
           <td>Orchestration</td>
-          <td>A person answers a plan review. No agent tool can.</td>
+          <td>A person answers a plan review. No agent tool can. A review run needs two different agents, so a maker never grades its own draft.</td>
+        </tr>
+        <tr>
+          <td>Document index</td>
+          <td>Documents are indexed and deleted through the <code>rag</code> endpoints. The agent tools only search and list, and the search tool tells the model that results are data and not instructions.</td>
+        </tr>
+        <tr>
+          <td>Memory</td>
+          <td>A person lists and deletes stored episodes through the <code>memory</code> endpoints. Deleting every episode needs <code>confirm=true</code>.</td>
+        </tr>
+        <tr>
+          <td>Tool results</td>
+          <td><code>Agent:ToolOutput:MaxChars</code> cuts one oversized result, so a single answer cannot push the rest of the conversation out of the prompt.</td>
+        </tr>
+        <tr>
+          <td>Local models</td>
+          <td>The <code>Local</code> provider refuses an endpoint outside loopback and the private networks unless <code>Local:AllowNonLocalEndpoint</code> is set.</td>
+        </tr>
+        <tr>
+          <td>Destructive MCP tools</td>
+          <td>A tool that a connected server marks <code>destructiveHint</code> needs a person&#x27;s approval on each call.</td>
         </tr>
         <tr>
           <td>Spend</td>

@@ -205,7 +205,7 @@ Authentication is off by default. The Host logs a prominent warning at each star
 }
 ```
 
-Endpoints are protected with `RequireAgentAuthorization(auth, key)`, and `AllowAnonymous` lists the keys that stay open. The keys in use are `agui`, `a2a`, `devui`, `notifications`, `webhooks`, `health`, `runs`, `connections`, `connectors`, `structured`, `orchestrations` and `mcp`. API keys are compared in fixed time. Setting `AllowedOrigins` switches CORS from any origin to the named origins with credentials.
+Endpoints are protected with `RequireAgentAuthorization(auth, key)`, and `AllowAnonymous` lists the keys that stay open. The keys in use are `agui`, `a2a`, `devui`, `notifications`, `webhooks`, `health`, `runs`, `connections`, `connectors`, `structured`, `orchestrations`, `mcp`, `rag` and `memory`. API keys are compared in fixed time. Setting `AllowedOrigins` switches CORS from any origin to the named origins with credentials.
 
 Two routes carry no endpoint authorization on purpose, because the caller is another service and sends none of our credentials:
 
@@ -229,7 +229,12 @@ Secrets reach a connector only through its connection context. They do not appea
 | System tools | `SystemTools:AllowedPaths` and `AllowedCommands` both deny everything when empty. The Host defaults the path list to the `agent-workspace` folder and the command list to `dotnet`, `git`, `npm` and `node`. Commands run without a shell. |
 | Vision | `Agent:Vision:AllowedPaths` and `AllowedUrlHosts` deny everything when empty. The fetch refuses private addresses at connect time. |
 | MCP server | Exposes nothing until `Agent:McpServer:ExposedTools` names it. Leaves out tools that need approval. The Host refuses to start with it on and authentication off unless `AllowUnauthenticated` is set. |
-| Orchestration | A person answers a plan review. No agent tool can. |
+| Orchestration | A person answers a plan review. No agent tool can. A review run needs two different agents, so a maker never grades its own draft. |
+| Document index | Documents are indexed and deleted through the `rag` endpoints. The agent tools only search and list, and the search tool tells the model that results are data and not instructions. |
+| Memory | A person lists and deletes stored episodes through the `memory` endpoints. Deleting every episode needs `confirm=true`. |
+| Tool results | `Agent:ToolOutput:MaxChars` cuts one oversized result, so a single answer cannot push the rest of the conversation out of the prompt. |
+| Local models | The `Local` provider refuses an endpoint outside loopback and the private networks unless `Local:AllowNonLocalEndpoint` is set. |
+| Destructive MCP tools | A tool that a connected server marks `destructiveHint` needs a person's approval on each call. |
 | Spend | `Agent:LoopGuard:MaxRunCost` caps a run, and `Agent:Budgets` caps daily spend per agent, per trigger and in total. |
 
 ---

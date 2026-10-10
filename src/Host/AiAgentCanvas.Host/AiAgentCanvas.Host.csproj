@@ -51,6 +51,7 @@
     <!-- Providers -->
     <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.AzureAIFoundry\AiAgentCanvas.Providers.AzureAIFoundry.csproj" />
     <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.Databricks\AiAgentCanvas.Providers.Databricks.csproj" />
+    <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.Local\AiAgentCanvas.Providers.Local.csproj" />
     <ProjectReference Include="..\..\Providers\AiAgentCanvas.Providers.Snowflake\AiAgentCanvas.Providers.Snowflake.csproj" />
   </ItemGroup>
 

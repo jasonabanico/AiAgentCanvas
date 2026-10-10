@@ -84,15 +84,32 @@ Images reach an agent through these tools. Attaching an image in the chat window
 
 ## Orchestration
 
-An orchestration run puts several named agents on one task. Three kinds ship.
+An orchestration run puts several named agents on one task. Six kinds ship.
 
 | Kind | How it works |
 |---|---|
 | `GroupChat` | The agents take turns on one shared conversation, round robin, until the round limit |
 | `Handoff` | A lead agent passes the conversation to a specialist by calling a handoff tool, and the specialist can pass it back. The model must support tool calls. |
 | `Magentic` | A manager agent writes a plan, assigns work to the team, tracks progress and replans when the team stalls |
+| `Sequential` | A pipeline. Each agent receives the conversation so far and adds its step, in the order named. The last answer is the result. |
+| `Concurrent` | Every agent works on the same task at once, without seeing the others. The result lists each agent's answer. Use it for independent parts of a task, or to gather several opinions for the caller to compare. |
+| `Review` | Maker and checker. The first agent drafts and the second reviews the draft against the task. See below. |
 
 The agents come from the agent registry, so each is a persona the host already knows. Each runs on the standard pipeline, which means a limit, a cost counter or a governance rule applies to a run as it does to a chat.
+
+**Review.** A model that grades its own work is lenient with it, so the draft and the verdict come from two different agents. A run takes exactly two: the maker first, then the checker. The maker writes a draft. The checker is asked for JSON, `{"approved": true or false, "feedback": "..."}`, and either approves or says what to change. The maker then receives its previous draft and the feedback and writes a revision. The loop ends in one of three ways, recorded in the run's `termination` field.
+
+| Termination | Meaning |
+|---|---|
+| `Approved` | The checker approved the draft. The only success. |
+| `MaxRounds` | The draft limit was reached with the checker still asking for changes. The last draft is the result. |
+| `NoProgress` | A revision came back identical to the draft before it, so another round would repeat itself |
+
+A reply the loop cannot read counts as not approved, because a loop that treats noise as a pass has no check in it. A bare `APPROVED` is accepted. The limit is `maxRounds`, the most drafts the maker may write, and defaults to `Agent:Orchestration:DefaultReviewRounds` (3). Each draft costs a maker call and a checker call.
+
+The checker is an agent, so it can have tools. A checker with a test-runner tool judges from the test result, which is a deterministic verifier. A checker prompted as an adversary gives a red-team review.
+
+A Review run keeps its state in the transcript, which is saved after every step. It has no workflow checkpoint, and an interrupted run resumes from the last finished step without repeating the earlier ones.
 
 **Durable by design.** Each step is checkpointed to disk, and the run record lives in SQLite. A Magentic run asks for a person to approve its plan (`requireSignoff`, on by default). It then stops completely: nothing is running and nothing is waiting in memory. The record holds the plan and a notification goes out. When the person answers, possibly days later and after a restart, the host rebuilds the workflow from the record, restores the checkpoint and continues from the same point.
 
@@ -116,6 +133,7 @@ Other endpoints: `GET /api/orchestrations` (filter with `status`), `GET /api/orc
 | `DatabasePath` | `orchestrations.db` |
 | `CheckpointDirectory` | `orchestration-checkpoints` |
 | `DefaultMaxRounds` | 8 |
+| `DefaultReviewRounds` | 3 |
 | `MaxRoundsCap` | 30 |
 | `MaxAgents` | 8 |
 | `RunTimeoutMinutes` | 15 |
@@ -124,6 +142,7 @@ Other endpoints: `GET /api/orchestrations` (filter with `status`), `GET /api/orc
 **Limits.**
 
 - The only request a run can stop for is a Magentic plan review. A run built from code with a custom request port is not covered.
+- A Concurrent run returns every answer and does not choose between them. Counting votes or picking the best answer is left to the caller.
 - The group chat manager is round robin. A manager that picks the next speaker with a model is not offered.
 - A run executes inside one process. Checkpoints make a restart safe, and two hosts do not share a run.
 - A handoff depends on the model calling the handoff tool. A model that ignores tools finishes with the lead.

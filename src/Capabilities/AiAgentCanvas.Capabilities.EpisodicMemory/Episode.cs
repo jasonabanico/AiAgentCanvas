@@ -25,6 +25,9 @@ public sealed class Episode
     /// </summary>
     public double Importance { get; set; } = 0.5;
 
+    /// <summary>How many times a recall has returned this episode. Each one refreshes its relevance.</summary>
+    public int RecallCount { get; set; }
+
     /// <summary>
     /// Embedding of goal plus summary, when an embedding model is configured.
     /// Recall ranks by cosine similarity against it and falls back to keyword

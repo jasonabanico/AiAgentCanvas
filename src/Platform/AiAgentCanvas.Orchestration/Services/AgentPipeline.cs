@@ -44,6 +44,18 @@ public static class AgentPipeline
                 loggerFactory.CreateLogger<ContextBudgetChatClient>());
         }
 
+        // Outside the budget, so the tool list is narrowed by relevance before the budget
+        // falls back to dropping tools by position.
+        var selectionOptions = sp.GetService<ToolSelectionOptions>();
+        if (selectionOptions is { Enabled: true })
+        {
+            pipeline = new ToolSelectingChatClient(
+                pipeline,
+                selectionOptions,
+                sp.GetService<IEmbeddingGenerator<string, Embedding<float>>>(),
+                loggerFactory.CreateLogger<ToolSelectingChatClient>());
+        }
+
         var routerOptions = sp.GetService<ModelRouterOptions>();
         if (routerOptions is not null)
         {
@@ -79,17 +91,19 @@ public static class AgentPipeline
     }
 
     /// <summary>
-    /// Wraps each function in the governance policy (when registered) and the tracing
-    /// wrapper. Tools that are not functions pass through unchanged.
+    /// Wraps each function in the governance policy (when registered), the output cap and the
+    /// tracing wrapper. Tools that are not functions pass through unchanged.
     /// </summary>
     public static List<AITool> WrapTools(IServiceProvider sp, IEnumerable<AITool> rawTools)
     {
         var governanceWrapper = sp.GetService<IToolGovernanceWrapper>();
+        var outputOptions = sp.GetService<ToolOutputOptions>();
 
         return rawTools.Select(t =>
         {
             if (t is not AIFunction fn) return t;
             if (governanceWrapper is not null) fn = governanceWrapper.Wrap(fn);
+            if (outputOptions is { Enabled: true }) fn = new BoundedOutputAIFunction(fn, outputOptions);
             return (AITool)new TracedAIFunction(fn);
         }).ToList();
     }

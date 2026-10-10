@@ -4,6 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace AiAgentCanvas.Capabilities.EpisodicMemory;
 
+/// <summary>What <see cref="EpisodicMemoryStore.Store"/> did with an episode.</summary>
+/// <param name="Stored">False when the episode scored below the importance threshold.</param>
+/// <param name="Id">The id the episode is stored under. For a merge, the id of the episode it merged into.</param>
+/// <param name="Merged">True when the episode repeated an earlier one and updated it.</param>
+public sealed record SaveOutcome(bool Stored, string Id, bool Merged);
+
 public sealed class EpisodicMemoryStore : IDisposable
 {
     private readonly SqliteConnection _db;
@@ -15,6 +21,17 @@ public sealed class EpisodicMemoryStore : IDisposable
     /// purpose: recall degrades as the store fills with turns nothing needed.
     /// </summary>
     public double ImportanceThreshold { get; init; } = 0.3;
+
+    /// <summary>
+    /// A new episode this similar to an earlier one by the same agent updates the earlier one
+    /// and does not add a second. Without it an agent that does the same task weekly fills its
+    /// memory with copies, and recall returns three of the same lesson. Only episodes that carry
+    /// an embedding can be compared.
+    /// </summary>
+    public double DuplicateThreshold { get; init; } = 0.95;
+
+    /// <summary>How much a recall refreshes an episode, so memories that keep proving useful outlast ones that do not.</summary>
+    public double RecallBoost { get; init; } = 0.1;
 
     public EpisodicMemoryStore(string dbPath, ILogger<EpisodicMemoryStore> logger)
     {
@@ -47,6 +64,7 @@ public sealed class EpisodicMemoryStore : IDisposable
 
         AddColumnIfMissing("importance", "REAL NOT NULL DEFAULT 0.5");
         AddColumnIfMissing("embedding", "BLOB");
+        AddColumnIfMissing("recall_count", "INTEGER NOT NULL DEFAULT 0");
     }
 
     /// <summary>
@@ -70,13 +88,26 @@ public sealed class EpisodicMemoryStore : IDisposable
     /// Writes the episode when it clears <see cref="ImportanceThreshold"/>.
     /// Returns false when it was filtered out, so the caller can say so.
     /// </summary>
-    public bool Save(Episode episode)
+    public bool Save(Episode episode) => Store(episode).Stored;
+
+    /// <summary>
+    /// Writes the episode, merges it into an earlier one it repeats, or drops it for scoring
+    /// below the importance threshold.
+    /// </summary>
+    public SaveOutcome Store(Episode episode)
     {
         if (episode.Importance < ImportanceThreshold)
         {
             _logger.LogDebug("Skipped episode '{Goal}', importance {Importance} is below the {Threshold} threshold",
                 episode.Goal, episode.Importance, ImportanceThreshold);
-            return false;
+            return new SaveOutcome(false, episode.Id, false);
+        }
+
+        if (FindDuplicate(episode) is { } earlier)
+        {
+            Merge(earlier, episode);
+            _logger.LogInformation("Merged episode '{Goal}' into earlier episode {Id}", episode.Goal, earlier.Id);
+            return new SaveOutcome(true, earlier.Id, true);
         }
 
         using var cmd = _db.CreateCommand();
@@ -100,7 +131,102 @@ public sealed class EpisodicMemoryStore : IDisposable
 
         _logger.LogInformation("Saved episode {Id}: {Goal} -> {Outcome} (importance {Importance}, embedded={Embedded})",
             episode.Id, episode.Goal, episode.Outcome, episode.Importance, episode.Embedding is not null);
-        return true;
+        return new SaveOutcome(true, episode.Id, false);
+    }
+
+    private Episode? FindDuplicate(Episode episode)
+    {
+        if (episode.Embedding is not { Length: > 0 } vector)
+            return null;
+
+        return LoadAll(episode.AgentName)
+            .Where(e => e.Id != episode.Id && e.Embedding is { Length: > 0 })
+            .Select(e => (Episode: e, Score: CosineSimilarity(vector, e.Embedding!)))
+            .Where(x => x.Score >= DuplicateThreshold)
+            .OrderByDescending(x => x.Score)
+            .Select(x => x.Episode)
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The newer run replaces the older one's account of what happened, since it is the latest
+    /// evidence, and keeps whichever importance was higher.
+    /// </summary>
+    private void Merge(Episode earlier, Episode repeat)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = """
+            UPDATE episodes SET
+                summary = $summary, outcome = $outcome, tools_used = $tools, turn_count = $turns,
+                completed_at = $completed, importance = MAX(importance, $importance),
+                relevance_score = 1.0, embedding = $embedding
+            WHERE id = $id
+            """;
+        cmd.Parameters.AddWithValue("$id", earlier.Id);
+        cmd.Parameters.AddWithValue("$summary", repeat.Summary);
+        cmd.Parameters.AddWithValue("$outcome", repeat.Outcome);
+        cmd.Parameters.AddWithValue("$tools", JsonSerializer.Serialize(repeat.ToolsUsed));
+        cmd.Parameters.AddWithValue("$turns", repeat.TurnCount);
+        cmd.Parameters.AddWithValue("$completed", repeat.CompletedAt.ToString("o"));
+        cmd.Parameters.AddWithValue("$importance", repeat.Importance);
+        cmd.Parameters.AddWithValue("$embedding", (object?)ToBlob(repeat.Embedding) ?? DBNull.Value);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Refreshes the relevance of episodes that were just recalled. Decay lowers relevance
+    /// with time, and recall raises it, so an episode that keeps being useful stays and one
+    /// nothing asks about fades.
+    /// </summary>
+    public void Reinforce(IEnumerable<string> ids)
+    {
+        foreach (var id in ids.Distinct())
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "UPDATE episodes SET relevance_score = MIN(1.0, relevance_score + $boost), recall_count = recall_count + 1 WHERE id = $id";
+            cmd.Parameters.AddWithValue("$boost", RecallBoost);
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public Episode? Get(string id)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = $"SELECT {Columns} FROM episodes WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return ReadAll(cmd).FirstOrDefault();
+    }
+
+    /// <summary>Lists stored episodes, newest first, including ones that have decayed out of recall.</summary>
+    public IReadOnlyList<Episode> List(string? agentName = null, int limit = 50, int offset = 0)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = $"SELECT {Columns} FROM episodes {(agentName is null ? "" : "WHERE agent_name = $agent")} ORDER BY completed_at DESC LIMIT $limit OFFSET $offset";
+        if (agentName is not null)
+            cmd.Parameters.AddWithValue("$agent", agentName);
+        cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+        cmd.Parameters.AddWithValue("$offset", Math.Max(0, offset));
+        return ReadAll(cmd);
+    }
+
+    /// <summary>Forgets one episode. Returns false when there is no such episode.</summary>
+    public bool Delete(string id)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "DELETE FROM episodes WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
+    /// <summary>Forgets every episode, or every episode of one agent, and returns how many.</summary>
+    public int DeleteAll(string? agentName = null)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = agentName is null ? "DELETE FROM episodes" : "DELETE FROM episodes WHERE agent_name = $agent";
+        if (agentName is not null)
+            cmd.Parameters.AddWithValue("$agent", agentName);
+        return cmd.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -187,7 +313,7 @@ public sealed class EpisodicMemoryStore : IDisposable
     }
 
     private const string Columns =
-        "id, agent_name, goal, summary, outcome, tools_used, turn_count, started_at, completed_at, relevance_score, importance, embedding";
+        "id, agent_name, goal, summary, outcome, tools_used, turn_count, started_at, completed_at, relevance_score, importance, embedding, recall_count";
 
     private List<Episode> LoadAll(string? agentName)
     {
@@ -228,6 +354,7 @@ public sealed class EpisodicMemoryStore : IDisposable
         RelevanceScore = reader.GetDouble(9),
         Importance = reader.IsDBNull(10) ? 0.5 : reader.GetDouble(10),
         Embedding = reader.IsDBNull(11) ? null : FromBlob((byte[])reader.GetValue(11)),
+        RecallCount = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
     };
 
     private static byte[]? ToBlob(float[]? vector)

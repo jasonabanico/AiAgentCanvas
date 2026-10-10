@@ -42,6 +42,22 @@ public sealed class OrchestrationStore
             CREATE INDEX IF NOT EXISTS idx_orchestration_status ON orchestration_runs(status, updated_at);
             """;
         cmd.ExecuteNonQuery();
+
+        AddColumnIfMissing(connection, "termination", "TEXT");
+    }
+
+    /// <summary>Brings a database created by an earlier version forward without a migration step.</summary>
+    private static void AddColumnIfMissing(SqliteConnection connection, string column, string definition)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('orchestration_runs') WHERE name = $name";
+        check.Parameters.AddWithValue("$name", column);
+        if (Convert.ToInt64(check.ExecuteScalar()) > 0)
+            return;
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE orchestration_runs ADD COLUMN {column} {definition}";
+        alter.ExecuteNonQuery();
     }
 
     private SqliteConnection Open()
@@ -58,11 +74,11 @@ public sealed class OrchestrationStore
         using var db = Open();
         using var cmd = db.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO orchestration_runs (id, kind, spec, status, pending, result, transcript, error, created_at, updated_at)
-            VALUES ($id, $kind, $spec, $status, $pending, $result, $transcript, $error, $created, $updated)
+            INSERT INTO orchestration_runs (id, kind, spec, status, pending, result, termination, transcript, error, created_at, updated_at)
+            VALUES ($id, $kind, $spec, $status, $pending, $result, $termination, $transcript, $error, $created, $updated)
             ON CONFLICT(id) DO UPDATE SET
-                status = $status, pending = $pending, result = $result, transcript = $transcript,
-                error = $error, updated_at = $updated
+                status = $status, pending = $pending, result = $result, termination = $termination,
+                transcript = $transcript, error = $error, updated_at = $updated
             """;
         cmd.Parameters.AddWithValue("$id", run.Id);
         cmd.Parameters.AddWithValue("$kind", run.Spec.Kind.ToString());
@@ -70,6 +86,7 @@ public sealed class OrchestrationStore
         cmd.Parameters.AddWithValue("$status", run.Status.ToString());
         cmd.Parameters.AddWithValue("$pending", run.Pending is null ? DBNull.Value : JsonSerializer.Serialize(run.Pending, Json));
         cmd.Parameters.AddWithValue("$result", (object?)run.Result ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$termination", (object?)run.Termination ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$transcript", JsonSerializer.Serialize(run.Transcript, Json));
         cmd.Parameters.AddWithValue("$error", (object?)run.Error ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$created", Format(run.CreatedAt));
@@ -133,7 +150,7 @@ public sealed class OrchestrationStore
         return ids;
     }
 
-    private const string Columns = "id, spec, status, pending, result, transcript, error, created_at, updated_at";
+    private const string Columns = "id, spec, status, pending, result, transcript, error, created_at, updated_at, termination";
 
     private static List<OrchestrationRun> ReadAll(SqliteCommand cmd)
     {
@@ -152,6 +169,7 @@ public sealed class OrchestrationStore
                 Error = reader.IsDBNull(6) ? null : reader.GetString(6),
                 CreatedAt = Parse(reader.GetString(7)),
                 UpdatedAt = Parse(reader.GetString(8)),
+                Termination = reader.IsDBNull(9) ? null : reader.GetString(9),
             });
         }
         return runs;

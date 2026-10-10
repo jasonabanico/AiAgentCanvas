@@ -17,7 +17,8 @@ Build intelligent AI agents with .NET 10 and Microsoft Agent Framework. From a s
 | 9 | [Architecture](guide-09-architecture.md) | Layers, project references, the chat pipeline and request flow |
 | 10 | [Behavior Patterns](guide-10-behavior-patterns.md) | Seven agent behavior patterns with code examples |
 | 11 | [Operations and Connectors](guide-11-operations-and-connectors.md) | Run ledger, spend limits, durable triggers, jobs, stored credentials, OAuth, and connectors |
-| 12 | [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md) | Schema-checked answers, image tools, group chat, handoff and Magentic runs with human sign-off, and serving tools over MCP |
+| 12 | [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md) | Schema-checked answers, image tools, six orchestration kinds with human sign-off, and serving tools over MCP |
+| 13 | [Running Fully Local](guide-13-running-fully-local.md) | The `Local` provider, models that call tools well, the machine to run them on, and keeping the host isolated |
 
 ## Appendix
 
@@ -32,6 +33,13 @@ Build intelligent AI agents with .NET 10 and Microsoft Agent Framework. From a s
 | [AG-UI Protocol](reference-agui-protocol.md) | SSE event types, request/response format, state mapping |
 | [Security and Governance](reference-security.md) | Governance kernel, tool-call pipeline, policy YAML, rate limiting |
 | [Platform Internals](reference-internals.md) | Context providers, MarkdownFile, tool design, seed interfaces, RAG pipeline |
+
+## Design Notes
+
+| Section | Description |
+|---------|-------------|
+| [Agentic AI coverage](design/agentic-ai-coverage.md) | Part V of the Hitchhiker's Guide to Agentic AI checked against the platform, concept by concept |
+| [Connectors](design/connectors.md) | How a connector definition and its instances work |
 
 ## Downloadable Guides
 

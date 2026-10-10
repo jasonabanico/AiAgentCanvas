@@ -6,7 +6,7 @@
 
 - .NET 10 SDK
 - Node.js 22 or later
-- A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account
+- A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, a Snowflake Cortex account, or a local model server (see [Running Fully Local](guide-13-running-fully-local.md))
 
 ### Setup Steps
 
@@ -26,7 +26,7 @@
      }
    }
    ```
-   To use Databricks or Snowflake, set `Provider` to `Databricks` or `Snowflake` and fill in that provider's section.
+   To use Databricks, Snowflake or a local model server, set `Provider` to `Databricks`, `Snowflake` or `Local` and fill in that provider's section.
 4. Turn on the capabilities you want. All flags default to `false`, so a fresh start is a bare chat agent. This set matches the examples below:
    ```json
    {
@@ -78,17 +78,19 @@ The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.js
 
 | Section | Key | Description |
 |---------|-----|-------------|
-| (root) | `Provider` | The LLM backend: `AzureAIFoundry` (default), `Databricks` or `Snowflake` |
+| (root) | `Provider` | The LLM backend: `AzureAIFoundry` (default), `Databricks`, `Snowflake` or `Local` |
 | `AIFoundry` | `Endpoint`, `Key`, `DeploymentName` | Azure OpenAI endpoint, API key and chat deployment (for example `gpt-4o`) |
 | `AIFoundry` | `UseAzureCredential` | Use `DefaultAzureCredential` instead of an API key |
 | `AIFoundry` | `EmbeddingDeploymentName` | Embedding deployment. RAG needs it, together with the `Rag` flag |
 | `AIFoundry` | `EconomyDeploymentName`, `JudgeDeploymentName` | A cheaper model for routing and summaries, and a separate model for the evaluation suite |
 | `Databricks`, `Snowflake` | `WorkspaceUrl` or `AccountUrl`, token, `ModelName` | The same settings for those providers, with `EmbeddingModelName`, `EconomyModelName` and `JudgeModelName` |
+| `Local` | `Endpoint`, `ModelName`, `EmbeddingModelName`, `EconomyModelName`, `JudgeModelName`, `AllowNonLocalEndpoint`, `RequestTimeoutSeconds` | A model server on this machine or network. See Running Fully Local. |
 | `Security` | `PolicyPath` | Path to the governance policy YAML file |
 | `Security` | `ApprovalRequiredTools` | Tool names that governance blocks. Defaults to `system_write_file`, `system_run_script`, `connect_mcp_server`, `schedule_task` |
 | `Security` | `RateLimitPerMinute` | Requests per minute for each caller on the endpoints that spend model calls: AG-UI, A2A, structured output, orchestrations and the MCP server. Default 30. Zero or less turns it off. |
 | `Authentication` | `Enabled`, `Schemes`, `AllowAnonymous`, `AllowedOrigins`, `ApiKey`, `JwtBearer` | Endpoint authentication. Off by default. |
-| `Agent` | `ContextBudget`, `LoopGuard`, `Pricing`, `Reflection`, `ModelRouter` | The chat pipeline. See Platform Internals. |
+| `Agent` | `ContextBudget`, `LoopGuard`, `Pricing`, `Reflection`, `ModelRouter`, `ToolSelection`, `ToolOutput` | The chat pipeline. See Platform Internals. |
+| `Agent` | `Rag` | Retrieval settings: `TopK`, `RetrieveK`, `AutoInject`, `Rerank`, chunk size and overlap, `MaxDocumentChars`, `TimeToLiveDays`. See MCP and RAG. |
 | `Agent` | `Scheduler`, `EventTriggers`, `Budgets`, `RunLedger`, `Jobs` | Unattended work, run records and spend limits. See Operations and Connectors. |
 | `Agent` | `Structured`, `Vision`, `Orchestration`, `McpServer` | The typed output, vision, orchestration and MCP server capabilities |
 | `SystemTools` | `AllowedPaths`, `AllowedCommands`, `MaxFileSizeBytes`, `ScriptTimeoutSeconds` | Filesystem and shell allowlists. Empty means deny. |
@@ -151,9 +153,9 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `SystemTools` | Tools to read, write and list files and to run scripts, inside `SystemTools:AllowedPaths` and `AllowedCommands`. Governed by the same policy pipeline as custom tools. `system_write_file` and `system_run_script` are blocked by default. |
 | `Notifications` | Agent-to-user notification delivery via SSE. Registers the notification store, tool provider, and the `/api/notifications` HTTP endpoints. |
 | `Scheduling` | Cron-based and one-time scheduled tasks that run an agent or a job. Persisted in SQLite and executed by a background service. `schedule_task` is blocked by default. |
-| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Needs an embedding model on the Azure AI Foundry or Databricks provider. |
+| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Documents are indexed through `POST /api/rag/documents`, and the agent gets `rag_search` and `rag_list_documents` tools. Needs an embedding model on the Azure AI Foundry, Databricks or Local provider. |
 | `InterAgentCommunication` | Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents. |
-| `EpisodicMemory` | Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. |
+| `EpisodicMemory` | Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. Repeats merge, recalls refresh, and `/api/memory/episodes` lists and deletes what is stored. |
 | `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
 | `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, webhook and connector triggers. Events wait in a durable SQLite queue with deduplication, retry and a dead-letter state. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
 | `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
@@ -163,7 +165,7 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `Connectors` | Connectors to outside services (Twilio SMS, Gmail and other MCP servers). Needs `Connections`. Adds the connector host, `/api/connectors/{connectionId}/webhook`, and connector triggers. |
 | `StructuredOutput` | Answers in a fixed JSON shape, checked against a schema and retried with the errors until they fit. Adds `extract_structured`, `list_schemas` and the `/api/structured` endpoints. |
 | `Vision` | Tools that describe an image or extract typed data from it. Images come from allowlisted folders and https hosts. Needs a vision-capable model. |
-| `AgentOrchestration` | Group chat, handoff and Magentic runs with checkpoints and a human sign-off step. Needs `InterAgentCommunication`. Adds the `/api/orchestrations` endpoints and the Orchestrations tab. |
+| `AgentOrchestration` | Group chat, handoff, Magentic, sequential, concurrent and maker-checker review runs, with a human sign-off step for Magentic. Needs `InterAgentCommunication`. Adds the `/api/orchestrations` endpoints and the Orchestrations tab. |
 | `McpServer` | Serves a chosen set of tools over the Model Context Protocol. Exposes nothing until `Agent:McpServer:ExposedTools` names it, and refuses to start with authentication off unless told otherwise. |
 
 The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in [Operations and Connectors](guide-11-operations-and-connectors.md). Typed output, vision, orchestration and the MCP server are described in [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md).
@@ -279,6 +281,9 @@ A production build is a static export. The Host serves it from `wwwroot`, so the
 | API calls return 401 | `Authentication:Enabled` is true and the request carries no credentials | Send the `X-API-Key` header, or a bearer token for the configured authority |
 | The Host stops at startup with a message about `Features:McpServer` | The MCP server is on and authentication is off | Turn authentication on, or set `Agent:McpServer:AllowUnauthenticated` for a trusted network |
 | A connection shows `NeedsReauth` | The provider refused the stored credential | Choose **Reconnect** on the Connections tab |
+| The Host stops at startup with a message about `Local:Endpoint` | The endpoint is outside the machine and the private networks | Point it at a local server, or set `Local:AllowNonLocalEndpoint` if a public endpoint is intended |
+| The model answers slowly or times out on a local server | A long prompt on a machine with slow memory | Raise `Local:RequestTimeoutSeconds`, shorten the prompt by turning off features, and set the server's context length to match `Agent:ContextBudget:MaxContextTokens` |
+| A document is indexed but a question about it finds nothing | The embedding model changed after indexing, or the question shares no words and the vectors are far apart | Delete the document and index it again with the current model, or search with other words through `rag_search` |
 | An orchestration run is `WaitingForInput` | A Magentic plan needs a person's approval | Open the Orchestrations tab and approve, ask for changes, or cancel |
 
 ---

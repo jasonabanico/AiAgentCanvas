@@ -20,13 +20,13 @@ Key packages:
 
 The abstraction layer between your agent code and the LLM provider. MEAI defines `IChatClient` for chat completions, `AIFunction` and `AITool` for tool definitions, and `IEmbeddingGenerator` for embeddings. The `FunctionInvokingChatClient` wraps any `IChatClient` and automatically handles the tool-call loop -- intercepting tool-call responses, executing functions, and feeding results back to the model. `DelegatingChatClient` enables middleware patterns like logging, caching, and governance wrapping.
 
-MEAI makes the LLM backend swappable. The platform defaults to Azure AI Foundry and also ships Databricks and Snowflake providers, selected by the `Provider` key. Any provider that implements `IChatClient` works without changing agent code. The evaluation suite uses `Microsoft.Extensions.AI.Evaluation` and its Quality evaluators.
+MEAI makes the LLM backend swappable. The platform defaults to Azure AI Foundry and also ships Databricks, Snowflake and Local providers, selected by the `Provider` key. The Local provider points the standard OpenAI client at an Ollama, llama.cpp, LM Studio or vLLM server. Any provider that implements `IChatClient` works without changing agent code. The evaluation suite uses `Microsoft.Extensions.AI.Evaluation` and its Quality evaluators.
 
 ## Azure AI Foundry (Azure OpenAI)
 
 The default LLM provider. `AzureAIFoundryClientFactory` creates `IChatClient` and `IEmbeddingGenerator` instances configured for Azure OpenAI endpoints. It supports both API key and managed identity authentication, selected through configuration. The factory is registered in DI and consumed by the agent runtime -- agents never talk to Azure directly.
 
-Azure AI Foundry is the default. Setting `Provider` to `Databricks` or `Snowflake` selects the other provider projects, and a provider project can register its own `economy` and `judge` clients. The rest of the platform is unaffected.
+Azure AI Foundry is the default. Setting `Provider` to `Databricks`, `Snowflake` or `Local` selects the other provider projects, and a provider project can register its own `economy` and `judge` clients. The rest of the platform is unaffected.
 
 ## AG-UI Protocol
 

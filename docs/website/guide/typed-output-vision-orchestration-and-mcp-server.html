@@ -155,7 +155,7 @@ if (result.Success) Console.WriteLine(result.Value!.City);
       </table>
       <p>Images reach an agent through these tools. Attaching an image in the chat window is not supported.</p>
       <h2>Orchestration</h2>
-      <p>An orchestration run puts several named agents on one task. Three kinds ship.</p>
+      <p>An orchestration run puts several named agents on one task. Six kinds ship.</p>
       <table>
         <thead><tr>
           <th>Kind</th>
@@ -174,9 +174,45 @@ if (result.Success) Console.WriteLine(result.Value!.City);
           <td><code>Magentic</code></td>
           <td>A manager agent writes a plan, assigns work to the team, tracks progress and replans when the team stalls</td>
         </tr>
+        <tr>
+          <td><code>Sequential</code></td>
+          <td>A pipeline. Each agent receives the conversation so far and adds its step, in the order named. The last answer is the result.</td>
+        </tr>
+        <tr>
+          <td><code>Concurrent</code></td>
+          <td>Every agent works on the same task at once, without seeing the others. The result lists each agent&#x27;s answer. Use it for independent parts of a task, or to gather several opinions for the caller to compare.</td>
+        </tr>
+        <tr>
+          <td><code>Review</code></td>
+          <td>Maker and checker. The first agent drafts and the second reviews the draft against the task. See below.</td>
+        </tr>
         </tbody>
       </table>
       <p>The agents come from the agent registry, so each is a persona the host already knows. Each runs on the standard pipeline, which means a limit, a cost counter or a governance rule applies to a run as it does to a chat.</p>
+      <p><strong>Review.</strong> A model that grades its own work is lenient with it, so the draft and the verdict come from two different agents. A run takes exactly two: the maker first, then the checker. The maker writes a draft. The checker is asked for JSON, <code>{&quot;approved&quot;: true or false, &quot;feedback&quot;: &quot;...&quot;}</code>, and either approves or says what to change. The maker then receives its previous draft and the feedback and writes a revision. The loop ends in one of three ways, recorded in the run&#x27;s <code>termination</code> field.</p>
+      <table>
+        <thead><tr>
+          <th>Termination</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Approved</code></td>
+          <td>The checker approved the draft. The only success.</td>
+        </tr>
+        <tr>
+          <td><code>MaxRounds</code></td>
+          <td>The draft limit was reached with the checker still asking for changes. The last draft is the result.</td>
+        </tr>
+        <tr>
+          <td><code>NoProgress</code></td>
+          <td>A revision came back identical to the draft before it, so another round would repeat itself</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>A reply the loop cannot read counts as not approved, because a loop that treats noise as a pass has no check in it. A bare <code>APPROVED</code> is accepted. The limit is <code>maxRounds</code>, the most drafts the maker may write, and defaults to <code>Agent:Orchestration:DefaultReviewRounds</code> (3). Each draft costs a maker call and a checker call.</p>
+      <p>The checker is an agent, so it can have tools. A checker with a test-runner tool judges from the test result, which is a deterministic verifier. A checker prompted as an adversary gives a red-team review.</p>
+      <p>A Review run keeps its state in the transcript, which is saved after every step. It has no workflow checkpoint, and an interrupted run resumes from the last finished step without repeating the earlier ones.</p>
       <p><strong>Durable by design.</strong> Each step is checkpointed to disk, and the run record lives in SQLite. A Magentic run asks for a person to approve its plan (<code>requireSignoff</code>, on by default). It then stops completely: nothing is running and nothing is waiting in memory. The record holds the plan and a notification goes out. When the person answers, possibly days later and after a restart, the host rebuilds the workflow from the record, restores the checkpoint and continues from the same point.</p>
       <table>
         <thead><tr>
@@ -232,6 +268,10 @@ if (result.Success) Console.WriteLine(result.Value!.City);
           <td>8</td>
         </tr>
         <tr>
+          <td><code>DefaultReviewRounds</code></td>
+          <td>3</td>
+        </tr>
+        <tr>
           <td><code>MaxRoundsCap</code></td>
           <td>30</td>
         </tr>
@@ -252,6 +292,7 @@ if (result.Success) Console.WriteLine(result.Value!.City);
       <p><strong>Limits.</strong></p>
       <ul>
         <li>The only request a run can stop for is a Magentic plan review. A run built from code with a custom request port is not covered.</li>
+        <li>A Concurrent run returns every answer and does not choose between them. Counting votes or picking the best answer is left to the caller.</li>
         <li>The group chat manager is round robin. A manager that picks the next speaker with a model is not offered.</li>
         <li>A run executes inside one process. Checkpoints make a restart safe, and two hosts do not share a run.</li>
         <li>A handoff depends on the model calling the handoff tool. A model that ignores tools finishes with the lead.</li>
