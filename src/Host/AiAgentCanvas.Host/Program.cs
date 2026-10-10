@@ -16,7 +16,11 @@ using AiAgentCanvas.Capabilities.AuditLog;
 using AiAgentCanvas.Capabilities.EpisodicMemory;
 using AiAgentCanvas.Capabilities.ComputerUse;
 using AiAgentCanvas.Capabilities.EventTriggers;
+using AiAgentCanvas.Capabilities.AgentOrchestration;
 using AiAgentCanvas.Capabilities.Jobs;
+using AiAgentCanvas.Capabilities.McpServer;
+using AiAgentCanvas.Capabilities.StructuredOutput;
+using AiAgentCanvas.Capabilities.Vision;
 using AiAgentCanvas.Connections;
 using AiAgentCanvas.Connectors;
 using AiAgentCanvas.Connectors.Mcp;
@@ -219,6 +223,33 @@ if (features.Connectors)
     builder.Services.AddMcpConnector();
 }
 
+if (features.StructuredOutput) builder.Services.AddAiAgentCanvasStructuredOutput(builder.Configuration);
+if (features.Vision) builder.Services.AddAiAgentCanvasVision(builder.Configuration);
+
+if (features.AgentOrchestration && !features.InterAgentCommunication)
+{
+    throw new InvalidOperationException(
+        "Features:AgentOrchestration requires Features:InterAgentCommunication, because the agents in a run come from the agent registry.");
+}
+
+if (features.AgentOrchestration) builder.Services.AddAiAgentCanvasAgentOrchestration(builder.Configuration);
+
+var mcpServer = new AiAgentCanvas.Capabilities.McpServer.McpServerOptions();
+builder.Configuration.GetSection(AiAgentCanvas.Capabilities.McpServer.McpServerOptions.SectionName).Bind(mcpServer);
+if (features.McpServer)
+{
+    // The endpoint hands tools to whoever can reach it. Refuse to start open unless the
+    // operator has said that is intended.
+    if (!auth.Enabled && !mcpServer.AllowUnauthenticated)
+    {
+        throw new InvalidOperationException(
+            "Features:McpServer exposes tools to any caller while Authentication:Enabled is false. "
+            + "Enable authentication, or set Agent:McpServer:AllowUnauthenticated to true if the endpoint is reachable only from a trusted network.");
+    }
+
+    builder.Services.AddAiAgentCanvasMcpServer(builder.Configuration);
+}
+
 var budgets = new BudgetOptions();
 builder.Configuration.GetSection(BudgetOptions.SectionName).Bind(budgets);
 if (budgets.Enabled)
@@ -276,6 +307,16 @@ if (features.Connectors)
     // sender's own signature before anything is read.
     app.MapConnectorWebhook();
 }
+
+if (features.StructuredOutput)
+    app.MapStructuredEndpoints().RequireAgentAuthorization(auth, "structured");
+
+// Answering a run that waits for a person is possible only here. No agent tool does it.
+if (features.AgentOrchestration)
+    app.MapOrchestrationEndpoints().RequireAgentAuthorization(auth, "orchestrations");
+
+if (features.McpServer)
+    app.MapAiAgentCanvasMcp(mcpServer).RequireAgentAuthorization(auth, "mcp");
 
 app.MapFallbackToFile("index.html");
 

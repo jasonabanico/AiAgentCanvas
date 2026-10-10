@@ -23,7 +23,7 @@ Host holds no compile-time reference to them.
   - `AiAgentCanvas.Connectors` — connector contracts (`IConnectorDefinition`, `IToolConnector`, `IEventSourceConnector`), `ConnectorHost`, the guarded per-connection HTTP client, and the webhook route
   - `AiAgentCanvas.Orchestration` — MAF agent wiring, AG-UI endpoint, agent registry/handoff, inter-agent messaging, and the chat-client pipeline (context budget, loop guard, model router, reflection, tool dedupe, tool tracing)
   - `AiAgentCanvas.Security` — Microsoft Agent Governance Toolkit + Purview integration
-- **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation), `RunLedger`, `Jobs`, `Connections`, `Connectors` (needs `Connections`)
+- **Capabilities** — opt-in feature modules, each behind a `Features:*` flag: `Rag`, `Scheduling`, `Skills`, `Notifications`, `SystemTools`, `EpisodicMemory`, `AuditLog`, `EventTriggers`, `ComputerUse` (Playwright browser automation), `RunLedger`, `Jobs`, `Connections`, `Connectors` (needs `Connections`), `StructuredOutput`, `Vision`, `AgentOrchestration` (needs `InterAgentCommunication`), `McpServer`
 - **Connectors** (`src/Connectors/`) — `AiAgentCanvas.Connector.TwilioSms` and `AiAgentCanvas.Connector.Mcp` (Gmail and any MCP server). A connector is a definition plus one instance per stored connection; see `docs/design/connectors.md`
 - **AgentData** — MD-persisted agent state: `Personas`, `Context`, `Entities`, `Guardrails`, `Profiles`, `Workflows`
 - **Agents** — specialist agent projects, e.g. `Agent.FinancialAnalyst` (sample: financial analysis persona + tools)
@@ -89,7 +89,7 @@ capability that references it.
 Endpoints are protected with `RequireAgentAuthorization(auth, key)` rather than
 `RequireAuthorization`, so the `Authentication:AllowAnonymous` list is honoured in
 one place. Keys in use: `agui`, `a2a`, `devui`, `notifications`, `webhooks`,
-`health`, `runs`, `connections`, `connectors`. Two routes carry no endpoint
+`health`, `runs`, `connections`, `connectors`, `structured`, `orchestrations`, `mcp`. Two routes carry no endpoint
 authorization on purpose, because the caller is another service and not one of ours: the
 OAuth callback (`MapConnectionCallback`, protected by encrypted time-limited state) and
 the connector webhook (`MapConnectorWebhook`, protected by the sender's own signature). Authentication is off by default and the Host logs a prominent warning
@@ -110,4 +110,7 @@ These exist because an agent without them fails in ways that produce no error:
 - **Background producers have consumers.** The scheduler has `ScheduledTaskRunner`; event triggers have `TriggerDispatchService`; the trigger queue is bounded and durable (`TriggerStore`), with at-least-once delivery, dedupe keys, backoff and a dead-letter state. A producer without a consumer is a feature that accepts work and never does it.
 - **Every unattended run is recorded and limited.** `RunTracking.RunAsync` writes a ledger record for scheduled tasks, triggers, handoffs and jobs. `Agent:Budgets` refuses a run once an agent, trigger or total daily limit is spent, measured from the ledger, and refuses to start without `RunLedger` and `Agent:Pricing`. Persona agents use the same pipeline as the default agent (`AgentPipeline`), so a limit applies to delegated work too.
 - **Secrets never reach the model, a log or a response.** Credentials are encrypted at rest and leave `ICredentialProvider` only to the connection's HTTP client. A connector gets its HTTP client from `IConnectionContext`, which restricts hosts, refuses redirects and retries only safe methods.
+- **Only a person answers a plan review.** `AgentOrchestration` stops a Magentic run for sign-off and records it. Agents get tools to start, read and cancel a run, and none to answer one. The answer goes through `/api/orchestrations/{id}/respond`.
+- **An exposed tool has an owner and a record.** `McpServer` exposes only tools named in `Agent:McpServer:ExposedTools`, leaves out any that need approval, passes each through governance and tracing, records each outside call as an `External` run, and refuses to start with authentication off unless `AllowUnauthenticated` is set.
+- **Images and answers are checked at the door.** `Vision` reads only from `AllowedPaths` and `AllowedUrlHosts` (empty means deny), decides the type from the bytes, and refuses private addresses at connect time. `StructuredOutput` validates every answer against its schema and returns a failure as a result.
 - **Tools that reach people need approval.** A connector tool with risk `Send` or `Destructive` is wrapped in `ApprovalRequiredAIFunction` unless `Connectors:ApprovalMode` is `Audit`. `Security:ApprovalRequiredTools` is a separate mechanism and blocks the tool without asking.

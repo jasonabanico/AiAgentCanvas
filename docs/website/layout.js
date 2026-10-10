@@ -14,6 +14,7 @@ const NAV_SECTIONS = [
       { title: '9. Architecture', file: 'architecture.html' },
       { title: '10. Behavior Patterns', file: 'behavior-patterns.html' },
       { title: '11. Operations and Connectors', file: 'operations-and-connectors.html' },
+      { title: '12. Typed Output, Vision, Orchestration and MCP Server', file: 'typed-output-vision-orchestration-and-mcp-server.html' },
     ]
   },
   {

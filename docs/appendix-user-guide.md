@@ -95,7 +95,11 @@ Every capability in the platform can be individually enabled via the `Features` 
     "RunLedger": false,
     "Jobs": false,
     "Connections": false,
-    "Connectors": false
+    "Connectors": false,
+    "StructuredOutput": false,
+    "Vision": false,
+    "AgentOrchestration": false,
+    "McpServer": false
   }
 }
 ```
@@ -125,8 +129,12 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `Jobs` | Deterministic jobs that run without a model, started from a schedule, a trigger or an agent tool. |
 | `Connections` | Encrypted credential storage, the OAuth connect flow with PKCE, and token refresh. Adds the `/api/connections` endpoints and the Connections tab. |
 | `Connectors` | Connectors to outside services (Twilio SMS, Gmail and other MCP servers). Needs `Connections`. Adds the connector host, `/api/connectors/{connectionId}/webhook`, and connector triggers. |
+| `StructuredOutput` | Answers in a fixed JSON shape, checked against a schema and retried with the errors until they fit. Adds `extract_structured`, `list_schemas` and the `/api/structured` endpoints. |
+| `Vision` | Tools that describe an image or extract typed data from it. Images come from allowlisted folders and https hosts. Needs a vision-capable model. |
+| `AgentOrchestration` | Group chat, handoff and Magentic runs with checkpoints and a human sign-off step. Needs `InterAgentCommunication`. Adds the `/api/orchestrations` endpoints and the Orchestrations tab. |
+| `McpServer` | Serves a chosen set of tools over the Model Context Protocol. Exposes nothing until `Agent:McpServer:ExposedTools` names it, and refuses to start with authentication off unless told otherwise. |
 
-The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in [Operations and Connectors](guide-11-operations-and-connectors.md).
+The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in [Operations and Connectors](guide-11-operations-and-connectors.md). Typed output, vision, orchestration and the MCP server are described in [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md).
 
 ### Service Modules (Agents and Data Connections)
 

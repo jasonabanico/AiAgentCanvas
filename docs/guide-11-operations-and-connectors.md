@@ -17,7 +17,7 @@ All of it is off by default and sits behind `Features:*` flags.
 
 An unattended agent leaves no trace in a chat window. The run ledger writes one record per run to SQLite: what started it, what it did, what it cost and how it ended.
 
-A record holds the agent name, the source (`Interactive`, `Scheduled`, `Trigger`, `Handoff` or `Job`), the trigger or task id, start and end times, status, the input and output text, token counts, estimated cost, the tool calls with outcome and duration, and the reason a run was cut short, if it was.
+A record holds the agent name, the source (`Interactive`, `Scheduled`, `Trigger`, `Handoff`, `Job`, `Orchestration` or `External`), the trigger or task id, start and end times, status, the input and output text, token counts, estimated cost, the tool calls with outcome and duration, and the reason a run was cut short, if it was.
 
 - **Nesting.** A run started inside another run, such as a handoff, records its parent. The parent's totals include the child's usage. Totals reported by the API count top-level runs only, so delegated work is not counted twice.
 - **Restarts.** A run still marked `Running` when the process starts again is marked `Abandoned`. Its outcome is unknown.

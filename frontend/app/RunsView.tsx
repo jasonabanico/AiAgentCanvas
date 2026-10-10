@@ -44,7 +44,7 @@ interface Detail {
 }
 
 const STATUSES = ["", "Running", "Succeeded", "Failed", "Cancelled", "Abandoned"];
-const SOURCES = ["", "Interactive", "Scheduled", "Trigger", "Handoff", "Job"];
+const SOURCES = ["", "Interactive", "Scheduled", "Trigger", "Handoff", "Job", "Orchestration", "External"];
 const WINDOWS = [
   { label: "Last hour", hours: 1 },
   { label: "Last 24 hours", hours: 24 },

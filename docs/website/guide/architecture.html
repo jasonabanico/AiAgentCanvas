@@ -95,6 +95,16 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.Jobs
 │   └── Platform.Abstractions
+├── Capabilities.StructuredOutput
+│   └── Platform.Abstractions
+├── Capabilities.Vision
+│   └── Platform.Abstractions
+├── Capabilities.AgentOrchestration
+│   ├── Platform.Abstractions
+│   └── Platform.Orchestration
+├── Capabilities.McpServer
+│   ├── Platform.Abstractions
+│   └── Platform.Orchestration
 ├── Platform.Connections
 │   └── Platform.Abstractions
 ├── Platform.Connectors
@@ -270,6 +280,26 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
           <td><strong>Jobs</strong></td>
           <td>Deterministic scheduled work that runs without a model</td>
           <td><code>JobRunner</code>, <code>IAgentJob</code>, <code>JobToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>StructuredOutput</strong></td>
+          <td>Schema-checked answers with retry</td>
+          <td><code>StructuredResponder</code>, <code>JsonSchemaValidator</code>, <code>SchemaCatalog</code></td>
+        </tr>
+        <tr>
+          <td><strong>Vision</strong></td>
+          <td>Image tools with allowlisted sources</td>
+          <td><code>ImageLoader</code>, <code>VisionToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>AgentOrchestration</strong></td>
+          <td>Group chat, handoff and Magentic runs with checkpoints and human sign-off</td>
+          <td><code>OrchestrationRunner</code>, <code>OrchestrationStore</code>, <code>OrchestrationEndpoints</code></td>
+        </tr>
+        <tr>
+          <td><strong>McpServer</strong></td>
+          <td>Serves chosen tools over MCP</td>
+          <td><code>ExposedToolSet</code>, <code>McpServerExtensions</code></td>
         </tr>
         </tbody>
       </table>

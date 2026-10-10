@@ -159,7 +159,11 @@
     &quot;RunLedger&quot;: false,
     &quot;Jobs&quot;: false,
     &quot;Connections&quot;: false,
-    &quot;Connectors&quot;: false
+    &quot;Connectors&quot;: false,
+    &quot;StructuredOutput&quot;: false,
+    &quot;Vision&quot;: false,
+    &quot;AgentOrchestration&quot;: false,
+    &quot;McpServer&quot;: false
   }
 }
 </code></pre>
@@ -261,9 +265,25 @@
           <td><code>Connectors</code></td>
           <td>Connectors to outside services (Twilio SMS, Gmail and other MCP servers). Needs <code>Connections</code>. Adds the connector host, <code>/api/connectors/{connectionId}/webhook</code>, and connector triggers.</td>
         </tr>
+        <tr>
+          <td><code>StructuredOutput</code></td>
+          <td>Answers in a fixed JSON shape, checked against a schema and retried with the errors until they fit. Adds <code>extract_structured</code>, <code>list_schemas</code> and the <code>/api/structured</code> endpoints.</td>
+        </tr>
+        <tr>
+          <td><code>Vision</code></td>
+          <td>Tools that describe an image or extract typed data from it. Images come from allowlisted folders and https hosts. Needs a vision-capable model.</td>
+        </tr>
+        <tr>
+          <td><code>AgentOrchestration</code></td>
+          <td>Group chat, handoff and Magentic runs with checkpoints and a human sign-off step. Needs <code>InterAgentCommunication</code>. Adds the <code>/api/orchestrations</code> endpoints and the Orchestrations tab.</td>
+        </tr>
+        <tr>
+          <td><code>McpServer</code></td>
+          <td>Serves a chosen set of tools over the Model Context Protocol. Exposes nothing until <code>Agent:McpServer:ExposedTools</code> names it, and refuses to start with authentication off unless told otherwise.</td>
+        </tr>
         </tbody>
       </table>
-      <p>The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
+      <p>The run ledger, spend limits, durable triggers, jobs, connections and connectors are described in <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>. Typed output, vision, orchestration and the MCP server are described in <a href="guide-12-typed-output-vision-orchestration-and-mcp-server.md">Typed Output, Vision, Orchestration and MCP Server</a>.</p>
       <h3>Service Modules (Agents and Data Connections)</h3>
       <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface instead of feature flags. Each module declares a configuration section name and self-registers its services. Host does not reference these projects at compile time at all: they&#x27;re loaded at runtime from a <code>plugins/</code> folder next to the Host executable, one subfolder per plugin, via <code>System.Runtime.Loader.AssemblyLoadContext</code>. <code>ServiceModuleExtensions.AddServiceModules</code> scans that folder, loads each plugin into its own isolated <code>PluginLoadContext</code>, and reflects over its types for <code>IServiceModule</code> implementations.</p>
       <p>Modules are opt-in, like feature flags: a module with no configuration section, or with <code>Enabled</code> absent, stays disabled. Set <code>Enabled</code> to <code>true</code> in its configuration section to register it:</p>

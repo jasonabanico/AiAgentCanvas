@@ -38,4 +38,16 @@ public sealed class FeatureFlags
 
     /// <summary>Connectors to outside services. Requires <see cref="Connections"/>.</summary>
     public bool Connectors { get; set; } = false;
+
+    /// <summary>Answers in a fixed JSON shape, checked against a schema and retried until it fits.</summary>
+    public bool StructuredOutput { get; set; } = false;
+
+    /// <summary>Image tools: describe an image, or extract typed data from one.</summary>
+    public bool Vision { get; set; } = false;
+
+    /// <summary>Group chat, handoff and Magentic runs with durable checkpoints. Needs <see cref="InterAgentCommunication"/>.</summary>
+    public bool AgentOrchestration { get; set; } = false;
+
+    /// <summary>Serves a chosen set of this host's tools over MCP.</summary>
+    public bool McpServer { get; set; } = false;
 }

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Typed Output, Vision, Orchestration and MCP Server - AI Agent Canvas</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../layout.js"></script>
+</head>
+<body>
+  <div class="page-layout">
+    <main class="main-content">
+      <h1>Typed Output, Vision, Orchestration and MCP Server</h1>
+      <p>This guide covers four capabilities that widen what an agent can do and what can call it. Typed output makes a model answer in a shape a program can rely on. Vision lets a model look at images. Orchestration runs several agents together, with durable state and a human decision point. The MCP server lets outside clients call chosen tools.</p>
+      <p>Each is off by default behind a <code>Features:*</code> flag.</p>
+      <table>
+        <thead><tr>
+          <th>Flag</th>
+          <th>Adds</th>
+          <th>Needs</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>StructuredOutput</code></td>
+          <td>Answers checked against a JSON Schema and retried until they fit</td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td><code>Vision</code></td>
+          <td>Tools that describe an image or extract typed data from it</td>
+          <td>A vision-capable model. <code>StructuredOutput</code> adds the extraction tool.</td>
+        </tr>
+        <tr>
+          <td><code>AgentOrchestration</code></td>
+          <td>Group chat, handoff and Magentic runs that survive a restart</td>
+          <td><code>InterAgentCommunication</code></td>
+        </tr>
+        <tr>
+          <td><code>McpServer</code></td>
+          <td>A Model Context Protocol endpoint serving a chosen set of tools</td>
+          <td>Authentication on, or an explicit opt-out</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>Typed output</h2>
+      <p>A model that is asked for JSON often returns JSON with a missing field, a string where a number belongs, or a sentence wrapped around the object. The structured responder expects that and does not trust the first answer.</p>
+      <p>For each request it does the following:</p>
+      <ul>
+        <li>Sends the schema twice: as the provider&#x27;s native response format, and in the instruction text. A provider that ignores the format still follows the text.</li>
+        <li>Parses the answer. A code fence or a sentence around the JSON is tolerated.</li>
+        <li>Checks the parsed value against the schema.</li>
+        <li>On a failure, sends the answer back with the specific errors (<code>$.age: expected integer but found string</code>) and asks again, up to the attempt limit.</li>
+      </ul>
+      <p>The result says whether it succeeded, the value, the errors from the last attempt, how many attempts it took, and the raw text of the last answer. A failure comes back as a result and does not throw, so a caller does not mistake a default value for an answer.</p>
+      <p>The responder runs on the same chat pipeline as an agent, so each attempt is counted, priced and limited like any other model call.</p>
+      <p><strong>From code.</strong> The shape can live in a class. <code>RespondAsync&lt;T&gt;</code> builds the schema from the type and returns a typed value.</p>
+      <pre><code class="language-csharp">
+public sealed record Weather(string City, double TempC);
+
+var result = await responder.RespondAsync&lt;Weather&gt;(
+    &quot;Extract the weather.&quot;, &quot;It is 21.5 degrees in Sydney.&quot;);
+
+if (result.Success) Console.WriteLine(result.Value!.City);
+</code></pre>
+      <p><strong>From an agent.</strong> The tool <code>extract_structured</code> takes the text, an instruction, and either <code>schemaName</code> (a stored schema) or <code>schema</code> (a JSON Schema document as text). <code>list_schemas</code> shows the stored ones. The text may come from an outside party, so it can fill the fields but cannot change the shape or the instruction.</p>
+      <p><strong>Stored schemas.</strong> Files named <code>*.schema.json</code> in <code>Agent:Structured:SchemaDirectory</code> are loaded at start. The file name without the suffix is the schema name. A file that is not valid JSON is skipped with a warning.</p>
+      <p><strong>From HTTP.</strong> <code>POST /api/structured/extract</code> takes <code>instruction</code>, <code>input</code>, <code>schemaName</code> or <code>schema</code>, and <code>maxAttempts</code>. <code>GET /api/structured/schemas</code> lists the names. The endpoint key is <code>structured</code>.</p>
+      <p><strong>What the validator checks.</strong> <code>type</code> (including a list of types), <code>properties</code>, <code>required</code>, <code>additionalProperties</code>, <code>items</code>, <code>enum</code>, <code>const</code>, <code>minimum</code>, <code>maximum</code>, <code>exclusiveMinimum</code>, <code>exclusiveMaximum</code>, <code>minLength</code>, <code>maxLength</code>, <code>pattern</code>, <code>minItems</code>, <code>maxItems</code>, <code>anyOf</code>, <code>oneOf</code>, <code>allOf</code>, and local <code>$ref</code> into <code>$defs</code> or <code>definitions</code>. It ignores other keywords, such as <code>format</code>, and does not treat them as failures. Errors are capped at 20 so a long bad array does not flood the retry message.</p>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:Structured</code>)</th>
+          <th>Default</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>SchemaDirectory</code></td>
+          <td><code>schemas</code></td>
+          <td>Folder of <code>*.schema.json</code> files</td>
+        </tr>
+        <tr>
+          <td><code>MaxAttemptsCap</code></td>
+          <td>5</td>
+          <td>The most attempts any request may use</td>
+        </tr>
+        <tr>
+          <td><code>MaxInputChars</code></td>
+          <td>100000</td>
+          <td>Longest input accepted</td>
+        </tr>
+        <tr>
+          <td><code>MaxSchemaChars</code></td>
+          <td>20000</td>
+          <td>Longest schema accepted from a caller</td>
+        </tr>
+        </tbody>
+      </table>
+      <h2>Vision</h2>
+      <p>The vision tools pass images to a model that can read them. They need a vision-capable model behind the pipeline. A text-only model rejects the request, and the tool reports the model&#x27;s error.</p>
+      <table>
+        <thead><tr>
+          <th>Tool</th>
+          <th>Does</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>describe_image</code></td>
+          <td>Answers a question about one or more images, or describes them</td>
+        </tr>
+        <tr>
+          <td><code>extract_from_image</code></td>
+          <td>Reads an image into a JSON shape, checked and retried like typed output. Present only when <code>StructuredOutput</code> is on.</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Both take <code>sources</code>: file paths or https addresses. Text in an image comes from whoever made it. The tools mark their result as untrusted content, and the model should treat it as data.</p>
+      <p><strong>Where images may come from.</strong> The same rule the system tools follow applies: an empty list denies everything.</p>
+      <ul>
+        <li><code>AllowedPaths</code> lists the folders files may be read from. A path outside them is refused, including a <code>..</code> path, a sibling folder whose name starts with an allowed one, and a link inside an allowed folder that points out of it.</li>
+        <li><code>AllowedUrlHosts</code> lists the hosts an image may be fetched from: an exact name or <code>*.example.com</code>. Only https is fetched. An address with a user name or password is refused.</li>
+        <li>The fetch follows no redirects. Before connecting, it refuses private, loopback and link-local addresses unless <code>AllowPrivateNetworks</code> is true. The check runs on the address actually connected to, so a name that resolves to an internal address does not get through.</li>
+      </ul>
+      <p><strong>What is accepted.</strong> PNG, JPEG, GIF and WebP, decided by the file&#x27;s first bytes and not by its name or the server&#x27;s claim. SVG is refused because it can carry script. The size limit is enforced while reading, so a server that lies about its length is still stopped.</p>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:Vision</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>AllowedPaths</code></td>
+          <td>empty (no files)</td>
+        </tr>
+        <tr>
+          <td><code>AllowedUrlHosts</code></td>
+          <td>empty (no fetching)</td>
+        </tr>
+        <tr>
+          <td><code>AllowPrivateNetworks</code></td>
+          <td>false</td>
+        </tr>
+        <tr>
+          <td><code>MaxImageBytes</code></td>
+          <td>5242880</td>
+        </tr>
+        <tr>
+          <td><code>MaxImagesPerCall</code></td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td><code>FetchTimeoutSeconds</code></td>
+          <td>15</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Images reach an agent through these tools. Attaching an image in the chat window is not supported.</p>
+      <h2>Orchestration</h2>
+      <p>An orchestration run puts several named agents on one task. Three kinds ship.</p>
+      <table>
+        <thead><tr>
+          <th>Kind</th>
+          <th>How it works</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>GroupChat</code></td>
+          <td>The agents take turns on one shared conversation, round robin, until the round limit</td>
+        </tr>
+        <tr>
+          <td><code>Handoff</code></td>
+          <td>A lead agent passes the conversation to a specialist by calling a handoff tool, and the specialist can pass it back. The model must support tool calls.</td>
+        </tr>
+        <tr>
+          <td><code>Magentic</code></td>
+          <td>A manager agent writes a plan, assigns work to the team, tracks progress and replans when the team stalls</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The agents come from the agent registry, so each is a persona the host already knows. Each runs on the standard pipeline, which means a limit, a cost counter or a governance rule applies to a run as it does to a chat.</p>
+      <p><strong>Durable by design.</strong> Each step is checkpointed to disk, and the run record lives in SQLite. A Magentic run asks for a person to approve its plan (<code>requireSignoff</code>, on by default). It then stops completely: nothing is running and nothing is waiting in memory. The record holds the plan and a notification goes out. When the person answers, possibly days later and after a restart, the host rebuilds the workflow from the record, restores the checkpoint and continues from the same point.</p>
+      <table>
+        <thead><tr>
+          <th>Status</th>
+          <th>Meaning</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Running</code></td>
+          <td>Working now</td>
+        </tr>
+        <tr>
+          <td><code>WaitingForInput</code></td>
+          <td>Stopped at a checkpoint for a person&#x27;s decision</td>
+        </tr>
+        <tr>
+          <td><code>Completed</code></td>
+          <td>Finished, with a result and a transcript</td>
+        </tr>
+        <tr>
+          <td><code>Failed</code></td>
+          <td>An agent or the model raised an error, or the run exceeded <code>RunTimeoutMinutes</code></td>
+        </tr>
+        <tr>
+          <td><code>Cancelled</code></td>
+          <td>A person or an agent cancelled it</td>
+        </tr>
+        <tr>
+          <td><code>Interrupted</code></td>
+          <td>The process stopped mid-run. Resume it from the last checkpoint.</td>
+        </tr>
+        </tbody>
+      </table>
+      <p><strong>A person answers, an agent does not.</strong> The tools <code>start_orchestration</code>, <code>get_orchestration</code>, <code>list_orchestrations</code> and <code>cancel_orchestration</code> are available to agents. There is no tool to approve or revise a plan. An agent that could approve its own plan would make the sign-off meaningless. The answer goes through <code>POST /api/orchestrations/{id}/respond</code> (endpoint key <code>orchestrations</code>) or the <strong>Orchestrations</strong> tab, which shows the plan with <strong>Approve</strong>, <strong>Ask for changes</strong> (with feedback) and <strong>Cancel run</strong>.</p>
+      <p>Other endpoints: <code>GET /api/orchestrations</code> (filter with <code>status</code>), <code>GET /api/orchestrations/{id}</code>, <code>POST /api/orchestrations</code> to start, <code>POST /api/orchestrations/{id}/resume</code> for an interrupted run, and <code>POST /api/orchestrations/{id}/cancel</code>.</p>
+      <p><strong>Recording.</strong> Each run appears in the run ledger with source <code>Orchestration</code>, so its cost and outcome sit with every other run. After a restart, runs left in <code>Running</code> are marked <code>Interrupted</code> and the log says how many. Finished runs and their checkpoints are deleted after <code>RetentionDays</code>. A run waiting for a person is kept however old it is.</p>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:Orchestration</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>DatabasePath</code></td>
+          <td><code>orchestrations.db</code></td>
+        </tr>
+        <tr>
+          <td><code>CheckpointDirectory</code></td>
+          <td><code>orchestration-checkpoints</code></td>
+        </tr>
+        <tr>
+          <td><code>DefaultMaxRounds</code></td>
+          <td>8</td>
+        </tr>
+        <tr>
+          <td><code>MaxRoundsCap</code></td>
+          <td>30</td>
+        </tr>
+        <tr>
+          <td><code>MaxAgents</code></td>
+          <td>8</td>
+        </tr>
+        <tr>
+          <td><code>RunTimeoutMinutes</code></td>
+          <td>15</td>
+        </tr>
+        <tr>
+          <td><code>RetentionDays</code></td>
+          <td>30</td>
+        </tr>
+        </tbody>
+      </table>
+      <p><strong>Limits.</strong></p>
+      <ul>
+        <li>The only request a run can stop for is a Magentic plan review. A run built from code with a custom request port is not covered.</li>
+        <li>The group chat manager is round robin. A manager that picks the next speaker with a model is not offered.</li>
+        <li>A run executes inside one process. Checkpoints make a restart safe, and two hosts do not share a run.</li>
+        <li>A handoff depends on the model calling the handoff tool. A model that ignores tools finishes with the lead.</li>
+      </ul>
+      <h2>MCP server</h2>
+      <p>The MCP server lets another agent, an IDE or a workflow engine call tools on this host through the Model Context Protocol. It is the reverse of the MCP connector, which lets this host call someone else&#x27;s tools.</p>
+      <p>Nothing is exposed until <code>Agent:McpServer:ExposedTools</code> names it. A name matches exactly, or by family with a trailing <code>*</code> (<code>rag_*</code>).</p>
+      <pre><code class="language-json">
+{
+  &quot;Features&quot;: { &quot;McpServer&quot;: true },
+  &quot;Agent&quot;: {
+    &quot;McpServer&quot;: {
+      &quot;ExposedTools&quot;: [&quot;extract_structured&quot;, &quot;list_schemas&quot;, &quot;rag_*&quot;]
+    }
+  }
+}
+</code></pre>
+      <p><strong>Safety rules.</strong></p>
+      <ul>
+        <li><strong>Authentication.</strong> The endpoint (default <code>/mcp</code>, endpoint key <code>mcp</code>) hands tools to whoever can reach it. The host refuses to start with <code>McpServer</code> on and <code>Authentication:Enabled</code> false. Set <code>Agent:McpServer:AllowUnauthenticated</code> to true only when the endpoint is reachable from a trusted network alone.</li>
+        <li><strong>Approval.</strong> A tool that needs a person&#x27;s approval is not offered, even when named, because an MCP call has no one to ask. The log says so.</li>
+        <li><strong>Governance and tracing.</strong> Each exposed tool passes through the same governance wrapper and tracing as when an agent calls it. A governance rule that blocks a tool for an agent blocks it here.</li>
+        <li><strong>Audit.</strong> Each outside call is recorded in the run ledger as a run with source <code>External</code>, with the tool name, its arguments (cut to 500 characters) and a preview of the result.</li>
+        <li><strong>Result size.</strong> A result longer than <code>MaxResultChars</code> is cut before it leaves, and the cut is marked.</li>
+        <li><strong>Missing names.</strong> A configured name the host does not register is logged and skipped. The rest still load.</li>
+        <li><strong>Connector tools.</strong> Tools that come from connections are not exposed, because they appear and disappear as connections change. Only tools registered at start are offered.</li>
+      </ul>
+      <table>
+        <thead><tr>
+          <th>Setting (<code>Agent:McpServer</code>)</th>
+          <th>Default</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>Path</code></td>
+          <td><code>/mcp</code></td>
+        </tr>
+        <tr>
+          <td><code>ServerName</code></td>
+          <td><code>AiAgentCanvas</code></td>
+        </tr>
+        <tr>
+          <td><code>ExposedTools</code></td>
+          <td>empty (nothing)</td>
+        </tr>
+        <tr>
+          <td><code>AllowUnauthenticated</code></td>
+          <td>false</td>
+        </tr>
+        <tr>
+          <td><code>MaxResultChars</code></td>
+          <td>100000</td>
+        </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

@@ -22,6 +22,7 @@ FILE_MAP = {
         ('guide-09-architecture.md', 'architecture.html', 'Architecture'),
         ('guide-10-behavior-patterns.md', 'behavior-patterns.html', 'Behavior Patterns'),
         ('guide-11-operations-and-connectors.md', 'operations-and-connectors.html', 'Operations and Connectors'),
+        ('guide-12-typed-output-vision-orchestration-and-mcp-server.md', 'typed-output-vision-orchestration-and-mcp-server.html', 'Typed Output, Vision, Orchestration and MCP Server'),
     ],
     'appendix': [
         ('appendix-user-guide.md', 'user-guide.html', 'User Guide'),

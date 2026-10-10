@@ -180,6 +180,10 @@ Seeded components are written to disk on first startup and never overwrite manua
 - **Run ledger** — one record per unattended run: source, tool calls, tokens, cost, and how it ended, with a Runs tab in the UI
 - **Spend limits** — per-run and daily limits per agent, per trigger and in total, measured from the ledger
 - **Jobs** — deterministic scheduled work that runs without a model
+- **Typed output** — answers checked against a JSON Schema and retried with the specific errors until they fit
+- **Vision** — image tools with allowlisted folders and hosts, and typed extraction from an image
+- **Orchestration** — group chat, handoff and Magentic runs with checkpoints, and a human sign-off step that only a person can answer
+- **MCP server** — serves a chosen set of tools to outside clients, with approval-gated tools excluded and every call recorded
 - **Connections and connectors** — encrypted credentials, OAuth with refresh, and connectors with risk-tagged tools, approval for sends, signed webhooks and events (Twilio SMS and Gmail through MCP ship in the box)
 - **Inter-agent communication** — agent registry with A2A agent cards, mailbox messaging, synchronous handoff
 - **Evaluation** — checked-in cases graded by `Microsoft.Extensions.AI.Evaluation.Quality`, run in CI, so a regression fails the build
