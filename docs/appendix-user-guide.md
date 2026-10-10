@@ -4,18 +4,18 @@
 
 ### Prerequisites
 
-- .NET 9 SDK
-- Node.js 20+
-- Azure AI Foundry account (or any Azure OpenAI endpoint)
+- .NET 10 SDK
+- Node.js 22 or later
+- A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account
 
 ### Setup Steps
 
 1. Clone the repository.
-2. Build the backend:
+2. Build the backend. A solution build also copies the sample agent and market data plugins into the Host's `plugins/` folder:
    ```bash
-   dotnet build
+   dotnet build AiAgentCanvas.sln
    ```
-3. Configure `src/Host/AiAgentCanvas.Host/appsettings.Development.json` with your Azure AI Foundry credentials:
+3. Configure `src/Host/AiAgentCanvas.Host/appsettings.Development.json` with your provider credentials. This example uses Azure AI Foundry:
    ```json
    {
      "AIFoundry": {
@@ -26,25 +26,47 @@
      }
    }
    ```
-4. Run the backend:
+   To use Databricks or Snowflake, set `Provider` to `Databricks` or `Snowflake` and fill in that provider's section.
+4. Turn on the capabilities you want. All flags default to `false`, so a fresh start is a bare chat agent. This set matches the examples below:
+   ```json
+   {
+     "Features": {
+       "Personas": true,
+       "Context": true,
+       "Guardrails": true,
+       "Skills": true,
+       "SkillAuthoring": true,
+       "Workflows": true,
+       "InterAgentCommunication": true,
+       "RunLedger": true
+     },
+     "Agents": { "FinancialAnalyst": { "Enabled": true } },
+     "DataConnections": { "MarketData": { "Enabled": true } }
+   }
+   ```
+5. Run the backend. It listens on `http://localhost:5149`:
    ```bash
    dotnet run --project src/Host/AiAgentCanvas.Host
    ```
-5. In a separate terminal, start the frontend:
+6. In a separate terminal, start the frontend. The dev server forwards `/api` requests to the backend:
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
-6. Open `http://localhost:3000` in your browser.
+7. Open `http://localhost:3000` in your browser.
 
 ### Five Things to Try First
 
-1. **Ask a question** -- type any question in the chat box and watch the streaming response.
-2. **Create a persona** -- say "create a persona called Research Assistant that specializes in summarizing articles."
-3. **Run a skill** -- say "create a skill called Summarize that takes a URL and returns a summary," then "run skill Summarize."
-4. **Check a stock quote** -- say "get me a stock quote for MSFT" to exercise the market data tools.
-5. **Create a workflow** -- say "create a workflow called Morning Briefing that checks stocks then summarizes news."
+These assume the flags from step 4 above.
+
+1. **Ask a question.** Type any question in the chat box and watch the streaming response.
+2. **Create a persona.** Say "create a persona called Research Assistant that specializes in summarizing articles."
+3. **Create and run a skill.** Say "create a skill called Summarize that takes a URL and returns a summary," then "run skill Summarize."
+4. **Check a stock quote.** Say "get me a stock quote for MSFT" to exercise the market data tools.
+5. **Create a workflow.** Say "create a workflow called Morning Briefing that checks stocks then summarizes news."
+
+After a few unattended runs, open the **Runs** tab to see what each one did and what it cost.
 
 ---
 
@@ -52,19 +74,29 @@
 
 ### appsettings.json Structure
 
-The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.json`.
+The base configuration file lives at `src/Host/AiAgentCanvas.Host/appsettings.json`. The template for new deployments is `appsettings.template.json` in the same folder. The main sections and keys:
 
-| Section | Key | Type | Description |
-|---------|-----|------|-------------|
-| `AIFoundry` | `Endpoint` | string | Azure OpenAI endpoint URL |
-| `AIFoundry` | `Key` | string | API key (leave blank if using Azure credential) |
-| `AIFoundry` | `DeploymentName` | string | Chat model deployment name (e.g., `gpt-4o`) |
-| `AIFoundry` | `EmbeddingDeploymentName` | string | Embedding model deployment; enables RAG when set |
-| `AIFoundry` | `UseAzureCredential` | bool | Use `DefaultAzureCredential` instead of API key |
-| `Security` | `PolicyPath` | string | Path to the governance policy YAML file |
-| `Security` | `RateLimitPerMinute` | int | Maximum tool calls per minute (default: 30) |
-| `VectorStore` | `ConnectionString` | string | SQLite connection string for the RAG vector store |
-| `ApplicationInsights` | `ConnectionString` | string | Azure Monitor connection string for telemetry |
+| Section | Key | Description |
+|---------|-----|-------------|
+| (root) | `Provider` | The LLM backend: `AzureAIFoundry` (default), `Databricks` or `Snowflake` |
+| `AIFoundry` | `Endpoint`, `Key`, `DeploymentName` | Azure OpenAI endpoint, API key and chat deployment (for example `gpt-4o`) |
+| `AIFoundry` | `UseAzureCredential` | Use `DefaultAzureCredential` instead of an API key |
+| `AIFoundry` | `EmbeddingDeploymentName` | Embedding deployment. RAG needs it, together with the `Rag` flag |
+| `AIFoundry` | `EconomyDeploymentName`, `JudgeDeploymentName` | A cheaper model for routing and summaries, and a separate model for the evaluation suite |
+| `Databricks`, `Snowflake` | `WorkspaceUrl` or `AccountUrl`, token, `ModelName` | The same settings for those providers, with `EmbeddingModelName`, `EconomyModelName` and `JudgeModelName` |
+| `Security` | `PolicyPath` | Path to the governance policy YAML file |
+| `Security` | `ApprovalRequiredTools` | Tool names that governance blocks. Defaults to `system_write_file`, `system_run_script`, `connect_mcp_server`, `schedule_task` |
+| `Security` | `RateLimitPerMinute` | Requests per minute for the `agent` rate-limit policy (default 30). See the note in the security reference. |
+| `Authentication` | `Enabled`, `Schemes`, `AllowAnonymous`, `AllowedOrigins`, `ApiKey`, `JwtBearer` | Endpoint authentication. Off by default. |
+| `Agent` | `ContextBudget`, `LoopGuard`, `Pricing`, `Reflection`, `ModelRouter` | The chat pipeline. See Platform Internals. |
+| `Agent` | `Scheduler`, `EventTriggers`, `Budgets`, `RunLedger`, `Jobs` | Unattended work, run records and spend limits. See Operations and Connectors. |
+| `Agent` | `Structured`, `Vision`, `Orchestration`, `McpServer` | The typed output, vision, orchestration and MCP server capabilities |
+| `SystemTools` | `AllowedPaths`, `AllowedCommands`, `MaxFileSizeBytes`, `ScriptTimeoutSeconds` | Filesystem and shell allowlists. Empty means deny. |
+| `Connections` | `PublicBaseUrl`, `KeyRingPath`, `OAuthApps` | The credential store and OAuth |
+| `Connectors` | `ApprovalMode`, `CheckIntervalSeconds` | The connector host |
+| `ChatHistory` | `ConnectionString`, `MaxMessages` | SQLite chat history |
+| `VectorStore` | `ConnectionString` | SQLite connection string for the RAG vector store |
+| `ApplicationInsights` | `ConnectionString` | Azure Monitor connection string. Also exports the platform's own spans and metrics. |
 
 ### Feature Flags
 
@@ -111,19 +143,19 @@ Every capability in the platform can be individually enabled via the `Features` 
 | `Guardrails` | Behavioral boundaries that constrain what the agent will and will not do. Guardrails are injected into the system prompt alongside the persona, enforcing policy at the reasoning level. |
 | `UserProfiles` | User identity and preferences. The agent knows who it is talking to -- name, role, preferences, and permissions -- and adjusts its responses accordingly. |
 | `Entities` | Long-term entity memory. Agents remember key entities (people, projects, systems, accounts) across conversations, stored in SQLite and recalled when relevant. |
-| `Skills` | Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. |
+| `Skills` | Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. Stored under `agent-data/skills`. |
 | `SkillRegistry` | Discovery and listing of all registered skills. Enables agents to browse available skills and invoke them by name. |
 | `SkillAuthoring` | Agents can create and edit skills at runtime through natural language instructions. New skills are persisted and immediately available. |
 | `Workflows` | Orchestrated multi-step sequences involving tools, decisions, and checkpoints. Supports sequential, concurrent, and declarative (YAML) execution patterns. |
-| `Mcp` | Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools. |
-| `SystemTools` | General-purpose tools available to every agent: shell command execution (with an allow-list), file operations, and system utilities. Governed by the same policy pipeline as custom tools. |
+| `Mcp` | Model Context Protocol client connections. Registers the connection manager and its tools, and connects the servers named by `IMcpConnectionSeed` at startup. The `connect_mcp_server` tool is blocked by default. |
+| `SystemTools` | Tools to read, write and list files and to run scripts, inside `SystemTools:AllowedPaths` and `AllowedCommands`. Governed by the same policy pipeline as custom tools. `system_write_file` and `system_run_script` are blocked by default. |
 | `Notifications` | Agent-to-user notification delivery via SSE. Registers the notification store, tool provider, and the `/api/notifications` HTTP endpoints. |
-| `Scheduling` | Cron-based and one-time scheduled agent tasks. Persisted in SQLite and executed by a background service. Enables agents to set reminders, run periodic checks, or defer work. |
-| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured. |
+| `Scheduling` | Cron-based and one-time scheduled tasks that run an agent or a job. Persisted in SQLite and executed by a background service. `schedule_task` is blocked by default. |
+| `Rag` | Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Needs an embedding model on the Azure AI Foundry or Databricks provider. |
 | `InterAgentCommunication` | Multi-agent coordination: agent registry, in-process handoff, background delegation, and asynchronous mailbox-based messaging between agents. |
 | `EpisodicMemory` | Agents remember past goals, outcomes, and tool usage across sessions. Episodes are stored in SQLite with automatic relevance decay (5% every 6 hours, pruned below 1%). Recent episodes are injected into the system prompt as context. |
 | `AuditLog` | Every model invocation, tool call, result, and error is recorded in a SQLite-backed audit trail. Sensitive parameters (keys, tokens, passwords) are automatically redacted. Agents can query their own history and retrieve aggregate statistics. |
-| `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
+| `EventTriggers` | Proactive agent engagement through scheduled (cron), file-watch, webhook and connector triggers. Events wait in a durable SQLite queue with deduplication, retry and a dead-letter state. Registers the trigger service, tool provider, and the `/api/triggers` HTTP endpoints. |
 | `ComputerUse` | Browser automation via headless Chromium (Playwright). Agents can navigate pages, click elements by coordinates or CSS selector, type text, take screenshots, and extract page content. |
 | `RunLedger` | One SQLite record per scheduled, triggered, delegated and job run: input, output, tool calls, tokens, estimated cost and how it ended. Adds the `/api/runs` endpoints and the Runs tab. Daily spend limits (`Agent:Budgets`) need it. |
 | `Jobs` | Deterministic jobs that run without a model, started from a schedule, a trigger or an agent tool. |
@@ -214,13 +246,9 @@ Security__RateLimitPerMinute=60
 
 ### Frontend Configuration
 
-The frontend reads its backend URL from `frontend/.env.local`:
+The frontend needs no backend URL setting. In development, `npm run dev` forwards requests to `/api` to `http://localhost:5149`, the address in the Host's launch settings. To point the dev server somewhere else, change the rewrite in `frontend/next.config.ts`.
 
-```
-NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
-```
-
-Change this to point at your deployed backend in production.
+A production build is a static export. The Host serves it from `wwwroot`, so the browser and the API share one origin. The Docker image listens on port 5000.
 
 ---
 
@@ -228,6 +256,7 @@ Change this to point at your deployed backend in production.
 
 ### UI Elements
 
+- **Tabs** -- Chat, Runs (the run ledger with totals and detail), Orchestrations (multi-agent runs, and where a person answers a plan review) and Connections (connected accounts).
 - **Streaming responses** -- text appears token by token as the model generates it.
 - **Tool call indicators** -- a status bar shows which tools are running and when they complete.
 - **State panel** -- displays structured data returned by tools (stock quotes, task lists, entity data).
@@ -240,11 +269,16 @@ Change this to point at your deployed backend in production.
 
 | Problem | Likely Cause | Solution |
 |---------|-------------|----------|
-| No response after sending a message | Backend is not running or frontend cannot reach it | Verify the backend is running on port 5000 and `NEXT_PUBLIC_BACKEND_URL` in `.env.local` is correct |
+| No response after sending a message | Backend is not running or the frontend cannot reach it | Verify the backend is running on `http://localhost:5149` and that the dev server's `/api` rewrite points to it |
 | Response starts then times out | Model deployment is overloaded or the API key has expired | Check the backend console for HTTP 429 or 401 errors; verify `AIFoundry:Key` and `AIFoundry:Endpoint` |
 | Tool call shows "blocked by governance policy" | Governance policy denied the tool call | Review `governance-policy.yaml` for deny rules matching the tool; adjust the policy or use a different approach |
 | State panel stays blank | The tool does not have a `ToolStateMapping` registered | Only tools with a registered `ToolStateMapping` emit state events; check if the tool is mapped in its service extensions |
 | Health check failed banner appears | Backend health endpoint returned an error | Check backend logs for startup failures; verify database connectivity and API key validity |
+| A tool call is refused and the tool is on the default list | `Security:ApprovalRequiredTools` blocks `system_write_file`, `system_run_script`, `connect_mcp_server` and `schedule_task` | Remove the name from the list only if you accept what the tool can do |
+| API calls return 401 | `Authentication:Enabled` is true and the request carries no credentials | Send the `X-API-Key` header, or a bearer token for the configured authority |
+| The Host stops at startup with a message about `Features:McpServer` | The MCP server is on and authentication is off | Turn authentication on, or set `Agent:McpServer:AllowUnauthenticated` for a trusted network |
+| A connection shows `NeedsReauth` | The provider refused the stored credential | Choose **Reconnect** on the Connections tab |
+| An orchestration run is `WaitingForInput` | A Magentic plan needs a person's approval | Open the Orchestrations tab and approve, ask for changes, or cancel |
 
 ---
 
@@ -302,3 +336,5 @@ All agent data is managed through natural language commands in the chat. Each do
 - "Schedule a task to run the **Daily Report** workflow every weekday at 9am."
 - "List all scheduled tasks."
 - "Cancel the **Daily Report** scheduled task."
+
+`schedule_task` is on the default approval-required list, so governance blocks it until you remove it from `Security:ApprovalRequiredTools`.

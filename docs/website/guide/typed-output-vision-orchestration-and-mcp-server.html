@@ -45,12 +45,12 @@
       <h2>Typed output</h2>
       <p>A model that is asked for JSON often returns JSON with a missing field, a string where a number belongs, or a sentence wrapped around the object. The structured responder expects that and does not trust the first answer.</p>
       <p>For each request it does the following:</p>
-      <ul>
+      <ol>
         <li>Sends the schema twice: as the provider&#x27;s native response format, and in the instruction text. A provider that ignores the format still follows the text.</li>
         <li>Parses the answer. A code fence or a sentence around the JSON is tolerated.</li>
         <li>Checks the parsed value against the schema.</li>
         <li>On a failure, sends the answer back with the specific errors (<code>$.age: expected integer but found string</code>) and asks again, up to the attempt limit.</li>
-      </ul>
+      </ol>
       <p>The result says whether it succeeded, the value, the errors from the last attempt, how many attempts it took, and the raw text of the last answer. A failure comes back as a result and does not throw, so a caller does not mistake a default value for an answer.</p>
       <p>The responder runs on the same chat pipeline as an agent, so each attempt is counted, priced and limited like any other model call.</p>
       <p><strong>From code.</strong> The shape can live in a class. <code>RespondAsync&lt;T&gt;</code> builds the schema from the type and returns a typed value.</p>

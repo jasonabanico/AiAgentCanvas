@@ -1,124 +1,110 @@
-<svg viewBox="0 0 800 780" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
-  <defs>
-    <marker id="arrow3" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
-    </marker>
-  </defs>
-
-  <!-- Background -->
-  <rect width="800" height="780" rx="12" fill="#0f172a"/>
-
-  <!-- Title -->
-  <text x="400" y="36" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="600">Project Structure</text>
-  <text x="400" y="56" text-anchor="middle" fill="#64748b" font-size="12">Solution folders and their projects</text>
-
-  <!-- 1. AiAgentCanvas (SDK) -->
-  <rect x="40" y="76" width="720" height="280" rx="10" fill="#111827" stroke="#3b82f6" stroke-width="1.5"/>
-  <rect x="40" y="76" width="720" height="32" rx="10" fill="#1e3a5f"/>
-  <rect x="40" y="96" width="720" height="12" fill="#1e3a5f"/>
-  <text x="60" y="98" fill="#60a5fa" font-size="13" font-weight="700">AiAgentCanvas (SDK)</text>
-  <text x="680" y="98" fill="#94a3b8" font-size="10" text-anchor="end">Platform layer -- no business logic</text>
-
-  <!-- Row 1 -->
-  <rect x="60" y="120" width="160" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="140" y="140" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Abstractions</text>
-  <text x="140" y="154" text-anchor="middle" fill="#64748b" font-size="9">Shared interfaces</text>
-
-  <rect x="235" y="120" width="120" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="295" y="140" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Core</text>
-  <text x="295" y="154" text-anchor="middle" fill="#64748b" font-size="9">Orchestration engine</text>
-
-  <rect x="370" y="120" width="130" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="435" y="140" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">AgentData</text>
-  <text x="435" y="154" text-anchor="middle" fill="#64748b" font-size="9">MD persistence</text>
-
-  <rect x="515" y="120" width="110" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="570" y="140" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Skills</text>
-  <text x="570" y="154" text-anchor="middle" fill="#64748b" font-size="9">Skill store + MCP</text>
-
-  <!-- Row 2 -->
-  <rect x="60" y="178" width="140" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="130" y="198" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Scheduler</text>
-  <text x="130" y="212" text-anchor="middle" fill="#64748b" font-size="9">Hangfire jobs</text>
-
-  <rect x="215" y="178" width="130" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="280" y="198" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Security</text>
-  <text x="280" y="212" text-anchor="middle" fill="#64748b" font-size="9">Governance + limits</text>
-
-  <rect x="360" y="178" width="150" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="435" y="198" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">SystemTools</text>
-  <text x="435" y="212" text-anchor="middle" fill="#64748b" font-size="9">File I/O + scripts</text>
-
-  <rect x="525" y="178" width="160" height="44" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="605" y="198" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Notifications</text>
-  <text x="605" y="212" text-anchor="middle" fill="#64748b" font-size="9">SSE channel</text>
-
-  <!-- Dependency arrows within SDK -->
-  <text x="60" y="250" fill="#475569" font-size="10">Dependencies:</text>
-  <line x1="180" y1="247" x2="220" y2="247" stroke="#334155" stroke-width="1" marker-end="url(#arrow3)"/>
-  <text x="228" y="250" fill="#64748b" font-size="10">All projects depend on Abstractions. Core references Abstractions only.</text>
-  <text x="228" y="264" fill="#64748b" font-size="10">AgentData, Skills, Security, Scheduler, Notifications reference Core and/or Abstractions.</text>
-
-  <!-- Web project -->
-  <rect x="60" y="282" width="680" height="36" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="400" y="305" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="600">AiAgentCanvas.Web  (Composition Root -- references all SDK projects)</text>
-
-  <!-- Connector line -->
-  <line x1="400" y1="356" x2="400" y2="388" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
-
-  <!-- 2. Orchestrator -->
-  <rect x="240" y="378" width="320" height="56" rx="10" fill="#111827" stroke="#334155" stroke-width="1.5"/>
-  <rect x="240" y="378" width="320" height="28" rx="10" fill="#1e293b"/>
-  <rect x="240" y="396" width="320" height="10" fill="#1e293b"/>
-  <text x="260" y="398" fill="#e2e8f0" font-size="13" font-weight="700">Orchestrator</text>
-  <text x="260" y="424" fill="#94a3b8" font-size="11">AiAgentCanvas.Orchestrator  (hosts Web)</text>
-
-  <!-- Connector line -->
-  <line x1="400" y1="434" x2="400" y2="470" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
-
-  <!-- 3. Agents -->
-  <rect x="40" y="470" width="340" height="130" rx="10" fill="#111827" stroke="#8b5cf6" stroke-width="1.5"/>
-  <rect x="40" y="470" width="340" height="28" rx="10" fill="#2d1b69"/>
-  <rect x="40" y="488" width="340" height="10" fill="#2d1b69"/>
-  <text x="60" y="490" fill="#a78bfa" font-size="13" font-weight="700">Agents</text>
-  <text x="310" y="490" fill="#7c3aed" font-size="10" text-anchor="end">src/Custom/</text>
-
-  <rect x="60" y="510" width="220" height="36" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
-  <text x="170" y="533" text-anchor="middle" fill="#c4b5fd" font-size="12">Agent.HelloWorld</text>
-
-  <text x="60" y="570" fill="#64748b" font-size="10">Contains persona, guardrail, context,</text>
-  <text x="60" y="584" fill="#64748b" font-size="10">entity, and skill seed implementations</text>
-
-  <!-- 4. DataConnections -->
-  <rect x="420" y="470" width="340" height="130" rx="10" fill="#111827" stroke="#334155" stroke-width="1.5"/>
-  <rect x="420" y="470" width="340" height="28" rx="10" fill="#1e293b"/>
-  <rect x="420" y="488" width="340" height="10" fill="#1e293b"/>
-  <text x="440" y="490" fill="#e2e8f0" font-size="13" font-weight="700">DataConnections</text>
-  <text x="690" y="490" fill="#475569" font-size="10" text-anchor="end">src/Custom/</text>
-
-  <rect x="440" y="510" width="210" height="36" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="545" y="533" text-anchor="middle" fill="#e2e8f0" font-size="12">MCP.HelloWorldData</text>
-
-  <rect x="440" y="554" width="210" height="36" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
-  <text x="545" y="577" text-anchor="middle" fill="#e2e8f0" font-size="12">VectorStore.Sqlite</text>
-
-  <!-- Connector lines from SDK to custom -->
-  <line x1="200" y1="356" x2="200" y2="470" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="600" y1="356" x2="600" y2="470" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
-
-  <!-- Legend -->
-  <rect x="40" y="630" width="720" height="130" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-  <text x="60" y="655" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">KEY PRINCIPLES</text>
-
-  <circle cx="70" cy="680" r="4" fill="#3b82f6"/>
-  <text x="84" y="684" fill="#94a3b8" font-size="11">Platform projects never change per use case</text>
-
-  <circle cx="70" cy="704" r="4" fill="#8b5cf6"/>
-  <text x="84" y="708" fill="#94a3b8" font-size="11">Custom projects hold all business-specific code (agents, MCP connections, vector stores)</text>
-
-  <circle cx="70" cy="728" r="4" fill="#22c55e"/>
-  <text x="84" y="732" fill="#94a3b8" font-size="11">Custom projects only reference Abstractions and Microsoft.Extensions.AI -- never Core or other platform projects</text>
-
-  <circle cx="70" cy="752" r="4" fill="#f59e0b"/>
-  <text x="84" y="756" fill="#94a3b8" font-size="11">Web is the composition root that wires everything together via extension methods</text>
+<svg viewBox="0 0 800 906" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker></defs>
+  <rect width="800" height="906" rx="12" fill="#0f172a"/>
+  <text x="400" y="34" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="600">Project Structure</text>
+  <text x="400" y="54" text-anchor="middle" fill="#94a3b8" font-size="12">Solution folders mirror src/&lt;Layer&gt;/&lt;Project&gt;. References run downward.</text>
+  <rect x="24" y="76" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="96" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">HOST</text>
+  <rect x="40" y="108" width="138.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="109.4" y="126.0" text-anchor="middle" fill="#e2e8f0" font-size="11">AiAgentCanvas.Host</text>
+  <text x="762" y="96" text-anchor="end" fill="#94a3b8" font-size="10">References everything except the plugin projects.</text>
+  <rect x="24" y="160" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="180" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">AGENTS</text>
+  <rect x="40" y="192" width="165.2" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="122.6" y="210.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Agent.FinancialAnalyst</text>
+  <text x="762" y="180" text-anchor="end" fill="#94a3b8" font-size="10">Loaded as plugins. Reference Abstractions only.</text>
+  <rect x="24" y="244" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="264" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">CONNECTORS</text>
+  <rect x="40" y="276" width="237.79999999999998" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="158.89999999999998" y="294.0" text-anchor="middle" fill="#e2e8f0" font-size="11">AiAgentCanvas.Connector.TwilioSms</text>
+  <rect x="285.79999999999995" y="276" width="198.2" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="384.9" y="294.0" text-anchor="middle" fill="#e2e8f0" font-size="11">AiAgentCanvas.Connector.Mcp</text>
+  <text x="762" y="264" text-anchor="end" fill="#94a3b8" font-size="10">Reference Platform.Connectors.</text>
+  <rect x="24" y="328" width="752" height="144" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="348" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">CAPABILITIES</text>
+  <rect x="40" y="360" width="60" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="70.0" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Rag</text>
+  <rect x="108" y="360" width="86.0" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="151.0" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Scheduling</text>
+  <rect x="202.0" y="360" width="60" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="232.0" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Skills</text>
+  <rect x="270.0" y="360" width="105.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="322.9" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Notifications</text>
+  <rect x="383.8" y="360" width="92.6" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="430.1" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">SystemTools</text>
+  <rect x="484.4" y="360" width="112.39999999999999" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="540.6" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">EpisodicMemory</text>
+  <rect x="604.8" y="360" width="72.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="641.1999999999999" y="378.0" text-anchor="middle" fill="#e2e8f0" font-size="11">AuditLog</text>
+  <rect x="40" y="396" width="105.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="92.9" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">EventTriggers</text>
+  <rect x="153.8" y="396" width="92.6" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="200.10000000000002" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">ComputerUse</text>
+  <rect x="254.4" y="396" width="79.4" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="294.1" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">RunLedger</text>
+  <rect x="341.8" y="396" width="60" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="371.8" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Jobs</text>
+  <rect x="409.8" y="396" width="125.6" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="472.6" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">StructuredOutput</text>
+  <rect x="543.4" y="396" width="60" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="573.4" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Vision</text>
+  <rect x="611.4" y="396" width="138.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="680.8" y="414.0" text-anchor="middle" fill="#e2e8f0" font-size="11">AgentOrchestration</text>
+  <rect x="40" y="432" width="79.4" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="79.7" y="450.0" text-anchor="middle" fill="#e2e8f0" font-size="11">McpServer</text>
+  <text x="762" y="348" text-anchor="end" fill="#94a3b8" font-size="10">Reference Abstractions, and Orchestration or AgentData where needed.</text>
+  <rect x="24" y="484" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="504" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">AGENTDATA</text>
+  <rect x="40" y="516" width="72.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="76.4" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Personas</text>
+  <rect x="120.8" y="516" width="66.19999999999999" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="153.89999999999998" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Context</text>
+  <rect x="195.0" y="516" width="72.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="231.4" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Entities</text>
+  <rect x="275.8" y="516" width="86.0" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="318.8" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Guardrails</text>
+  <rect x="369.8" y="516" width="72.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="406.2" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Profiles</text>
+  <rect x="450.6" y="516" width="79.4" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="490.3" y="534.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Workflows</text>
+  <text x="762" y="504" text-anchor="end" fill="#94a3b8" font-size="10">Reference Abstractions. Workflows also references Orchestration.</text>
+  <rect x="24" y="568" width="752" height="108" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="588" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">DATACONNECTIONS</text>
+  <rect x="40" y="600" width="185.0" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="132.5" y="618.0" text-anchor="middle" fill="#e2e8f0" font-size="11">DataConnection.MarketData</text>
+  <rect x="233.0" y="600" width="237.79999999999998" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="351.9" y="618.0" text-anchor="middle" fill="#e2e8f0" font-size="11">DataConnection.VectorStore.Sqlite</text>
+  <rect x="478.79999999999995" y="600" width="211.39999999999998" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="584.5" y="618.0" text-anchor="middle" fill="#e2e8f0" font-size="11">DataConnection.Storage.Sqlite</text>
+  <rect x="40" y="636" width="270.79999999999995" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="175.39999999999998" y="654.0" text-anchor="middle" fill="#e2e8f0" font-size="11">DataConnection.VectorSearch.Databricks</text>
+  <rect x="318.79999999999995" y="636" width="264.2" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="450.9" y="654.0" text-anchor="middle" fill="#e2e8f0" font-size="11">DataConnection.VectorSearch.Snowflake</text>
+  <text x="762" y="588" text-anchor="end" fill="#94a3b8" font-size="10">Reference Abstractions.</text>
+  <rect x="24" y="688" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="708" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">PROVIDERS</text>
+  <rect x="40" y="720" width="178.39999999999998" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="129.2" y="738.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Providers.AzureAIFoundry</text>
+  <rect x="226.39999999999998" y="720" width="152.0" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="302.4" y="738.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Providers.Databricks</text>
+  <rect x="386.4" y="720" width="145.39999999999998" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="459.09999999999997" y="738.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Providers.Snowflake</text>
+  <text x="762" y="708" text-anchor="end" fill="#94a3b8" font-size="10">Reference Abstractions.</text>
+  <rect x="24" y="772" width="752" height="72" rx="10" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="40" y="792" text-anchor="start" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="1">PLATFORM</text>
+  <rect x="40" y="804" width="99.19999999999999" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="89.6" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Abstractions</text>
+  <rect x="147.2" y="804" width="105.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="200.1" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Orchestration</text>
+  <rect x="261.0" y="804" width="72.8" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="297.4" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Security</text>
+  <rect x="341.8" y="804" width="112.39999999999999" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="398.0" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Authentication</text>
+  <rect x="462.2" y="804" width="92.6" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="508.5" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Connections</text>
+  <rect x="562.8" y="804" width="86.0" height="28" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="605.8" y="822.0" text-anchor="middle" fill="#e2e8f0" font-size="11">Connectors</text>
+  <text x="762" y="792" text-anchor="end" fill="#94a3b8" font-size="10">Depends on nothing else in the solution.</text>
+  <line x1="400" y1="850" x2="400" y2="872" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="400" y="886" text-anchor="middle" fill="#94a3b8" font-size="11">Contracts and ports live in Platform.Abstractions, even the ones a capability owns.</text>
 </svg>

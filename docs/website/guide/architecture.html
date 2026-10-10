@@ -11,27 +11,16 @@
   <div class="page-layout">
     <main class="main-content">
       <h1>9. Architecture</h1>
-      <p>The platform is organized into five layers. Each layer depends only on the layers below it. This constraint keeps the dependency graph clean -- you can change a capability without touching the platform, or swap a data connection without affecting agent logic.</p>
+      <p>The solution is organized into layers under <code>src/&lt;Layer&gt;/&lt;Project&gt;/</code>, and the Visual Studio solution folders mirror that tree one to one. References run downward. A project may depend on a layer below it and never on one above, which keeps the dependency graph clean: you can change a capability without touching the platform, or swap a data connection without affecting agent logic.</p>
+      <figure><img src="../images/architecture-overview.svg" alt="Architecture overview"><figcaption>Architecture overview</figcaption></figure>
       <h2>Layer Overview</h2>
       <pre><code>
-┌─────────────────────────────────────────────────────┐
-│  Host                                               │
-│  ASP.NET Core composition root                      │
-├─────────────────────────────────────────────────────┤
-│  Agents                                             │
-│  Custom agent projects (persona, tools, seeds)      │
-├─────────────────────────────────────────────────────┤
-│  Platform                                           │
-│  Orchestration, abstractions, security              │
-├──────────────────────┬──────────────────────────────┤
-│  Capabilities        │  AgentData                   │
-│  Cross-cutting       │  Six context domains         │
-│  features            │                              │
-├──────────────────────┴──────────────────────────────┤
-│  DataConnections                                    │
-│  Storage and external data                          │
-└─────────────────────────────────────────────────────┘
+Host ──&gt; Capabilities, AgentData, Connectors, DataConnections, Providers, Platform
+Capabilities ──&gt; AgentData, Platform
+AgentData, Connectors, DataConnections, Providers, Agents ──&gt; Platform
+Platform ──&gt; nothing else in the solution
 </code></pre>
+      <p>Agents are loaded as plugins at runtime, so the Host holds no compile-time reference to them.</p>
       <table>
         <thead><tr>
           <th>Layer</th>
@@ -40,111 +29,129 @@
         <tbody>
         <tr>
           <td><strong>Host</strong></td>
-          <td>ASP.NET Core composition root. Wires all layers together, runs the web server, maps HTTP endpoints. The only project that references everything else.</td>
+          <td>ASP.NET Core composition root. Binds the <code>Features</code> flags, wires the layers together, and maps the HTTP endpoints with their authorization. The only project that references most of the others.</td>
         </tr>
         <tr>
           <td><strong>Agents</strong></td>
-          <td>Custom agent projects. Each implements <code>IServiceModule</code> to self-register its persona, tools, and seeds. Agent projects reference only Platform.Abstractions. The host discovers them automatically via assembly scanning.</td>
+          <td>Custom agent projects. Each implements <code>IServiceModule</code> to self-register its persona, tool names and seeds. They reference only <code>AiAgentCanvas.Abstractions</code>. The host discovers them in the <code>plugins/</code> folder.</td>
+        </tr>
+        <tr>
+          <td><strong>Connectors</strong></td>
+          <td>One project per outside service: <code>Connector.TwilioSms</code> and <code>Connector.Mcp</code>, which Gmail uses. Each reference <code>Platform.Connectors</code>.</td>
         </tr>
         <tr>
           <td><strong>Platform</strong></td>
-          <td>Orchestration engine, shared abstractions, and security. Contains the agent runtime, registry, handoff, AG-UI server, A2A server, and governance.</td>
+          <td>The engine and cross-cutting concerns: shared contracts, the agent runtime and chat pipeline, governance, authentication, the credential store and the connector host.</td>
         </tr>
         <tr>
           <td><strong>Capabilities</strong></td>
-          <td>Cross-cutting features that any agent can use. Skills, scheduling, notifications, system tools, and RAG.</td>
+          <td>Opt-in feature modules, each behind a <code>Features:*</code> flag.</td>
         </tr>
         <tr>
           <td><strong>AgentData</strong></td>
-          <td>Six context domains that store and provide agent knowledge: personas, context, entities, guardrails, profiles, and workflows.</td>
+          <td>Six context domains that store and provide agent knowledge: personas, context, entities, guardrails, profiles and workflows.</td>
         </tr>
         <tr>
           <td><strong>DataConnections</strong></td>
-          <td>Storage backends and external data sources. SQLite for persistence, vector store for RAG, market data for domain-specific tools.</td>
+          <td>Tool providers and storage adapters: SQLite stores, the vector store, vector search and market data.</td>
+        </tr>
+        <tr>
+          <td><strong>Providers</strong></td>
+          <td>The LLM backend, chosen by the <code>Provider</code> key: Azure AI Foundry, Databricks or Snowflake.</td>
         </tr>
         </tbody>
       </table>
+      <p>Ports belong in <code>AiAgentCanvas.Abstractions</code>, including the ones a capability owns, such as <code>IAgentMessaging</code>, <code>IScheduledTaskStore</code>, <code>IRunLedger</code>, <code>ICredentialProvider</code> and <code>IStructuredResponder</code>. A capability that defined an interface in its own project would force its storage adapter to depend upward on the capability, which breaks the layering.</p>
+      <figure><img src="../images/project-structure.svg" alt="Project structure"><figcaption>Project structure</figcaption></figure>
       <h2>Project Reference Map</h2>
-      <pre><code>
-Host
-├── Platform.Orchestration
-│   └── Platform.Abstractions
-├── Platform.Security
-│   └── Platform.Abstractions
-├── Capabilities.Skills
-│   ├── Platform.Abstractions
-│   └── Platform.Orchestration
-├── Capabilities.Scheduling
-│   ├── Platform.Abstractions
-│   └── AgentData.Personas
-├── Capabilities.Notifications
-│   └── Platform.Abstractions
-├── Capabilities.SystemTools
-│   └── Platform.Abstractions
-├── Capabilities.Rag
-│   └── Platform.Abstractions
-├── Capabilities.EpisodicMemory
-│   └── Platform.Abstractions
-├── Capabilities.AuditLog
-│   └── Platform.Abstractions
-├── Capabilities.EventTriggers
-│   └── Platform.Abstractions
-├── Capabilities.ComputerUse
-│   └── Platform.Abstractions
-├── Capabilities.RunLedger
-│   └── Platform.Abstractions
-├── Capabilities.Jobs
-│   └── Platform.Abstractions
-├── Capabilities.StructuredOutput
-│   └── Platform.Abstractions
-├── Capabilities.Vision
-│   └── Platform.Abstractions
-├── Capabilities.AgentOrchestration
-│   ├── Platform.Abstractions
-│   └── Platform.Orchestration
-├── Capabilities.McpServer
-│   ├── Platform.Abstractions
-│   └── Platform.Orchestration
-├── Platform.Connections
-│   └── Platform.Abstractions
-├── Platform.Connectors
-│   ├── Platform.Connections
-│   └── Platform.Orchestration
-├── Connector.TwilioSms
-│   └── Platform.Connectors
-├── Connector.Mcp
-│   └── Platform.Connectors
-├── AgentData.Personas
-│   └── Platform.Abstractions
-├── AgentData.Context
-│   └── Platform.Abstractions
-├── AgentData.Entities
-│   └── Platform.Abstractions
-├── AgentData.Guardrails
-│   └── Platform.Abstractions
-├── AgentData.Profiles
-│   └── Platform.Abstractions
-├── AgentData.Workflows
-│   ├── Platform.Abstractions
-│   └── Platform.Orchestration
-├── DataConnections.Storage.Sqlite
-│   └── Platform.Abstractions
-├── DataConnections.VectorStore.Sqlite
-│   └── Platform.Abstractions
-├── DataConnections.VectorSearch.Databricks
-│   └── Platform.Abstractions
-├── Providers.AzureAIFoundry
-└── Providers.Databricks
-
-Plugins (loaded at runtime, not referenced above -- see Service Modules)
-├── Agent.FinancialAnalyst
-│   └── Platform.Abstractions
-└── DataConnections.MarketData
-    └── Platform.Abstractions
-</code></pre>
+      <p>Each project and what it references, taken from the project files.</p>
+      <table>
+        <thead><tr>
+          <th>Layer</th>
+          <th>Project</th>
+          <th>References</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>Platform</td>
+          <td><code>Abstractions</code></td>
+          <td>none</td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td><code>Orchestration</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td><code>Security</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td><code>Authentication</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td><code>Connections</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Platform</td>
+          <td><code>Connectors</code></td>
+          <td>Abstractions, Connections, Orchestration</td>
+        </tr>
+        <tr>
+          <td>Capabilities</td>
+          <td><code>AuditLog</code>, <code>ComputerUse</code>, <code>EpisodicMemory</code>, <code>EventTriggers</code>, <code>Jobs</code>, <code>Notifications</code>, <code>Rag</code>, <code>RunLedger</code>, <code>StructuredOutput</code>, <code>SystemTools</code>, <code>Vision</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Capabilities</td>
+          <td><code>Skills</code>, <code>AgentOrchestration</code>, <code>McpServer</code></td>
+          <td>Abstractions, Orchestration</td>
+        </tr>
+        <tr>
+          <td>Capabilities</td>
+          <td><code>Scheduling</code></td>
+          <td>Abstractions, AgentData.Personas</td>
+        </tr>
+        <tr>
+          <td>AgentData</td>
+          <td><code>Personas</code>, <code>Context</code>, <code>Entities</code>, <code>Guardrails</code>, <code>Profiles</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>AgentData</td>
+          <td><code>Workflows</code></td>
+          <td>Abstractions, Orchestration</td>
+        </tr>
+        <tr>
+          <td>Connectors</td>
+          <td><code>Connector.TwilioSms</code>, <code>Connector.Mcp</code></td>
+          <td>Platform.Connectors</td>
+        </tr>
+        <tr>
+          <td>DataConnections</td>
+          <td><code>MarketData</code>, <code>Storage.Sqlite</code>, <code>VectorStore.Sqlite</code>, <code>VectorSearch.Databricks</code>, <code>VectorSearch.Snowflake</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Providers</td>
+          <td><code>AzureAIFoundry</code>, <code>Databricks</code>, <code>Snowflake</code></td>
+          <td>Abstractions</td>
+        </tr>
+        <tr>
+          <td>Agents</td>
+          <td><code>Agent.FinancialAnalyst</code></td>
+          <td>Abstractions</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>The Host references all the projects above except <code>Agent.FinancialAnalyst</code> and <code>DataConnection.MarketData</code>, which are plugins loaded from the <code>plugins/</code> folder (see Service Modules below).</p>
       <h2>Projects in Detail</h2>
       <h3>Platform Layer</h3>
-      <p>The platform provides the runtime that powers every agent. It is split into three projects to separate concerns.</p>
       <table>
         <thead><tr>
           <th>Project</th>
@@ -153,22 +160,79 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         </tr></thead>
         <tbody>
         <tr>
-          <td><strong>Platform.Abstractions</strong></td>
-          <td>Interfaces and contracts. Every other project references this. No implementations.</td>
-          <td><code>IServiceModule</code>, <code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, <code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>, <code>ToolStateMapping</code></td>
+          <td><strong>Abstractions</strong></td>
+          <td>Interfaces and contracts. All other projects reference this.</td>
+          <td><code>IServiceModule</code>, <code>IAgentRegistry</code>, <code>IAgentHandoff</code>, <code>IAgentMessaging</code>, the seed interfaces (<code>IPersonaSeed</code>, <code>IAgentToolsSeed</code>, <code>IContextSeed</code>, <code>IWorkflowSeed</code>, <code>IEntitySeed</code>, <code>IGuardrailSeed</code>, <code>ISkillSeed</code>, <code>IUserProfileSeed</code>, <code>IGoalSeed</code>, <code>IMcpConnectionSeed</code>), <code>IRunLedger</code>, <code>RunTracking</code>, <code>AgentRunContext</code>, <code>IBudgetGuard</code>, <code>IAgentJob</code>, <code>ICredentialProvider</code>, <code>IConnectorEventSink</code>, <code>IStructuredResponder</code>, <code>ToolStateMapping</code></td>
         </tr>
         <tr>
-          <td><strong>Platform.Orchestration</strong></td>
-          <td>Agent runtime and coordination. Builds agents from seeds, manages handoff, runs the AG-UI and A2A servers.</td>
-          <td><code>AgentRegistry</code>, <code>InProcessAgentHandoff</code>, <code>InProcessAgentMessaging</code>, <code>HandoffToolProvider</code>, <code>ToolDeduplicatingChatClient</code>, <code>CoreServiceExtensions</code></td>
+          <td><strong>Orchestration</strong></td>
+          <td>Agent runtime and coordination. Builds agents from seeds, runs the AG-UI and A2A servers, and owns the chat pipeline.</td>
+          <td><code>AgentRegistry</code>, <code>AgentPipeline</code>, <code>InProcessAgentHandoff</code>, <code>InProcessAgentMessaging</code>, <code>HandoffToolProvider</code>, <code>ContextBudgetChatClient</code>, <code>LoopGuardChatClient</code>, <code>CostTrackingChatClient</code>, <code>BudgetGuard</code>, <code>CoreServiceExtensions</code></td>
         </tr>
         <tr>
-          <td><strong>Platform.Security</strong></td>
-          <td>Governance and policy enforcement. Wraps tool calls with policy checks, injects security context.</td>
+          <td><strong>Security</strong></td>
+          <td>Governance and policy enforcement. Wraps tool calls with policy checks and injects security context.</td>
           <td><code>GovernedAIFunction</code>, <code>GovernanceToolWrapper</code>, <code>GovernedMcpGateway</code>, <code>GovernanceContextProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>Authentication</strong></td>
+          <td>Pluggable endpoint authentication. Schemes are picked by name from <code>Authentication:Schemes</code>.</td>
+          <td><code>IAgentAuthenticationScheme</code>, <code>ApiKeyScheme</code>, <code>RequireAgentAuthorization</code></td>
+        </tr>
+        <tr>
+          <td><strong>Connections</strong></td>
+          <td>Encrypted credential store, the OAuth authorization code flow with PKCE, and token refresh.</td>
+          <td><code>ConnectionStore</code>, <code>CredentialProvider</code>, <code>OAuthService</code>, <code>ConnectionEndpoints</code></td>
+        </tr>
+        <tr>
+          <td><strong>Connectors</strong></td>
+          <td>Connector contracts, the host that runs one connector per stored connection, the guarded HTTP client, and the webhook route.</td>
+          <td><code>IConnectorDefinition</code>, <code>IToolConnector</code>, <code>IEventSourceConnector</code>, <code>ConnectorHost</code>, <code>ConnectorTools</code></td>
         </tr>
         </tbody>
       </table>
+      <h3>The Chat Pipeline</h3>
+      <p>The model is wrapped in a chain of delegating chat clients before an agent sees it. <code>AgentPipeline</code> builds the chain, and the default agent and the persona agents use it. From the outside in:</p>
+      <pre><code>
+LoopGuard ─ Reflection ─ Audit ─ ModelRouter ─ ContextBudget ─ CostTracking ─ ToolDedupe ─ provider
+</code></pre>
+      <table>
+        <thead><tr>
+          <th>Client</th>
+          <th>Job</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td><code>LoopGuardChatClient</code></td>
+          <td>Ends a run that has used its tool rounds, token budget or cost cap, or that repeats itself or stops making progress. It withdraws the tools and asks the model to report what it has.</td>
+        </tr>
+        <tr>
+          <td><code>ReflectiveChatClient</code></td>
+          <td>Optional. Injects a reflection prompt after a number of consecutive tool rounds.</td>
+        </tr>
+        <tr>
+          <td><code>AuditingChatClient</code></td>
+          <td>Present when <code>AuditLog</code> is on. Records each model call.</td>
+        </tr>
+        <tr>
+          <td><code>CostAwareModelRouter</code></td>
+          <td>Optional. Sends simple turns to the economy model.</td>
+        </tr>
+        <tr>
+          <td><code>ContextBudgetChatClient</code></td>
+          <td>Counts the prompt with the model&#x27;s tokenizer, enforces a ceiling per component and compacts history with a summarizer.</td>
+        </tr>
+        <tr>
+          <td><code>CostTrackingChatClient</code></td>
+          <td>Records tokens and estimated cost for each call, streaming included.</td>
+        </tr>
+        <tr>
+          <td><code>ToolDeduplicatingChatClient</code></td>
+          <td>Removes duplicate tool definitions.</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Tools get the same treatment from <code>AgentPipeline.WrapTools</code>: the governance wrapper first, then <code>TracedAIFunction</code>, which records a span and the call in the ambient run record.</p>
       <h3>AgentData Layer</h3>
       <p>Six domain-specific projects that store and provide agent knowledge. Each follows the same pattern: a store for persistence, tools for LLM access, and a context provider for automatic injection.</p>
       <table>
@@ -182,43 +246,43 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         <tr>
           <td><strong>Personas</strong></td>
           <td><code>PersonaStore</code></td>
-          <td><code>PersonaToolProvider</code> (list, read, set active)</td>
-          <td><code>PersonaContextProvider</code> -- injects active persona instructions</td>
+          <td><code>create_persona</code>, <code>update_persona</code>, <code>list_personas</code>, <code>read_persona</code>, <code>switch_persona</code>, <code>delete_persona</code></td>
+          <td><code>PersonaContextProvider</code> injects the active persona</td>
         </tr>
         <tr>
           <td><strong>Context</strong></td>
           <td><code>PersistentContextStore</code></td>
-          <td><code>ContextToolProvider</code> (add, list, remove)</td>
-          <td><code>PersistentContextProvider</code> -- injects all stored context entries</td>
+          <td><code>save_context</code>, <code>update_context</code>, <code>list_context</code>, <code>read_context</code>, <code>delete_context</code></td>
+          <td><code>PersistentContextProvider</code> injects all stored entries</td>
         </tr>
         <tr>
           <td><strong>Entities</strong></td>
           <td><code>EntityStore</code></td>
-          <td><code>EntityToolProvider</code> (create, read, update, list)</td>
-          <td><code>EntityContextProvider</code> -- injects entity index</td>
+          <td><code>save_entity</code>, <code>update_entity</code>, <code>read_entity</code>, <code>search_entities</code>, <code>list_entities</code>, <code>delete_entity</code></td>
+          <td><code>EntityContextProvider</code> injects the entity index</td>
         </tr>
         <tr>
           <td><strong>Guardrails</strong></td>
           <td><code>GuardrailStore</code></td>
-          <td><code>GuardrailToolProvider</code> (list, read, set active)</td>
-          <td><code>GuardrailContextProvider</code> -- injects active guardrail rules</td>
+          <td><code>create_guardrail</code>, <code>update_guardrail</code>, <code>list_guardrails</code>, <code>toggle_guardrail</code>, <code>delete_guardrail</code></td>
+          <td><code>GuardrailContextProvider</code> injects enabled rules</td>
         </tr>
         <tr>
           <td><strong>Profiles</strong></td>
           <td><code>UserProfileStore</code></td>
-          <td><code>UserProfileToolProvider</code> (read, update)</td>
-          <td><code>UserProfileContextProvider</code> -- injects user profile context</td>
+          <td><code>create_user_profile</code>, <code>update_user_profile</code>, <code>switch_user_profile</code>, <code>read_user_profile</code>, <code>list_user_profiles</code>, <code>delete_user_profile</code></td>
+          <td><code>UserProfileContextProvider</code> injects the active profile</td>
         </tr>
         <tr>
           <td><strong>Workflows</strong></td>
           <td><code>WorkflowStore</code></td>
-          <td><code>WorkflowToolProvider</code> (create, list, run, run_sequential, run_concurrent)</td>
-          <td>None (workflows are invoked explicitly, not injected)</td>
+          <td><code>create_workflow</code>, <code>list_workflows</code>, <code>read_workflow</code>, <code>run_workflow</code>, <code>run_sequential_workflow</code>, <code>run_concurrent_workflow</code>, <code>delete_workflow</code>, plus <code>list_declarative_workflows</code> and <code>run_declarative_workflow</code></td>
+          <td>None. Workflows run on request.</td>
         </tr>
         </tbody>
       </table>
       <h3>Capabilities Layer</h3>
-      <p>Cross-cutting features that agents use but that are not specific to any single domain.</p>
+      <p>Features that agents use but that are not specific to any single domain. Each is registered only when its flag is on.</p>
       <table>
         <thead><tr>
           <th>Capability</th>
@@ -228,47 +292,47 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         <tbody>
         <tr>
           <td><strong>Skills</strong></td>
-          <td>Reusable, parameterized procedures agents can invoke by name</td>
-          <td><code>SkillStore</code>, <code>SkillToolProvider</code>, <code>SkillExecutor</code></td>
+          <td>Reusable prompt-template procedures, a skill registry, runtime authoring and the MCP connection manager</td>
+          <td><code>SkillStore</code>, <code>SkillToolProvider</code>, <code>SkillAuthoringToolProvider</code>, <code>LocalSkillRegistry</code>, <code>McpConnectionManager</code></td>
         </tr>
         <tr>
           <td><strong>Scheduling</strong></td>
-          <td>Cron-based and one-time scheduled agent tasks</td>
-          <td><code>ScheduleStore</code>, <code>ScheduleToolProvider</code>, <code>ScheduleExecutor</code></td>
+          <td>Cron-based and one-time scheduled tasks that run an agent or a job</td>
+          <td><code>ScheduledTaskRunner</code>, <code>ScheduledAgentJob</code>, <code>SchedulerToolProvider</code></td>
         </tr>
         <tr>
           <td><strong>Notifications</strong></td>
-          <td>Agent-to-user notification delivery</td>
-          <td><code>NotificationStore</code>, <code>NotificationToolProvider</code></td>
+          <td>Agent-to-user notification delivery over SSE</td>
+          <td><code>InMemoryNotificationSink</code>, <code>NotificationEndpoint</code></td>
         </tr>
         <tr>
           <td><strong>SystemTools</strong></td>
-          <td>General-purpose tools: date/time, math, web search, file operations</td>
-          <td><code>SystemToolProvider</code></td>
+          <td>File read, write and list and script execution inside allowlists</td>
+          <td><code>SystemToolProvider</code>, <code>SystemToolOptions</code></td>
         </tr>
         <tr>
           <td><strong>RAG</strong></td>
-          <td>Vector-based retrieval-augmented generation with citation tracking</td>
-          <td><code>RagToolProvider</code>, <code>RagContextProvider</code>, <code>VectorSearchService</code></td>
+          <td>Chunking, hybrid retrieval, LLM reranking and cited context</td>
+          <td><code>DocumentChunker</code>, <code>LlmReranker</code>, <code>RagContextProvider</code></td>
         </tr>
         <tr>
           <td><strong>EpisodicMemory</strong></td>
-          <td>Cross-session memory with relevance decay, search, and context injection</td>
+          <td>Cross-session memory with relevance decay, search and context injection</td>
           <td><code>EpisodicMemoryStore</code>, <code>EpisodicMemoryToolProvider</code>, <code>EpisodicMemoryContextProvider</code>, <code>MemoryDecayService</code></td>
         </tr>
         <tr>
           <td><strong>AuditLog</strong></td>
-          <td>Comprehensive agent activity tracking with sensitive parameter redaction</td>
+          <td>Model call and tool call audit trail with sensitive parameter redaction</td>
           <td><code>AuditLogStore</code>, <code>AuditingChatClient</code>, <code>AuditLogToolProvider</code></td>
         </tr>
         <tr>
           <td><strong>EventTriggers</strong></td>
-          <td>Proactive agent engagement via scheduled, file-watch, webhook and connector triggers, held in a durable queue</td>
+          <td>Scheduled, file-watch, webhook and connector triggers held in a durable queue</td>
           <td><code>TriggerRegistry</code>, <code>TriggerStore</code>, <code>TriggerEventQueue</code>, <code>TriggerDispatchService</code>, <code>ConnectorEventBridge</code></td>
         </tr>
         <tr>
           <td><strong>ComputerUse</strong></td>
-          <td>Browser automation via headless Chromium (Playwright)</td>
+          <td>Browser automation through headless Chromium (Playwright)</td>
           <td><code>BrowserSession</code>, <code>ComputerUseToolProvider</code></td>
         </tr>
         <tr>
@@ -278,8 +342,8 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         </tr>
         <tr>
           <td><strong>Jobs</strong></td>
-          <td>Deterministic scheduled work that runs without a model</td>
-          <td><code>JobRunner</code>, <code>IAgentJob</code>, <code>JobToolProvider</code></td>
+          <td>Deterministic work that runs without a model</td>
+          <td><code>JobRunner</code>, <code>JobToolProvider</code></td>
         </tr>
         <tr>
           <td><strong>StructuredOutput</strong></td>
@@ -303,7 +367,7 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         </tr>
         </tbody>
       </table>
-      <p>Connections and connectors sit in the Platform layer because other capabilities depend on them. <code>Platform.Connections</code> stores credentials and runs OAuth. <code>Platform.Connectors</code> defines the connector contracts and runs one connector per stored connection. See <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
+      <p>Connections and connectors sit in the Platform layer because other projects depend on them. <code>Platform.Connections</code> stores credentials and runs OAuth. <code>Platform.Connectors</code> defines the connector contracts and runs one connector per stored connection. See <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
       <h3>DataConnections and Providers</h3>
       <p>Storage backends and external data sources. These projects implement the persistence and data-access interfaces defined in Abstractions.</p>
       <p><strong>DataConnections:</strong></p>
@@ -316,23 +380,28 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         <tbody>
         <tr>
           <td><strong>Storage.Sqlite</strong></td>
-          <td>SQLite-backed persistence for all stores (personas, entities, context, schedules, etc.)</td>
-          <td><code>SqliteStorageProvider</code>, migration scripts</td>
+          <td>SQLite store for scheduled tasks</td>
+          <td><code>SqliteScheduledTaskStore</code>, <code>SqliteStoreBase</code></td>
         </tr>
         <tr>
           <td><strong>VectorStore.Sqlite</strong></td>
-          <td>SQLite-backed vector store for RAG embeddings</td>
-          <td><code>SqliteVectorStore</code></td>
+          <td>SQLite vector store for RAG embeddings, and the chat history provider</td>
+          <td><code>SqliteVectorStore</code>, <code>SqliteChatHistoryProvider</code></td>
         </tr>
         <tr>
           <td><strong>MarketData</strong></td>
-          <td>Stock quotes, price history, and SEC EDGAR company filings</td>
-          <td><code>StockQuoteTool</code>, <code>StockHistoryTool</code>, <code>EdgarCompanyFactsTool</code></td>
+          <td>Stock quotes, price history and SEC EDGAR company facts. A plugin.</td>
+          <td><code>MarketDataToolProvider</code></td>
         </tr>
         <tr>
           <td><strong>VectorSearch.Databricks</strong></td>
-          <td>Databricks Vector Search index queries for RAG grounding</td>
+          <td>Databricks Vector Search index queries for grounding</td>
           <td><code>DatabricksVectorSearchToolProvider</code></td>
+        </tr>
+        <tr>
+          <td><strong>VectorSearch.Snowflake</strong></td>
+          <td>Snowflake Cortex Search queries for grounding</td>
+          <td><code>SnowflakeCortexSearchToolProvider</code></td>
         </tr>
         </tbody>
       </table>
@@ -345,40 +414,43 @@ Plugins (loaded at runtime, not referenced above -- see Service Modules)
         <tbody>
         <tr>
           <td><strong>Providers.AzureAIFoundry</strong></td>
-          <td>LLM client configuration for Azure AI Foundry (Azure OpenAI) endpoints</td>
+          <td>LLM client for Azure AI Foundry (Azure OpenAI) endpoints</td>
         </tr>
         <tr>
           <td><strong>Providers.Databricks</strong></td>
-          <td>LLM client configuration for Databricks Foundation Model APIs (OpenAI-compatible)</td>
+          <td>LLM client for Databricks Foundation Model APIs (OpenAI-compatible)</td>
+        </tr>
+        <tr>
+          <td><strong>Providers.Snowflake</strong></td>
+          <td>LLM client for Snowflake Cortex</td>
         </tr>
         </tbody>
       </table>
+      <p>Each provider registers its chat client and, where configured, embeddings plus keyed <code>economy</code> and <code>judge</code> clients.</p>
       <h2>Frontend</h2>
-      <p>The frontend is a Next.js 15 application using React 19. It connects to the backend via the AG-UI protocol -- a raw SSE (Server-Sent Events) client that consumes the event stream directly.</p>
-      <p>There is no CopilotKit SDK dependency. The frontend implements the AG-UI client from scratch, handling event types like <code>TEXT_MESSAGE_CONTENT</code>, <code>TOOL_CALL_START</code>, <code>TOOL_CALL_END</code>, <code>STATE_SNAPSHOT</code>, and <code>STATE_DELTA</code> to render the chat interface, tool activity, and live state updates.</p>
+      <p>The frontend is a Next.js 15 application using React 19. It connects to the backend through the AG-UI protocol, a raw SSE (Server-Sent Events) client that consumes the event stream directly. There is no CopilotKit SDK dependency. The client handles event types such as <code>TEXT_MESSAGE_CONTENT</code>, <code>TOOL_CALL_START</code>, <code>TOOL_CALL_END</code>, <code>STATE_SNAPSHOT</code> and <code>STATE_DELTA</code> to render the chat, tool activity and live state.</p>
+      <p>The page has four tabs. <strong>Chat</strong> is the conversation. <strong>Runs</strong> lists the run ledger with totals and run detail. <strong>Orchestrations</strong> shows multi-agent runs and is where a person answers a plan review. <strong>Connections</strong> adds, checks and removes connected accounts. In development, <code>npm run dev</code> forwards <code>/api</code> requests to the backend on <code>http://localhost:5149</code>. A production build is a static export that the Host serves from <code>wwwroot</code>.</p>
+      <figure><img src="../images/request-flow.svg" alt="Request flow"><figcaption>Request flow</figcaption></figure>
       <h2>Request Flow</h2>
       <p>A user message travels through the system in this sequence:</p>
-      <ul>
-        <li><strong>Frontend POSTs to <code>/api/copilotkit</code></strong> -- the AG-UI endpoint. The request contains the user message, conversation history, and frontend state.</li>
-      </ul>
-      <ul>
-        <li><strong>AG-UI server resolves the session</strong> -- identifies the user, loads conversation history, and prepares the agent context.</li>
-      </ul>
-      <ul>
-        <li><strong>Context providers inject data</strong> -- each registered <code>AIContextProvider</code> appends its domain knowledge to the system prompt: persona instructions, guardrail rules, entity index, user profile, RAG results, and governance context.</li>
-      </ul>
-      <ul>
-        <li><strong>HarnessAgent runs the agent loop</strong> -- the agent built via <code>AsHarnessAgent</code> executes the reason-act-observe cycle. The LLM receives the assembled prompt with all context and tool definitions.</li>
-      </ul>
-      <ul>
-        <li><strong>ToolDeduplicatingChatClient removes duplicates</strong> -- before the request reaches the LLM, this delegating client strips duplicate tool definitions (which can occur when multiple providers register overlapping tools).</li>
-      </ul>
-      <ul>
-        <li><strong>GovernedAIFunction evaluates tool calls</strong> -- every tool invocation passes through the governance wrapper. The <code>GovernedMcpGateway</code> evaluates the call against active policies. Blocked calls return an error message instead of executing. All decisions are logged as audit events.</li>
-      </ul>
-      <ul>
-        <li><strong>Results stream as AG-UI SSE events</strong> -- text content, tool call progress, state updates, and completion signals stream back to the frontend as Server-Sent Events. The frontend renders them incrementally as they arrive.</li>
-      </ul>
+      <ol>
+        <li><strong>Frontend POSTs to <code>/api/copilotkit</code></strong>, the AG-UI endpoint. The request carries the user message, conversation history and frontend state. Endpoint authorization applies when authentication is on.</li>
+      </ol>
+      <ol>
+        <li><strong>AG-UI server resolves the session</strong>, identifies the user, loads conversation history and prepares the agent context.</li>
+      </ol>
+      <ol>
+        <li><strong>Context providers inject data.</strong> Each registered <code>AIContextProvider</code> appends its knowledge to the system prompt: the governance scan, the default prompt, persona instructions, context entries, guardrail rules, the user profile, the entity index, and RAG results and episodic memory when those capabilities are on.</li>
+      </ol>
+      <ol>
+        <li><strong>HarnessAgent runs the agent loop.</strong> The agent built through <code>AsHarnessAgent</code> executes the reason-act-observe cycle. Each model call goes through the chat pipeline described above.</li>
+      </ol>
+      <ol>
+        <li><strong>Tool calls pass the governance wrapper and tracing.</strong> The <code>GovernedMcpGateway</code> evaluates a call against the policy file and the approval-required list. A blocked call returns an error message and does not execute. Each decision is logged as an audit event.</li>
+      </ol>
+      <ol>
+        <li><strong>Results stream as AG-UI SSE events.</strong> Text content, tool call progress, state updates, interrupts and completion signals reach the frontend as they happen.</li>
+      </ol>
       <pre><code>
 Frontend                    Host                         LLM
    │                         │                            │
@@ -386,7 +458,7 @@ Frontend                    Host                         LLM
    │                         │── resolve session           │
    │                         │── inject context            │
    │                         │── build prompt + tools      │
-   │                         │── send to LLM ─────────────&gt;│
+   │                         │── chat pipeline ───────────&gt;│
    │                         │                            │── reason
    │                         │&lt;── tool call ──────────────│
    │                         │── governance check          │
@@ -398,10 +470,11 @@ Frontend                    Host                         LLM
    │&lt;── SSE: state update ──│                            │
    │&lt;── SSE: run complete ──│                            │
 </code></pre>
+      <p>Runs that start without a person, such as scheduled tasks, trigger events, job runs and orchestrations, use the same pipeline and tool wrapping. Each is recorded in the run ledger and counted against the spend limits.</p>
       <h2>Feature Flags and Service Modules</h2>
       <p>The platform uses two mechanisms to control which capabilities are active at runtime.</p>
       <h3>Feature Flags</h3>
-      <p>Platform capabilities (Scheduling, AuditLog, ComputerUse, RAG, etc.) are controlled by boolean flags in the <code>Features</code> section of <code>appsettings.json</code>. All flags default to <code>false</code> -- the platform is opt-in. When a flag is <code>true</code>, the capability&#x27;s services, tools, and endpoints are registered. This is evaluated once at startup -- there is no runtime toggle.</p>
+      <p>Capabilities are controlled by boolean flags in the <code>Features</code> section of <code>appsettings.json</code>. All flags default to <code>false</code>, so the platform is opt-in. When a flag is <code>true</code>, the capability&#x27;s services, tools and endpoints are registered. The flags are read once at startup, and there is no runtime toggle.</p>
       <pre><code class="language-json">
 {
   &quot;Features&quot;: {
@@ -410,23 +483,23 @@ Frontend                    Host                         LLM
   }
 }
 </code></pre>
-      <p>The <code>FeatureFlags</code> class in the Host project binds to this section. <code>Program.cs</code> checks each flag before calling the capability&#x27;s registration method.</p>
+      <p>The <code>FeatureFlags</code> class in the Host project binds to this section. <code>Program.cs</code> checks each flag before calling the capability&#x27;s registration method. A few flags have prerequisites that the Host checks at startup: <code>Connectors</code> needs <code>Connections</code>, <code>AgentOrchestration</code> needs <code>InterAgentCommunication</code>, daily budgets need <code>RunLedger</code>, and <code>McpServer</code> needs authentication on.</p>
       <h3>Service Modules</h3>
       <p>Agent projects and data-connection projects use the <code>IServiceModule</code> interface (defined in Platform.Abstractions) instead of feature flags. Each module declares a configuration section name and a <code>ConfigureServices</code> method.</p>
       <p>Unlike every other layer, Host does not hold a project reference to these modules at all. They are loaded at runtime from a <code>plugins/</code> folder next to the Host executable, one subfolder per plugin, using <code>System.Runtime.Loader.AssemblyLoadContext</code>. <code>ServiceModuleExtensions.AddServiceModules</code> walks that folder, loads each plugin&#x27;s assembly into its own <code>PluginLoadContext</code>, reflects over its types for <code>IServiceModule</code> implementations, and calls <code>ConfigureServices</code> for each one whose config section explicitly sets <code>Enabled</code> to <code>true</code>.</p>
       <p><code>PluginLoadContext</code> resolves a plugin&#x27;s own private dependencies from its folder via <code>AssemblyDependencyResolver</code>, but defers to whatever the host already has loaded for anything shared, most importantly <code>AiAgentCanvas.Abstractions</code> itself. Without that, the plugin&#x27;s copy of <code>IServiceModule</code> would be a distinct runtime type from the host&#x27;s copy, and the <code>is IServiceModule</code> check would fail even though the source is identical.</p>
       <p>This means adding a new agent or data-connection project touches nothing in Host: no <code>Program.cs</code> change, no <code>ProjectReference</code>, not even a comment. Two things make a project loadable this way:</p>
-      <ul>
+      <ol>
         <li>Implement <code>IServiceModule</code> against Abstractions.</li>
-        <li>Add a post-build target that copies the project&#x27;s own build output into <code>$(HostPluginsDir)$(MSBuildProjectName)\</code> (see <code>Directory.Build.props</code> for <code>HostPluginsDir</code>, and any existing plugin project, e.g. <code>Agent.FinancialAnalyst.csproj</code>, for the target itself). Also set <code>&lt;GenerateDependencyFile&gt;true&lt;/GenerateDependencyFile&gt;</code> so <code>AssemblyDependencyResolver</code> has a manifest to resolve the plugin&#x27;s own dependencies.</li>
-      </ul>
+        <li>Add a post-build target that copies the project&#x27;s own build output into <code>$(HostPluginsDir)$(MSBuildProjectName)\</code> (see <code>Directory.Build.props</code> for <code>HostPluginsDir</code>, and any existing plugin project, such as <code>Agent.FinancialAnalyst.csproj</code>, for the target itself). Also set <code>&lt;GenerateDependencyFile&gt;true&lt;/GenerateDependencyFile&gt;</code> so <code>AssemblyDependencyResolver</code> has a manifest to resolve the plugin&#x27;s own dependencies.</li>
+      </ol>
       <p>The project still needs to be part of the solution so a normal solution build produces its output, but Host&#x27;s own <code>.csproj</code> never names it.</p>
       <pre><code>
-Agents:FinancialAnalyst:Enabled = false  (default -- not registered)
+Agents:FinancialAnalyst:Enabled = false  (default, not registered)
 DataConnections:MarketData:Enabled = true   (opted in)
 </code></pre>
       <h3>Provider-Specific Configuration</h3>
-      <p>Provider-specific settings are nested under their provider section rather than in <code>Features</code>. The Databricks Vector Search tool, for example, lives at <code>Databricks:VectorSearch</code> and self-gates based on whether its required settings are present (no explicit <code>Enabled</code> flag needed).</p>
+      <p>Provider-specific settings are nested under their provider section rather than in <code>Features</code>. The Databricks Vector Search tool, for example, lives at <code>Databricks:VectorSearch</code> and self-gates based on whether its required settings are present, so it needs no explicit <code>Enabled</code> flag.</p>
     </main>
   </div>
 </body>

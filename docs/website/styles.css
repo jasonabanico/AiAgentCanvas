@@ -484,3 +484,20 @@ body {
   .hero h1 { font-size: 2.25rem; }
   .hero { padding: 3rem 1rem 2rem; }
 }
+
+.main-content figure {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.main-content figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+.main-content figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}

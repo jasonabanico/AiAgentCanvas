@@ -77,15 +77,34 @@ builder.Services.AddAiAgentCanvasSecurity(builder.Configuration);
 </code></pre>
       <h3>GovernedAIFunction</h3>
       <p><code>GovernedAIFunction</code> extends <code>DelegatingAIFunction</code> (from <code>Microsoft.Extensions.AI</code>) and intercepts every tool call. It:</p>
-      <ul>
+      <ol>
         <li>Serializes the call arguments to JSON.</li>
         <li>Calls <code>GovernedMcpGateway.Evaluate()</code> to get an allow/block decision.</li>
         <li>Emits an audit event via <code>AuditEmitter</code> (either <code>PolicyCheck</code> or <code>ToolCallBlocked</code>).</li>
         <li>If blocked, returns a JSON error string: <code>{&quot;error&quot;: &quot;Tool &#x27;X&#x27; was blocked by governance policy.&quot;, &quot;status&quot;: &quot;...&quot;}</code>.</li>
         <li>If allowed, delegates to the inner function via <code>base.InvokeCoreAsync()</code>.</li>
-      </ul>
+      </ol>
       <h3>GovernanceToolWrapper</h3>
-      <p><code>GovernanceToolWrapper</code> implements <code>IToolGovernanceWrapper</code>. At startup, the orchestration layer calls <code>Wrap()</code> on every registered <code>AIFunction</code>, replacing the original with a <code>GovernedAIFunction</code>. This ensures governance applies to all tools without requiring each tool to implement its own checks.</p>
+      <p><code>GovernanceToolWrapper</code> implements <code>IToolGovernanceWrapper</code>. <code>AgentPipeline.WrapTools</code> calls <code>Wrap()</code> on each <code>AIFunction</code> and wraps the result in <code>TracedAIFunction</code>. The default agent, persona agents, the tools served by the MCP server, and connector tools are wrapped this way.</p>
+      <p>Three kinds of tool are not wrapped by the governance policy:</p>
+      <ul>
+        <li>Tools that <code>connect_mcp_server</code> registers at runtime go into the dynamic tool registry as they are. The default list blocks <code>connect_mcp_server</code> for this reason.</li>
+        <li>Tools that skills register at runtime follow the same path.</li>
+      </ul>
+      <h3>Approval-Required Tools</h3>
+      <p><code>Security:ApprovalRequiredTools</code> lists tool names that the governance gateway treats as needing approval. The list is a hard block: there is no approval prompt for these tools, and a call is refused until an operator removes the name from the list. The default is:</p>
+      <pre><code class="language-json">
+&quot;Security&quot;: {
+  &quot;ApprovalRequiredTools&quot;: [
+    &quot;system_write_file&quot;,
+    &quot;system_run_script&quot;,
+    &quot;connect_mcp_server&quot;,
+    &quot;schedule_task&quot;
+  ]
+}
+</code></pre>
+      <p>Each entry must match the name a tool registers under. An entry that matches no tool protects nothing, so a typo raises no error.</p>
+      <p>Connector tools use a different mechanism. A connector tool with risk <code>Send</code> or <code>Destructive</code> is wrapped in <code>ApprovalRequiredAIFunction</code>, which asks a person before the call runs. The default interactive agent has an approval channel and shows the prompt in the chat. A persona agent or an unattended run has no channel, so it does not execute the call. Set <code>Connectors:ApprovalMode</code> to <code>Audit</code> to run those tools without asking. Calls are still traced and counted.</p>
       <hr>
       <h2>Policy Format</h2>
       <p>Governance policies are defined in YAML. The policy file path is set via <code>Security:PolicyPath</code> in configuration (default: <code>governance-policy.yaml</code>).</p>
@@ -100,7 +119,7 @@ rules:
     action: deny
     condition:
       tool_name:
-        in: [run_script]
+        in: [system_run_script]
     reason: &quot;Shell execution requires explicit approval&quot;
 
   - name: restrict-file-write-paths
@@ -108,7 +127,7 @@ rules:
     action: deny
     condition:
       tool_name:
-        equals: write_file
+        equals: system_write_file
       path:
         matches: &quot;^(/etc|/var|C:\\\\Windows|C:\\\\Program Files)&quot;
     reason: &quot;Writing to system directories is blocked&quot;
@@ -168,12 +187,12 @@ rules:
         <tr>
           <td><code>equals</code></td>
           <td>Exact string match</td>
-          <td><code>tool_name: { equals: write_file }</code></td>
+          <td><code>tool_name: { equals: system_write_file }</code></td>
         </tr>
         <tr>
           <td><code>in</code></td>
           <td>Matches any value in a list</td>
-          <td><code>tool_name: { in: [run_script, exec] }</code></td>
+          <td><code>tool_name: { in: [system_run_script, exec] }</code></td>
         </tr>
         <tr>
           <td><code>matches</code></td>
@@ -186,7 +205,7 @@ rules:
       <p>When multiple rules match a tool call, <code>ConflictResolutionStrategy.DenyOverrides</code> applies: any matching <code>deny</code> rule wins regardless of <code>allow</code> rules. This is the default and recommended setting.</p>
       <hr>
       <h2>Rate Limiting</h2>
-      <p>Rate limiting uses ASP.NET&#x27;s built-in fixed-window rate limiter with a policy named <code>&quot;agent&quot;</code>.</p>
+      <p>The platform registers ASP.NET&#x27;s fixed-window rate limiter with a policy named <code>&quot;agent&quot;</code>. No endpoint applies the policy yet (see Known Gaps in <a href="reference-internals.md">Platform Internals</a>), so it does not limit any request today.</p>
       <table>
         <thead><tr>
           <th>Parameter</th>
@@ -207,16 +226,15 @@ rules:
         </tr>
         </tbody>
       </table>
-      <p>When the limit is exceeded, the server returns HTTP 429 with a JSON body:</p>
+      <p>When the policy rejects a request, the server returns HTTP 429 with a JSON body:</p>
       <pre><code class="language-json">
 {
-  &quot;error&quot;: &quot;Rate limit exceeded. Try again later.&quot;,
-  &quot;retryAfterSeconds&quot;: 60
+  &quot;error&quot;: &quot;Rate limit exceeded. Try again later.&quot;
 }
 </code></pre>
       <hr>
       <h2>Security Headers</h2>
-      <p>Three security headers are applied to every HTTP response via inline middleware in <code>UseAiAgentCanvasSecurity()</code>:</p>
+      <p>Three security headers are applied to HTTP responses through inline middleware in <code>UseAiAgentCanvasSecurity()</code>:</p>
       <table>
         <thead><tr>
           <th>Header</th>
@@ -242,18 +260,76 @@ rules:
         </tbody>
       </table>
       <hr>
+      <h2>Authentication</h2>
+      <p>Authentication is off by default. The Host logs a prominent warning at each start while it is off, because the endpoints it protects run shell commands, schedule unattended work and spend money. <code>AiAgentCanvas.Authentication</code> picks schemes by name from <code>Authentication:Schemes</code>. Two ship: <code>ApiKey</code> for machine callers and <code>JwtBearer</code> for any OIDC authority, which covers Entra ID, Auth0, Okta and Keycloak.</p>
+      <pre><code class="language-json">
+{
+  &quot;Authentication&quot;: {
+    &quot;Enabled&quot;: true,
+    &quot;Schemes&quot;: [&quot;ApiKey&quot;, &quot;JwtBearer&quot;],
+    &quot;AllowAnonymous&quot;: [&quot;health&quot;],
+    &quot;AllowedOrigins&quot;: [&quot;https://app.example.com&quot;],
+    &quot;ApiKey&quot;: { &quot;HeaderName&quot;: &quot;X-API-Key&quot;, &quot;Keys&quot;: [&quot;a-long-random-key&quot;] },
+    &quot;JwtBearer&quot;: { &quot;Authority&quot;: &quot;https://login.example.com&quot;, &quot;Audience&quot;: &quot;agents&quot; }
+  }
+}
+</code></pre>
+      <p>Endpoints are protected with <code>RequireAgentAuthorization(auth, key)</code>, and <code>AllowAnonymous</code> lists the keys that stay open. The keys in use are <code>agui</code>, <code>a2a</code>, <code>devui</code>, <code>notifications</code>, <code>webhooks</code>, <code>health</code>, <code>runs</code>, <code>connections</code>, <code>connectors</code>, <code>structured</code>, <code>orchestrations</code> and <code>mcp</code>. API keys are compared in fixed time. Setting <code>AllowedOrigins</code> switches CORS from any origin to the named origins with credentials.</p>
+      <p>Two routes carry no endpoint authorization on purpose, because the caller is another service and sends none of our credentials:</p>
+      <ul>
+        <li>The <strong>OAuth callback</strong> (<code>/api/connections/oauth/callback</code>). The provider redirects the browser here. An encrypted, time-limited <code>state</code> value proves this host started the flow.</li>
+        <li>The <strong>connector webhook</strong> (<code>/api/connectors/{connectionId}/webhook</code>). The connector checks the sender&#x27;s own signature, and a request that fails is refused with 401 before anything is parsed.</li>
+      </ul>
+      <hr>
+      <h2>Credentials and Connections</h2>
+      <p>Connection secrets are encrypted with ASP.NET Core Data Protection before they reach the database. Metadata stays readable and secrets do not. The key ring lives in <code>Connections:KeyRingPath</code>, and on Windows it is also wrapped with DPAPI. Whoever can read both the key ring and <code>connections.db</code> can read all stored secrets, so keep the key ring out of source control and out of the web root, and back up both together.</p>
+      <p>Secrets reach a connector only through its connection context. They do not appear in tool arguments, tool results, log lines or API responses. A connector&#x27;s HTTP client allows only the hosts the connector names, over https (http for loopback only), follows no redirects, and retries only requests that are safe to repeat. The OAuth redirect address is built from <code>Connections:PublicBaseUrl</code> and not from the request, so a forged <code>Host</code> header cannot send an authorization code elsewhere.</p>
+      <hr>
+      <h2>Other Exposure Controls</h2>
+      <table>
+        <thead><tr>
+          <th>Feature</th>
+          <th>Control</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td>System tools</td>
+          <td><code>SystemTools:AllowedPaths</code> and <code>AllowedCommands</code> both deny everything when empty. The Host defaults the path list to the <code>agent-workspace</code> folder and the command list to <code>dotnet</code>, <code>git</code>, <code>npm</code> and <code>node</code>. Commands run without a shell.</td>
+        </tr>
+        <tr>
+          <td>Vision</td>
+          <td><code>Agent:Vision:AllowedPaths</code> and <code>AllowedUrlHosts</code> deny everything when empty. The fetch refuses private addresses at connect time.</td>
+        </tr>
+        <tr>
+          <td>MCP server</td>
+          <td>Exposes nothing until <code>Agent:McpServer:ExposedTools</code> names it. Leaves out tools that need approval. The Host refuses to start with it on and authentication off unless <code>AllowUnauthenticated</code> is set.</td>
+        </tr>
+        <tr>
+          <td>Orchestration</td>
+          <td>A person answers a plan review. No agent tool can.</td>
+        </tr>
+        <tr>
+          <td>Spend</td>
+          <td><code>Agent:LoopGuard:MaxRunCost</code> caps a run, and <code>Agent:Budgets</code> caps daily spend per agent, per trigger and in total.</td>
+        </tr>
+        </tbody>
+      </table>
+      <hr>
       <h2>Production Checklist</h2>
       <p>Before deploying to production, verify each item:</p>
-      <ul>
-        <li><strong>Set real API keys</strong> -- replace placeholder values in <code>AIFoundry:Endpoint</code> and <code>AIFoundry:Key</code> with production credentials, or enable <code>UseAzureCredential</code> for managed identity.</li>
-        <li><strong>Configure governance policies</strong> -- review and customize <code>governance-policy.yaml</code> for your security requirements. Add deny rules for any tools that should not run in production.</li>
-        <li><strong>Enable rate limiting</strong> -- set <code>Security:RateLimitPerMinute</code> to an appropriate value for your expected load.</li>
-        <li><strong>Review tool allowlists</strong> -- audit the system tools configuration (<code>AllowedCommands</code>) and remove any commands not needed in production.</li>
-        <li><strong>Configure HTTPS</strong> -- ensure the application runs behind HTTPS termination (reverse proxy or Kestrel HTTPS configuration).</li>
-        <li><strong>Set logging level</strong> -- change <code>Logging:LogLevel:Default</code> to <code>Warning</code> or <code>Error</code> to reduce log volume and avoid logging sensitive data.</li>
-        <li><strong>Remove DevUI in production</strong> -- the <code>AddDevUI()</code> and <code>MapDevUI()</code> calls should be wrapped in an environment check so the development UI is not exposed in production.</li>
-        <li><strong>Review MCP connection security</strong> -- the default policy blocks MCP connections to private/internal addresses. Verify this rule is active and add additional endpoint restrictions as needed.</li>
-      </ul>
+      <ol>
+        <li><strong>Set real API keys.</strong> Replace placeholder values in <code>AIFoundry:Endpoint</code> and <code>AIFoundry:Key</code> with production credentials, or enable <code>UseAzureCredential</code> for managed identity. Keep secrets in environment variables or a secret store.</li>
+        <li><strong>Turn authentication on.</strong> Set <code>Authentication:Enabled</code> to true, choose schemes, and list <code>AllowedOrigins</code>. Without it, endpoints are open to anyone who can reach the process.</li>
+        <li><strong>Configure governance policies.</strong> Review <code>governance-policy.yaml</code> and add deny rules for tools that should not run in production.</li>
+        <li><strong>Review the approval-required list.</strong> <code>schedule_task</code>, <code>system_write_file</code>, <code>system_run_script</code> and <code>connect_mcp_server</code> are blocked by default. Remove a name only when you accept what the tool can do.</li>
+        <li><strong>Review the tool allowlists.</strong> Audit <code>SystemTools:AllowedPaths</code>, <code>SystemTools:AllowedCommands</code>, and the vision folders and hosts. Remove anything the deployment does not need.</li>
+        <li><strong>Set spend limits.</strong> Fill in <code>Agent:Pricing</code> for the models in use, then set <code>Agent:LoopGuard:MaxRunCost</code> and <code>Agent:Budgets</code>. Budgets need the <code>RunLedger</code> flag.</li>
+        <li><strong>Protect the credential store.</strong> Put <code>Connections:KeyRingPath</code> somewhere private, back it up with <code>connections.db</code>, and set <code>Connections:PublicBaseUrl</code> to the public https address.</li>
+        <li><strong>Configure HTTPS.</strong> Run behind HTTPS termination, either a reverse proxy or Kestrel HTTPS.</li>
+        <li><strong>Set the logging level.</strong> Change <code>Logging:LogLevel:Default</code> to <code>Warning</code> or <code>Error</code> to reduce volume and avoid logging sensitive data.</li>
+        <li><strong>Remove DevUI in production.</strong> Wrap the <code>AddDevUI()</code> and <code>MapDevUI()</code> calls in an environment check so the development UI is not exposed.</li>
+        <li><strong>Review MCP connection security.</strong> The default policy blocks <code>connect_mcp_server</code> calls to private and internal addresses. Verify the rule is active. Prefer a connector for any server that needs credentials.</li>
+      </ol>
     </main>
   </div>
 </body>

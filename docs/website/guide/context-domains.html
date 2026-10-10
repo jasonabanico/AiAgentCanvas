@@ -14,11 +14,11 @@
       <p>Context domains are the agent&#x27;s knowledge system. Each domain stores a specific type of information as markdown files with YAML frontmatter. The platform injects this data into the system prompt before every LLM request, so the agent always has access to its configuration, policies, and accumulated knowledge. The agent can also manage domain data at runtime through built-in tools.</p>
       <h2>The Three-Class Pattern</h2>
       <p>Every domain follows the same structure:</p>
-      <ul>
+      <ol>
         <li><strong>Store</strong> -- reads and writes markdown files from layered directories. Handles CRUD operations and file parsing via the <code>MarkdownFile</code> utility.</li>
         <li><strong>Tool provider</strong> -- exposes the store&#x27;s operations as <code>AITool</code> instances so the LLM can create, read, update, and delete domain data through conversation.</li>
         <li><strong>Context provider</strong> -- an <code>AIContextProvider</code> that reads domain data from the store and injects it into the system prompt before each LLM call.</li>
-      </ul>
+      </ol>
       <p>This pattern means data flows in both directions: the platform injects domain data *into* the LLM&#x27;s context, and the LLM can modify domain data *through* tool calls. A user can say &quot;add a guardrail that prevents sharing internal pricing&quot; and the agent will create a guardrail file that takes effect on the next request.</p>
       <h2>The Six Domains</h2>
       <table>
@@ -104,12 +104,12 @@ agent-data/
       <p>The <code>agent/</code> directory is where seed data lands on first startup and where tool-created content is saved. The <code>user/</code> directory is a no-code alternative to implementing seed interfaces: drop a properly formatted markdown file into the right subdirectory and the platform picks it up automatically.</p>
       <h2>Layered Reading</h2>
       <p>Each store reads from multiple directories and merges the results. When the platform calls <code>ListAll()</code> on a domain store, it collects files from:</p>
-      <ul>
+      <ol>
         <li>The agent&#x27;s own <code>agent/</code> directory (system-written)</li>
         <li>The agent&#x27;s own <code>user/</code> directory (hand-written)</li>
         <li>The <code>shared/agent/</code> directory (shared system-written)</li>
         <li>The <code>shared/user/</code> directory (shared hand-written)</li>
-      </ul>
+      </ol>
       <p>All files are merged into a single list. If two files have the same name, the agent-level file takes precedence over the shared-level file. This layering lets you define shared defaults (company-wide guardrails, common entity schemas) that individual agents can override with their own versions.</p>
       <p>The context provider then reads this merged list and formats it into the appropriate system prompt section. The LLM sees user-provided, system-created, and shared data together, without needing to know where each piece came from.</p>
       <h2>How Domains Interact</h2>

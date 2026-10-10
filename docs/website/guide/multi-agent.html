@@ -15,13 +15,13 @@
       <h2>Option 1: In-Process Handoff</h2>
       <p>All agents run in the same .NET process. The main agent delegates to a specialist by calling the <code>handoff_to_agent</code> tool. The specialist runs to completion and returns its response directly.</p>
       <p>Under the hood, the flow is:</p>
-      <ul>
+      <ol>
         <li><code>HandoffToolProvider</code> exposes the <code>handoff_to_agent</code> tool to the LLM</li>
         <li><code>InProcessAgentHandoff</code> receives the call with the target agent name and context</li>
         <li><code>AgentRegistry.Resolve</code> finds or builds the target agent (loading its persona and scoped tools)</li>
         <li>The target agent runs as a <code>ChatClientAgent</code> with its own persona instructions</li>
         <li>The response flows back to the calling agent as a tool result</li>
-      </ul>
+      </ol>
       <p><strong>When to use:</strong> Multiple specialists without deployment complexity. Shared LLM endpoint. Low latency between agents. All agents owned by the same team.</p>
       <h3>Setup</h3>
       <p>Register a persona seed and tool seed for each specialist agent. The <code>AgentRegistry</code> builds agents on demand from these seeds.</p>
@@ -101,7 +101,7 @@ AIAgent agent = chatClient.AsHarnessAgent(new HarnessAgentOptions
     // ...
 });
 </code></pre>
-      <p>No additional configuration needed. Register persona and tool seeds, and the agent becomes available for both handoff and background delegation.</p>
+      <p>No additional configuration needed. Register persona and tool seeds, and the agent becomes available for both handoff and background delegation. Persona agents run on the same chat pipeline as the default agent, so the context budget, loop guard and cost tracking apply to delegated work.</p>
       <h3>Example: Parallel Research</h3>
       <p>The LLM might use background delegation like this during a conversation:</p>
       <pre><code>
@@ -157,6 +157,8 @@ public void RegisterRemote(string name, string a2aUrl, string? description = nul
 }
 </code></pre>
       <p>After registration, <code>handoff_to_agent(&quot;compliance-checker&quot;, ...)</code> sends the request over HTTP to the remote host. The calling agent does not need to know whether the target is local or remote.</p>
+      <h2>Option 4: Orchestration Runs</h2>
+      <p>The first three options let the model decide when to involve another agent. An orchestration run starts several named agents on one task from a tool call, an API call or a person. Three kinds ship: group chat (agents take turns), handoff (a lead passes work to specialists and takes it back) and Magentic (a manager plans, assigns work and replans). Each step is checkpointed to disk, and a Magentic run can stop for a person to approve its plan, then continue after a restart. Orchestrations need <code>InterAgentCommunication</code> and the <code>AgentOrchestration</code> flag. See <a href="guide-12-typed-output-vision-orchestration-and-mcp-server.md">Typed Output, Vision, Orchestration and MCP Server</a>.</p>
       <h2>Comparison</h2>
       <table>
         <thead><tr>

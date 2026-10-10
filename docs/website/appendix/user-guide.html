@@ -14,21 +14,21 @@
       <h2>Getting Started</h2>
       <h3>Prerequisites</h3>
       <ul>
-        <li>.NET 9 SDK</li>
-        <li>Node.js 20+</li>
-        <li>Azure AI Foundry account (or any Azure OpenAI endpoint)</li>
+        <li>.NET 10 SDK</li>
+        <li>Node.js 22 or later</li>
+        <li>A model provider: an Azure OpenAI deployment, a Databricks serving endpoint, or a Snowflake Cortex account</li>
       </ul>
       <h3>Setup Steps</h3>
-      <ul>
+      <ol>
         <li>Clone the repository.</li>
-        <li>Build the backend:</li>
-      </ul>
+        <li>Build the backend. A solution build also copies the sample agent and market data plugins into the Host&#x27;s <code>plugins/</code> folder:</li>
+      </ol>
       <pre><code class="language-bash">
-   dotnet build
+   dotnet build AiAgentCanvas.sln
 </code></pre>
-      <ul>
-        <li>Configure <code>src/Host/AiAgentCanvas.Host/appsettings.Development.json</code> with your Azure AI Foundry credentials:</li>
-      </ul>
+      <ol>
+        <li>Configure <code>src/Host/AiAgentCanvas.Host/appsettings.Development.json</code> with your provider credentials. This example uses Azure AI Foundry:</li>
+      </ol>
       <pre><code class="language-json">
    {
      &quot;AIFoundry&quot;: {
@@ -39,96 +39,158 @@
      }
    }
 </code></pre>
-      <ul>
-        <li>Run the backend:</li>
-      </ul>
+      <p>To use Databricks or Snowflake, set <code>Provider</code> to <code>Databricks</code> or <code>Snowflake</code> and fill in that provider&#x27;s section.</p>
+      <ol>
+        <li>Turn on the capabilities you want. All flags default to <code>false</code>, so a fresh start is a bare chat agent. This set matches the examples below:</li>
+      </ol>
+      <pre><code class="language-json">
+   {
+     &quot;Features&quot;: {
+       &quot;Personas&quot;: true,
+       &quot;Context&quot;: true,
+       &quot;Guardrails&quot;: true,
+       &quot;Skills&quot;: true,
+       &quot;SkillAuthoring&quot;: true,
+       &quot;Workflows&quot;: true,
+       &quot;InterAgentCommunication&quot;: true,
+       &quot;RunLedger&quot;: true
+     },
+     &quot;Agents&quot;: { &quot;FinancialAnalyst&quot;: { &quot;Enabled&quot;: true } },
+     &quot;DataConnections&quot;: { &quot;MarketData&quot;: { &quot;Enabled&quot;: true } }
+   }
+</code></pre>
+      <ol>
+        <li>Run the backend. It listens on <code>http://localhost:5149</code>:</li>
+      </ol>
       <pre><code class="language-bash">
    dotnet run --project src/Host/AiAgentCanvas.Host
 </code></pre>
-      <ul>
-        <li>In a separate terminal, start the frontend:</li>
-      </ul>
+      <ol>
+        <li>In a separate terminal, start the frontend. The dev server forwards <code>/api</code> requests to the backend:</li>
+      </ol>
       <pre><code class="language-bash">
    cd frontend
    npm install
    npm run dev
 </code></pre>
-      <ul>
+      <ol>
         <li>Open <code>http://localhost:3000</code> in your browser.</li>
-      </ul>
+      </ol>
       <h3>Five Things to Try First</h3>
-      <ul>
-        <li><strong>Ask a question</strong> -- type any question in the chat box and watch the streaming response.</li>
-        <li><strong>Create a persona</strong> -- say &quot;create a persona called Research Assistant that specializes in summarizing articles.&quot;</li>
-        <li><strong>Run a skill</strong> -- say &quot;create a skill called Summarize that takes a URL and returns a summary,&quot; then &quot;run skill Summarize.&quot;</li>
-        <li><strong>Check a stock quote</strong> -- say &quot;get me a stock quote for MSFT&quot; to exercise the market data tools.</li>
-        <li><strong>Create a workflow</strong> -- say &quot;create a workflow called Morning Briefing that checks stocks then summarizes news.&quot;</li>
-      </ul>
+      <p>These assume the flags from step 4 above.</p>
+      <ol>
+        <li><strong>Ask a question.</strong> Type any question in the chat box and watch the streaming response.</li>
+        <li><strong>Create a persona.</strong> Say &quot;create a persona called Research Assistant that specializes in summarizing articles.&quot;</li>
+        <li><strong>Create and run a skill.</strong> Say &quot;create a skill called Summarize that takes a URL and returns a summary,&quot; then &quot;run skill Summarize.&quot;</li>
+        <li><strong>Check a stock quote.</strong> Say &quot;get me a stock quote for MSFT&quot; to exercise the market data tools.</li>
+        <li><strong>Create a workflow.</strong> Say &quot;create a workflow called Morning Briefing that checks stocks then summarizes news.&quot;</li>
+      </ol>
+      <p>After a few unattended runs, open the <strong>Runs</strong> tab to see what each one did and what it cost.</p>
       <hr>
       <h2>Configuration Reference</h2>
       <h3>appsettings.json Structure</h3>
-      <p>The base configuration file lives at <code>src/Host/AiAgentCanvas.Host/appsettings.json</code>.</p>
+      <p>The base configuration file lives at <code>src/Host/AiAgentCanvas.Host/appsettings.json</code>. The template for new deployments is <code>appsettings.template.json</code> in the same folder. The main sections and keys:</p>
       <table>
         <thead><tr>
           <th>Section</th>
           <th>Key</th>
-          <th>Type</th>
           <th>Description</th>
         </tr></thead>
         <tbody>
         <tr>
-          <td><code>AIFoundry</code></td>
-          <td><code>Endpoint</code></td>
-          <td>string</td>
-          <td>Azure OpenAI endpoint URL</td>
+          <td>(root)</td>
+          <td><code>Provider</code></td>
+          <td>The LLM backend: <code>AzureAIFoundry</code> (default), <code>Databricks</code> or <code>Snowflake</code></td>
         </tr>
         <tr>
           <td><code>AIFoundry</code></td>
-          <td><code>Key</code></td>
-          <td>string</td>
-          <td>API key (leave blank if using Azure credential)</td>
-        </tr>
-        <tr>
-          <td><code>AIFoundry</code></td>
-          <td><code>DeploymentName</code></td>
-          <td>string</td>
-          <td>Chat model deployment name (e.g., <code>gpt-4o</code>)</td>
-        </tr>
-        <tr>
-          <td><code>AIFoundry</code></td>
-          <td><code>EmbeddingDeploymentName</code></td>
-          <td>string</td>
-          <td>Embedding model deployment; enables RAG when set</td>
+          <td><code>Endpoint</code>, <code>Key</code>, <code>DeploymentName</code></td>
+          <td>Azure OpenAI endpoint, API key and chat deployment (for example <code>gpt-4o</code>)</td>
         </tr>
         <tr>
           <td><code>AIFoundry</code></td>
           <td><code>UseAzureCredential</code></td>
-          <td>bool</td>
-          <td>Use <code>DefaultAzureCredential</code> instead of API key</td>
+          <td>Use <code>DefaultAzureCredential</code> instead of an API key</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>EmbeddingDeploymentName</code></td>
+          <td>Embedding deployment. RAG needs it, together with the <code>Rag</code> flag</td>
+        </tr>
+        <tr>
+          <td><code>AIFoundry</code></td>
+          <td><code>EconomyDeploymentName</code>, <code>JudgeDeploymentName</code></td>
+          <td>A cheaper model for routing and summaries, and a separate model for the evaluation suite</td>
+        </tr>
+        <tr>
+          <td><code>Databricks</code>, <code>Snowflake</code></td>
+          <td><code>WorkspaceUrl</code> or <code>AccountUrl</code>, token, <code>ModelName</code></td>
+          <td>The same settings for those providers, with <code>EmbeddingModelName</code>, <code>EconomyModelName</code> and <code>JudgeModelName</code></td>
         </tr>
         <tr>
           <td><code>Security</code></td>
           <td><code>PolicyPath</code></td>
-          <td>string</td>
           <td>Path to the governance policy YAML file</td>
         </tr>
         <tr>
           <td><code>Security</code></td>
+          <td><code>ApprovalRequiredTools</code></td>
+          <td>Tool names that governance blocks. Defaults to <code>system_write_file</code>, <code>system_run_script</code>, <code>connect_mcp_server</code>, <code>schedule_task</code></td>
+        </tr>
+        <tr>
+          <td><code>Security</code></td>
           <td><code>RateLimitPerMinute</code></td>
-          <td>int</td>
-          <td>Maximum tool calls per minute (default: 30)</td>
+          <td>Requests per minute for the <code>agent</code> rate-limit policy (default 30). See the note in the security reference.</td>
+        </tr>
+        <tr>
+          <td><code>Authentication</code></td>
+          <td><code>Enabled</code>, <code>Schemes</code>, <code>AllowAnonymous</code>, <code>AllowedOrigins</code>, <code>ApiKey</code>, <code>JwtBearer</code></td>
+          <td>Endpoint authentication. Off by default.</td>
+        </tr>
+        <tr>
+          <td><code>Agent</code></td>
+          <td><code>ContextBudget</code>, <code>LoopGuard</code>, <code>Pricing</code>, <code>Reflection</code>, <code>ModelRouter</code></td>
+          <td>The chat pipeline. See Platform Internals.</td>
+        </tr>
+        <tr>
+          <td><code>Agent</code></td>
+          <td><code>Scheduler</code>, <code>EventTriggers</code>, <code>Budgets</code>, <code>RunLedger</code>, <code>Jobs</code></td>
+          <td>Unattended work, run records and spend limits. See Operations and Connectors.</td>
+        </tr>
+        <tr>
+          <td><code>Agent</code></td>
+          <td><code>Structured</code>, <code>Vision</code>, <code>Orchestration</code>, <code>McpServer</code></td>
+          <td>The typed output, vision, orchestration and MCP server capabilities</td>
+        </tr>
+        <tr>
+          <td><code>SystemTools</code></td>
+          <td><code>AllowedPaths</code>, <code>AllowedCommands</code>, <code>MaxFileSizeBytes</code>, <code>ScriptTimeoutSeconds</code></td>
+          <td>Filesystem and shell allowlists. Empty means deny.</td>
+        </tr>
+        <tr>
+          <td><code>Connections</code></td>
+          <td><code>PublicBaseUrl</code>, <code>KeyRingPath</code>, <code>OAuthApps</code></td>
+          <td>The credential store and OAuth</td>
+        </tr>
+        <tr>
+          <td><code>Connectors</code></td>
+          <td><code>ApprovalMode</code>, <code>CheckIntervalSeconds</code></td>
+          <td>The connector host</td>
+        </tr>
+        <tr>
+          <td><code>ChatHistory</code></td>
+          <td><code>ConnectionString</code>, <code>MaxMessages</code></td>
+          <td>SQLite chat history</td>
         </tr>
         <tr>
           <td><code>VectorStore</code></td>
           <td><code>ConnectionString</code></td>
-          <td>string</td>
           <td>SQLite connection string for the RAG vector store</td>
         </tr>
         <tr>
           <td><code>ApplicationInsights</code></td>
           <td><code>ConnectionString</code></td>
-          <td>string</td>
-          <td>Azure Monitor connection string for telemetry</td>
+          <td>Azure Monitor connection string. Also exports the platform&#x27;s own spans and metrics.</td>
         </tr>
         </tbody>
       </table>
@@ -195,7 +257,7 @@
         </tr>
         <tr>
           <td><code>Skills</code></td>
-          <td>Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably.</td>
+          <td>Named, multi-step procedures the agent can invoke by name. Skills are registered as tools and contain structured instructions the agent follows to execute complex workflows repeatably. Stored under <code>agent-data/skills</code>.</td>
         </tr>
         <tr>
           <td><code>SkillRegistry</code></td>
@@ -211,11 +273,11 @@
         </tr>
         <tr>
           <td><code>Mcp</code></td>
-          <td>Model Context Protocol connections to external tools and data sources. MCP servers are configured at runtime and their tools appear alongside native agent tools.</td>
+          <td>Model Context Protocol client connections. Registers the connection manager and its tools, and connects the servers named by <code>IMcpConnectionSeed</code> at startup. The <code>connect_mcp_server</code> tool is blocked by default.</td>
         </tr>
         <tr>
           <td><code>SystemTools</code></td>
-          <td>General-purpose tools available to every agent: shell command execution (with an allow-list), file operations, and system utilities. Governed by the same policy pipeline as custom tools.</td>
+          <td>Tools to read, write and list files and to run scripts, inside <code>SystemTools:AllowedPaths</code> and <code>AllowedCommands</code>. Governed by the same policy pipeline as custom tools. <code>system_write_file</code> and <code>system_run_script</code> are blocked by default.</td>
         </tr>
         <tr>
           <td><code>Notifications</code></td>
@@ -223,11 +285,11 @@
         </tr>
         <tr>
           <td><code>Scheduling</code></td>
-          <td>Cron-based and one-time scheduled agent tasks. Persisted in SQLite and executed by a background service. Enables agents to set reminders, run periodic checks, or defer work.</td>
+          <td>Cron-based and one-time scheduled tasks that run an agent or a job. Persisted in SQLite and executed by a background service. <code>schedule_task</code> is blocked by default.</td>
         </tr>
         <tr>
           <td><code>Rag</code></td>
-          <td>Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks using cosine similarity. Requires an embedding model to be configured.</td>
+          <td>Retrieval-augmented generation backed by a vector store. Documents are chunked, embedded, and stored. At query time, the agent retrieves relevant chunks with hybrid search and reranking. Needs an embedding model on the Azure AI Foundry or Databricks provider.</td>
         </tr>
         <tr>
           <td><code>InterAgentCommunication</code></td>
@@ -243,7 +305,7 @@
         </tr>
         <tr>
           <td><code>EventTriggers</code></td>
-          <td>Proactive agent engagement through scheduled (cron), file-watch, and webhook triggers. Registers the trigger service, tool provider, and the <code>/api/triggers</code> HTTP endpoints.</td>
+          <td>Proactive agent engagement through scheduled (cron), file-watch, webhook and connector triggers. Events wait in a durable SQLite queue with deduplication, retry and a dead-letter state. Registers the trigger service, tool provider, and the <code>/api/triggers</code> HTTP endpoints.</td>
         </tr>
         <tr>
           <td><code>ComputerUse</code></td>
@@ -345,15 +407,13 @@ AIFoundry__Endpoint=https://prod.openai.azure.com
 Security__RateLimitPerMinute=60
 </code></pre>
       <h3>Frontend Configuration</h3>
-      <p>The frontend reads its backend URL from <code>frontend/.env.local</code>:</p>
-      <pre><code>
-NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
-</code></pre>
-      <p>Change this to point at your deployed backend in production.</p>
+      <p>The frontend needs no backend URL setting. In development, <code>npm run dev</code> forwards requests to <code>/api</code> to <code>http://localhost:5149</code>, the address in the Host&#x27;s launch settings. To point the dev server somewhere else, change the rewrite in <code>frontend/next.config.ts</code>.</p>
+      <p>A production build is a static export. The Host serves it from <code>wwwroot</code>, so the browser and the API share one origin. The Docker image listens on port 5000.</p>
       <hr>
       <h2>Using the Chat Interface</h2>
       <h3>UI Elements</h3>
       <ul>
+        <li><strong>Tabs</strong> -- Chat, Runs (the run ledger with totals and detail), Orchestrations (multi-agent runs, and where a person answers a plan review) and Connections (connected accounts).</li>
         <li><strong>Streaming responses</strong> -- text appears token by token as the model generates it.</li>
         <li><strong>Tool call indicators</strong> -- a status bar shows which tools are running and when they complete.</li>
         <li><strong>State panel</strong> -- displays structured data returned by tools (stock quotes, task lists, entity data).</li>
@@ -372,8 +432,8 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
         <tbody>
         <tr>
           <td>No response after sending a message</td>
-          <td>Backend is not running or frontend cannot reach it</td>
-          <td>Verify the backend is running on port 5000 and <code>NEXT_PUBLIC_BACKEND_URL</code> in <code>.env.local</code> is correct</td>
+          <td>Backend is not running or the frontend cannot reach it</td>
+          <td>Verify the backend is running on <code>http://localhost:5149</code> and that the dev server&#x27;s <code>/api</code> rewrite points to it</td>
         </tr>
         <tr>
           <td>Response starts then times out</td>
@@ -394,6 +454,31 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
           <td>Health check failed banner appears</td>
           <td>Backend health endpoint returned an error</td>
           <td>Check backend logs for startup failures; verify database connectivity and API key validity</td>
+        </tr>
+        <tr>
+          <td>A tool call is refused and the tool is on the default list</td>
+          <td><code>Security:ApprovalRequiredTools</code> blocks <code>system_write_file</code>, <code>system_run_script</code>, <code>connect_mcp_server</code> and <code>schedule_task</code></td>
+          <td>Remove the name from the list only if you accept what the tool can do</td>
+        </tr>
+        <tr>
+          <td>API calls return 401</td>
+          <td><code>Authentication:Enabled</code> is true and the request carries no credentials</td>
+          <td>Send the <code>X-API-Key</code> header, or a bearer token for the configured authority</td>
+        </tr>
+        <tr>
+          <td>The Host stops at startup with a message about <code>Features:McpServer</code></td>
+          <td>The MCP server is on and authentication is off</td>
+          <td>Turn authentication on, or set <code>Agent:McpServer:AllowUnauthenticated</code> for a trusted network</td>
+        </tr>
+        <tr>
+          <td>A connection shows <code>NeedsReauth</code></td>
+          <td>The provider refused the stored credential</td>
+          <td>Choose <strong>Reconnect</strong> on the Connections tab</td>
+        </tr>
+        <tr>
+          <td>An orchestration run is <code>WaitingForInput</code></td>
+          <td>A Magentic plan needs a person&#x27;s approval</td>
+          <td>Open the Orchestrations tab and approve, ask for changes, or cancel</td>
         </tr>
         </tbody>
       </table>
@@ -451,6 +536,7 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
         <li>&quot;List all scheduled tasks.&quot;</li>
         <li>&quot;Cancel the <strong>Daily Report</strong> scheduled task.&quot;</li>
       </ul>
+      <p><code>schedule_task</code> is on the default approval-required list, so governance blocks it until you remove it from <code>Security:ApprovalRequiredTools</code>.</p>
     </main>
   </div>
 </body>

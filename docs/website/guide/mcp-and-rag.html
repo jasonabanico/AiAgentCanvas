@@ -18,22 +18,24 @@
       <h3>Connecting via Agent Tools</h3>
       <p>The agent exposes three MCP management tools through the <code>McpConnectionManager</code>:</p>
       <pre><code>
-connect_mcp_server(name, endpoint, transport)   -- connect and discover tools
-disconnect_mcp_server(name)                     -- disconnect and remove tools
-list_mcp_connections()                          -- list active connections
+connect_mcp_server(name, endpoint, transport, bearerToken, apiKey)   -- connect and discover tools
+disconnect_mcp_server(name)                                          -- disconnect and remove tools
+list_mcp_connections()                                               -- list active connections
 </code></pre>
-      <p>A user can connect to an MCP server through conversation:</p>
+      <p><code>connect_mcp_server</code> is on the default <code>Security:ApprovalRequiredTools</code> list, so governance blocks it until an operator removes it from that list. Two reasons support the default. The <code>bearerToken</code> and <code>apiKey</code> arguments are visible to the model, so a secret typed into the chat passes through it. And tools registered this way are not wrapped by the governance policy or the tracing wrapper (see Governance below).</p>
+      <p>Once an operator has allowed it, a user can connect through conversation:</p>
       <blockquote><p>&quot;Connect to the GitHub MCP server at https://mcp.github.com/sse&quot;</p></blockquote>
-      <p>The agent calls <code>connect_mcp_server</code> with the name, endpoint, and transport type. From that point on, the GitHub server&#x27;s tools are available in the conversation.</p>
+      <p>The agent calls <code>connect_mcp_server</code> with the name, endpoint and transport type. For an account-backed server, prefer a connection and the MCP connector (see Connectors below).</p>
       <h3>How Connection Works</h3>
       <p>The <code>McpConnectionManager</code> handles the full connection lifecycle:</p>
-      <ul>
+      <ol>
         <li>The LLM calls <code>connect_mcp_server</code> with a name, endpoint URL, and transport type</li>
-        <li>The manager creates a transport client based on the specified type (stdio, SSE, or streamable HTTP)</li>
+        <li>The manager creates an HTTP client transport. The transport types are <code>http</code> and <code>sse</code>. Stdio is not supported.</li>
         <li>It connects via <code>McpClient.CreateAsync()</code> and calls <code>ListToolsAsync()</code> to discover the server&#x27;s tools</li>
         <li>Discovered tools are registered into the <code>DynamicToolRegistry</code> under the key <code>mcp:{name}</code></li>
-        <li>The <code>DynamicToolContextProvider</code> picks up the new tools on the next LLM invocation</li>
-      </ul>
+        <li>A health ping runs every two minutes. A failed ping triggers a reconnect, and the tools are registered again</li>
+      </ol>
+      <p>The registry holds the tools, but nothing in the runtime yet delivers registry tools to an agent. See Known Gaps in <a href="reference-internals.md">Platform Internals</a>.</p>
       <pre><code class="language-csharp">
 private async Task&lt;string&gt; ConnectMcpServer(string name, string endpoint,
     string transport, CancellationToken ct)
@@ -56,7 +58,7 @@ private async Task&lt;string&gt; ConnectMcpServer(string name, string endpoint,
 </code></pre>
       <p>Once connected, MCP tools appear alongside built-in tools with no distinction from the LLM&#x27;s perspective. The agent can call them, and they show up in tool listings.</p>
       <h3>Governance</h3>
-      <p>Every MCP tool call passes through the <code>GovernedMcpGateway</code> before execution. The gateway evaluates the call against the agent&#x27;s active guardrails and policies:</p>
+      <p>The <code>GovernedMcpGateway</code> evaluates a tool call against the policy file and the approval-required list. It applies to tools the host wraps at startup, and to the <code>connect_mcp_server</code> call itself. The default policy has a rule that denies <code>connect_mcp_server</code> when the <code>endpoint</code> argument points at a private or internal address, which blocks the connection before it is made:</p>
       <pre><code class="language-csharp">
 public McpGatewayDecision Evaluate(string agentId, string toolName, string? payload = null)
 {
@@ -79,14 +81,15 @@ public McpGatewayDecision Evaluate(string agentId, string toolName, string? payl
     return decision;
 }
 </code></pre>
-      <p>This means an MCP tool that violates a guardrail is blocked the same way a built-in tool would be. The governance layer does not distinguish between tool sources.</p>
+      <p>Tools that an MCP server contributes at runtime are registered raw in the dynamic tool registry. They are not wrapped, so a guardrail policy does not see their calls. Tools that come from a connector are different: the connector host wraps each one for governance and tracing, and wraps any tool with risk <code>Send</code> or <code>Destructive</code> in an approval requirement.</p>
       <h3>Building an MCP Connection Seed</h3>
       <p>To auto-connect to an MCP server at startup (instead of requiring the user to connect manually), implement <code>IMcpConnectionSeed</code>:</p>
       <pre><code class="language-csharp">
 services.AddSingleton&lt;IMcpConnectionSeed&gt;(new McpConnectionSeed(
     name: &quot;company-data&quot;,
     endpoint: &quot;https://mcp.internal.example.com/sse&quot;,
-    transport: &quot;sse&quot;));
+    transport: &quot;sse&quot;,
+    apiKey: &quot;key-from-your-secret-store&quot;));
 </code></pre>
       <p>The interface:</p>
       <pre><code class="language-csharp">
@@ -94,10 +97,18 @@ public interface IMcpConnectionSeed
 {
     string Name { get; }
     string Endpoint { get; }
-    string Transport { get; }  // &quot;sse&quot;, &quot;http&quot;, or &quot;stdio&quot;
+    string Transport { get; }               // &quot;sse&quot; or &quot;http&quot;
+    string? BearerToken { get; }
+    string? ApiKey { get; }
+    string? ExpectedIssuer { get; }         // reject a server that names itself differently
+    IDictionary&lt;string, string&gt;? AdditionalHeaders { get; }
 }
 </code></pre>
-      <p>When the platform starts, it resolves all <code>IMcpConnectionSeed</code> services and connects to each one automatically. The agent is ready to use those tools from the first request, with no user intervention.</p>
+      <p>When the <code>Mcp</code> flag is on, the platform resolves all <code>IMcpConnectionSeed</code> services at startup and connects to each one. A seed that fails to connect is logged and skipped. Seeds bypass the approval list, because the operator wrote them. Keep secrets out of source: read them from configuration or a secret store.</p>
+      <h3>Connectors</h3>
+      <p>A connection stores an account&#x27;s credentials encrypted, and a connector turns that account into tools. The MCP connector connects to an MCP server over the connection&#x27;s guarded HTTP client, so the credential comes from the store, the token refreshes, and calls reach only the server&#x27;s own host. Gmail is this connector with Google OAuth. See <a href="guide-11-operations-and-connectors.md">Operations and Connectors</a>.</p>
+      <h3>Serving Your Own Tools Over MCP</h3>
+      <p>The reverse direction is the <code>McpServer</code> capability. It serves a chosen set of this host&#x27;s tools to outside clients, with approval-gated tools left out and each call recorded. See <a href="guide-12-typed-output-vision-orchestration-and-mcp-server.md">Typed Output, Vision, Orchestration and MCP Server</a>.</p>
       <h2>Retrieval-Augmented Generation (RAG)</h2>
       <h3>What RAG Does</h3>
       <p>RAG retrieves relevant document chunks at query time and injects them into the agent&#x27;s context. Instead of fine-tuning a model on your documents or cramming everything into the system prompt, RAG searches a vector store for the chunks most relevant to the user&#x27;s current question and includes only those. The agent gets grounded, up-to-date information with source citations.</p>
@@ -130,12 +141,12 @@ Store in SQLite                        LLM Reranking
 </code></pre>
       <h3>Chunking</h3>
       <p>The <code>DocumentChunker</code> recursively splits documents into chunks suitable for embedding. It follows a semantic hierarchy rather than using fixed-size character windows:</p>
-      <ul>
+      <ol>
         <li><strong>Split by paragraphs</strong> (double newlines)</li>
         <li>If a paragraph exceeds <code>ChunkSize</code>, <strong>split by sentences</strong> (period, exclamation, or question mark followed by space or newline)</li>
         <li>Apply <strong>overlap</strong> between consecutive chunks for context continuity</li>
         <li>Discard chunks under 20 characters</li>
-      </ul>
+      </ol>
       <pre><code class="language-csharp">
 public sealed class DocumentChunker
 {
@@ -171,7 +182,7 @@ public sealed class DocumentChunker
         </tbody>
       </table>
       <h3>Embedding</h3>
-      <p>Each chunk is embedded into a vector using Azure AI Foundry&#x27;s embedding model. The platform uses <code>IEmbeddingGenerator</code> from Microsoft.Extensions.AI, so the embedding provider is swappable via DI. The same embedding model is used for both document ingestion and query-time embedding to ensure consistent vector space alignment.</p>
+      <p>Each chunk is embedded into a vector using the provider&#x27;s embedding model: an Azure AI Foundry deployment or a Databricks model. Snowflake embeddings are not wired. The platform uses <code>IEmbeddingGenerator</code> from Microsoft.Extensions.AI, so the embedding provider is swappable via DI. The same embedding model is used for both document ingestion and query-time embedding to ensure consistent vector space alignment.</p>
       <h3>Storage</h3>
       <p>Chunks are stored as <code>DocumentRecord</code> entries in a SQLite database with two indexing strategies:</p>
       <ul>
@@ -200,23 +211,23 @@ The CEO noted that enterprise customer count increased by 23% in Q3...
 </code></pre>
       <p>The agent can reference these citations in its response, giving users a clear trail back to the source documents.</p>
       <h3>Enabling RAG</h3>
-      <p>RAG is opt-in and requires an embedding model deployment. Set the deployment name in configuration:</p>
+      <p>RAG needs two things: the <code>Rag</code> feature flag and an embedding model on the active provider.</p>
       <pre><code class="language-json">
 {
+  &quot;Features&quot;: { &quot;Rag&quot;: true },
   &quot;AIFoundry&quot;: {
     &quot;EmbeddingDeploymentName&quot;: &quot;text-embedding-ada-002&quot;
   }
 }
 </code></pre>
-      <p>When this value is set, the platform auto-registers all RAG components at startup:</p>
+      <p>For the Databricks provider, set <code>Databricks:EmbeddingModelName</code> instead. The Host registers the RAG components only when the flag is on and the active provider (Azure AI Foundry or Databricks) has its embedding setting. With the flag on and no embedding model, nothing is registered and the agent runs without retrieval. The components are:</p>
       <ul>
         <li><code>DocumentChunker</code> for splitting documents</li>
-        <li><code>IEmbeddingGenerator</code> configured against the Azure AI Foundry embedding deployment</li>
-        <li>SQLite vector store with FTS5 indexing</li>
-        <li>Hybrid search and reranking pipeline</li>
-        <li>RAG context provider that injects retrieved chunks before each LLM call</li>
+        <li><code>IEmbeddingGenerator</code> for the provider&#x27;s embedding model</li>
+        <li>A SQLite vector store with FTS5 indexing</li>
+        <li>The hybrid search and reranking pipeline</li>
+        <li>A RAG context provider that injects retrieved chunks before each model call</li>
       </ul>
-      <p>When the value is not set, RAG components are not registered and the agent operates without document retrieval. No code changes needed either way -- the presence of the configuration key is the only switch.</p>
     </main>
   </div>
 </body>
