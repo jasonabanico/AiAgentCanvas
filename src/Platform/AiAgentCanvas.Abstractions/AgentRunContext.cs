@@ -8,6 +8,12 @@ public enum RunSource
     Trigger,
     Handoff,
     Job,
+
+    /// <summary>A group chat, handoff or Magentic run of several agents.</summary>
+    Orchestration,
+
+    /// <summary>A tool called by an outside client, such as another agent over MCP.</summary>
+    External,
 }
 
 public sealed record ToolCallRecord(string Name, string Outcome, double DurationMs);

@@ -17,6 +17,7 @@ Build intelligent AI agents with .NET 9 and Microsoft Agent Framework. From a si
 | 9 | [Architecture](guide-09-architecture.md) | Five-layer architecture and request flow |
 | 10 | [Behavior Patterns](guide-10-behavior-patterns.md) | Seven agent behavior patterns with code examples |
 | 11 | [Operations and Connectors](guide-11-operations-and-connectors.md) | Run ledger, spend limits, durable triggers, jobs, stored credentials, OAuth, and connectors |
+| 12 | [Typed Output, Vision, Orchestration and MCP Server](guide-12-typed-output-vision-orchestration-and-mcp-server.md) | Schema-checked answers, image tools, group chat, handoff and Magentic runs with human sign-off, and serving tools over MCP |
 
 ## Appendix
 

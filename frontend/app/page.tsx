@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import RunsView from "./RunsView";
 import ConnectionsView from "./ConnectionsView";
+import OrchestrationsView from "./OrchestrationsView";
 
 interface Message {
   id: string;
@@ -63,7 +64,7 @@ export default function Home() {
   const [reasoning, setReasoning] = useState<ReasoningBlock | null>(null);
   const [interrupt, setInterrupt] = useState<InterruptInfo | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
-  const [view, setView] = useState<"chat" | "runs" | "connections">("chat");
+  const [view, setView] = useState<"chat" | "runs" | "orchestrations" | "connections">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadId = useThreadId();
   const currentRunId = useRef<string>("");
@@ -449,13 +450,13 @@ export default function Home() {
         <h1 style={styles.title}>AI Agent Canvas</h1>
         <p style={styles.subtitle}>Multi-agent enterprise copilot</p>
         <nav style={styles.nav}>
-          {(["chat", "runs", "connections"] as const).map((v) => (
+          {(["chat", "runs", "orchestrations", "connections"] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
               style={{ ...styles.navButton, ...(view === v ? styles.navButtonActive : {}) }}
             >
-              {v === "chat" ? "Chat" : v === "runs" ? "Runs" : "Connections"}
+              {v === "chat" ? "Chat" : v === "runs" ? "Runs" : v === "orchestrations" ? "Orchestrations" : "Connections"}
             </button>
           ))}
         </nav>
@@ -651,6 +652,7 @@ export default function Home() {
       )}
 
       {view === "runs" && <RunsView />}
+      {view === "orchestrations" && <OrchestrationsView />}
       {view === "connections" && <ConnectionsView />}
     </div>
   );

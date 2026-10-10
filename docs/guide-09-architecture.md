@@ -65,6 +65,16 @@ Host
 │   └── Platform.Abstractions
 ├── Capabilities.Jobs
 │   └── Platform.Abstractions
+├── Capabilities.StructuredOutput
+│   └── Platform.Abstractions
+├── Capabilities.Vision
+│   └── Platform.Abstractions
+├── Capabilities.AgentOrchestration
+│   ├── Platform.Abstractions
+│   └── Platform.Orchestration
+├── Capabilities.McpServer
+│   ├── Platform.Abstractions
+│   └── Platform.Orchestration
 ├── Platform.Connections
 │   └── Platform.Abstractions
 ├── Platform.Connectors
@@ -145,6 +155,10 @@ Cross-cutting features that agents use but that are not specific to any single d
 | **ComputerUse** | Browser automation via headless Chromium (Playwright) | `BrowserSession`, `ComputerUseToolProvider` |
 | **RunLedger** | One record per unattended run, with usage, tool calls and outcome | `SqliteRunLedger`, `RunLedgerEndpoints`, `RunLedgerToolProvider` |
 | **Jobs** | Deterministic scheduled work that runs without a model | `JobRunner`, `IAgentJob`, `JobToolProvider` |
+| **StructuredOutput** | Schema-checked answers with retry | `StructuredResponder`, `JsonSchemaValidator`, `SchemaCatalog` |
+| **Vision** | Image tools with allowlisted sources | `ImageLoader`, `VisionToolProvider` |
+| **AgentOrchestration** | Group chat, handoff and Magentic runs with checkpoints and human sign-off | `OrchestrationRunner`, `OrchestrationStore`, `OrchestrationEndpoints` |
+| **McpServer** | Serves chosen tools over MCP | `ExposedToolSet`, `McpServerExtensions` |
 
 Connections and connectors sit in the Platform layer because other capabilities depend on them. `Platform.Connections` stores credentials and runs OAuth. `Platform.Connectors` defines the connector contracts and runs one connector per stored connection. See [Operations and Connectors](guide-11-operations-and-connectors.md).
 

@@ -45,7 +45,7 @@
       <p><code>Agent:Budgets</code> is a configuration section and not a flag. It needs <code>RunLedger</code> and <code>Agent:Pricing</code>, and the Host refuses to start with budgets enabled and no ledger.</p>
       <h2>Run ledger</h2>
       <p>An unattended agent leaves no trace in a chat window. The run ledger writes one record per run to SQLite: what started it, what it did, what it cost and how it ended.</p>
-      <p>A record holds the agent name, the source (<code>Interactive</code>, <code>Scheduled</code>, <code>Trigger</code>, <code>Handoff</code> or <code>Job</code>), the trigger or task id, start and end times, status, the input and output text, token counts, estimated cost, the tool calls with outcome and duration, and the reason a run was cut short, if it was.</p>
+      <p>A record holds the agent name, the source (<code>Interactive</code>, <code>Scheduled</code>, <code>Trigger</code>, <code>Handoff</code>, <code>Job</code>, <code>Orchestration</code> or <code>External</code>), the trigger or task id, start and end times, status, the input and output text, token counts, estimated cost, the tool calls with outcome and duration, and the reason a run was cut short, if it was.</p>
       <ul>
         <li><strong>Nesting.</strong> A run started inside another run, such as a handoff, records its parent. The parent&#x27;s totals include the child&#x27;s usage. Totals reported by the API count top-level runs only, so delegated work is not counted twice.</li>
         <li><strong>Restarts.</strong> A run still marked <code>Running</code> when the process starts again is marked <code>Abandoned</code>. Its outcome is unknown.</li>
