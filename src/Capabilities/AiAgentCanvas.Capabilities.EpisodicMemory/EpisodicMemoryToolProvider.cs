@@ -37,6 +37,8 @@ public static class EpisodicMemoryToolProvider
                         results = store.Search(query, agentFilter, take);
                     }
 
+                    // An episode that is asked for again is still useful, so it is kept fresh.
+                    store.Reinforce(results.Select(r => r.Id));
                     return Serialize(results);
                 }, "search_memory"),
 
@@ -66,11 +68,26 @@ public static class EpisodicMemoryToolProvider
                         episode.Embedding = vector.ToArray();
                     }
 
-                    var saved = store.Save(episode);
-                    return JsonSerializer.Serialize(saved
-                        ? new { saved = true, episode.Id, note = (string?)null }
-                        : new { saved = false, episode.Id, note = (string?)"Importance was below the store's threshold, so this episode was not kept." });
+                    var written = store.Store(episode);
+                    return JsonSerializer.Serialize(new
+                    {
+                        saved = written.Stored,
+                        written.Id,
+                        merged = written.Merged,
+                        note = !written.Stored
+                            ? "Importance was below the store's threshold, so this episode was not kept."
+                            : written.Merged
+                                ? "A very similar episode was already stored, so it was updated with this one and no second copy was added."
+                                : (string?)null,
+                    });
                 }, "save_to_memory"),
+
+            AIFunctionFactory.Create(
+                [Description("Forget one stored episode by its id, for example when the user asks you to forget something. Search or list memory first to find the id")]
+                (string episodeId) => JsonSerializer.Serialize(store.Delete(episodeId)
+                    ? new { forgotten = true, id = episodeId, note = (string?)null }
+                    : new { forgotten = false, id = episodeId, note = (string?)"No stored episode has that id." }),
+                "forget_memory"),
         ];
     }
 
@@ -85,6 +102,7 @@ public static class EpisodicMemoryToolProvider
             e.ToolsUsed,
             e.TurnCount,
             e.Importance,
+            e.RecallCount,
             CompletedAt = e.CompletedAt.ToString("g"),
         }));
 }

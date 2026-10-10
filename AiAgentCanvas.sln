@@ -103,6 +103,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Capabilities.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Capabilities.McpServer", "src\Capabilities\AiAgentCanvas.Capabilities.McpServer\AiAgentCanvas.Capabilities.McpServer.csproj", "{3A67A06B-3D9A-4E94-A5E2-AFF9A6EEC9CC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiAgentCanvas.Providers.Local", "src\Providers\AiAgentCanvas.Providers.Local\AiAgentCanvas.Providers.Local.csproj", "{E45C670E-E983-454E-B596-501CD84F86C1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -605,6 +607,18 @@ Global
 		{3A67A06B-3D9A-4E94-A5E2-AFF9A6EEC9CC}.Release|x64.Build.0 = Release|Any CPU
 		{3A67A06B-3D9A-4E94-A5E2-AFF9A6EEC9CC}.Release|x86.ActiveCfg = Release|Any CPU
 		{3A67A06B-3D9A-4E94-A5E2-AFF9A6EEC9CC}.Release|x86.Build.0 = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|x64.Build.0 = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Debug|x86.Build.0 = Debug|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|x64.ActiveCfg = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|x64.Build.0 = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|x86.ActiveCfg = Release|Any CPU
+		{E45C670E-E983-454E-B596-501CD84F86C1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -651,5 +665,6 @@ Global
 		{9652CF81-CE6B-464F-9360-36C730AE017A} = {8B68D284-3DE8-39D0-91FE-C345E8B9C4E9}
 		{EEEED573-76D4-46BA-A742-DE73B4E1A07E} = {8B68D284-3DE8-39D0-91FE-C345E8B9C4E9}
 		{3A67A06B-3D9A-4E94-A5E2-AFF9A6EEC9CC} = {8B68D284-3DE8-39D0-91FE-C345E8B9C4E9}
+		{E45C670E-E983-454E-B596-501CD84F86C1} = {D9007A03-FD03-1159-6598-E081D0A1BEBA}
 	EndGlobalSection
 EndGlobal

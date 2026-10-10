@@ -17,6 +17,10 @@ public static class SqliteVectorStoreExtensions
             collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
             return collection;
         });
+
+        // The same collection answers document-level questions: list, replace, delete, expire.
+        services.AddSingleton<IDocumentIndex>(sp =>
+            (IDocumentIndex)sp.GetRequiredService<VectorStoreCollection<string, DocumentRecord>>());
         return services;
     }
 

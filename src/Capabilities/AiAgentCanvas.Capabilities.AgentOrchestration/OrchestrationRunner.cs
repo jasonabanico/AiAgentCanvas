@@ -18,8 +18,9 @@ public sealed class OrchestrationException(string message) : Exception(message);
 public sealed record OrchestrationResponse(bool Approve, string? Feedback = null);
 
 /// <summary>
-/// Runs several agents as a group chat, a handoff chain or a Magentic team, and keeps the run
-/// durable. Each step is checkpointed to disk. A run that needs a person, such as a Magentic
+/// Runs several agents as a group chat, a handoff chain, a Magentic team, a pipeline, a
+/// concurrent fan-out or a maker-checker review, and keeps the run durable. Each workflow step
+/// is checkpointed to disk. A run that needs a person, such as a Magentic
 /// plan awaiting sign-off, stops, records what it is asking, and ends the process work
 /// entirely. When the person answers, possibly days later and after a restart, the run is
 /// rebuilt from its record, restored from the checkpoint, and continues where it stopped.
@@ -176,6 +177,16 @@ public sealed class OrchestrationRunner
 
     private async Task DriveAsync(OrchestrationRun run, OrchestrationResponse? response, bool resume, CancellationToken ct)
     {
+        // A Review run is a loop over two agents, not a workflow graph. Its state is the
+        // transcript, which it saves after each step, so there is no checkpoint to restore.
+        if (run.Spec.Kind == OrchestrationKind.Review)
+        {
+            var maker = _resolve(run.Spec.Agents[0]) ?? throw new OrchestrationException($"No agent named '{run.Spec.Agents[0]}'.");
+            var checker = _resolve(run.Spec.Agents[1]) ?? throw new OrchestrationException($"No agent named '{run.Spec.Agents[1]}'.");
+            await ReviewLoop.RunAsync(run, maker, checker, run.Spec.MaxRounds ?? _options.DefaultReviewRounds, _store.Save, ct);
+            return;
+        }
+
         var workflow = Build(run.Spec);
 
         Directory.CreateDirectory(CheckpointPath(run.Id));
@@ -278,7 +289,12 @@ public sealed class OrchestrationRunner
 
         run.Pending = null;
         run.Status = OrchestrationStatus.Completed;
-        run.Result = output ?? run.Transcript.LastOrDefault()?.Text;
+
+        // Concurrent agents answer in parallel, so the result is every answer, each labelled
+        // with its agent. The other kinds end with one final answer.
+        run.Result = run.Spec.Kind == OrchestrationKind.Concurrent && run.Transcript.Count > 0
+            ? string.Join("\n\n", run.Transcript.Select(t => $"{t.Agent}:\n{t.Text}"))
+            : output ?? run.Transcript.LastOrDefault()?.Text;
     }
 
     private static PendingInput Describe(ExternalRequest request)
@@ -362,11 +378,13 @@ public sealed class OrchestrationRunner
 
         var agents = spec.Agents.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        // The lead is the first agent of a handoff and the manager of a Magentic team. A group
-        // chat has no lead.
+        // The lead is the first agent of a handoff and the manager of a Magentic team. The other
+        // kinds have no lead: a group chat and a pipeline run in the order named, a concurrent
+        // run has no order, and a Review run takes its maker and checker from the list.
         string? lead = spec.Kind switch
         {
-            OrchestrationKind.GroupChat => null,
+            OrchestrationKind.GroupChat or OrchestrationKind.Sequential
+                or OrchestrationKind.Concurrent or OrchestrationKind.Review => null,
             OrchestrationKind.Handoff => string.IsNullOrWhiteSpace(spec.Lead) ? agents.FirstOrDefault() : spec.Lead.Trim(),
             _ => string.IsNullOrWhiteSpace(spec.Lead) ? "default" : spec.Lead.Trim(),
         };
@@ -380,6 +398,11 @@ public sealed class OrchestrationRunner
                 ? "Name at least one agent for the team."
                 : "Name at least two agents.");
 
+        // The maker and the checker have to be two agents. One agent grading its own draft is
+        // the check this kind exists to avoid.
+        if (spec.Kind == OrchestrationKind.Review && agents.Count != 2)
+            throw new OrchestrationException("A review needs exactly two agents: the maker first, then the checker.");
+
         if (agents.Count > _options.MaxAgents)
             throw new OrchestrationException($"{agents.Count} agents were named. The limit is {_options.MaxAgents}.");
 
@@ -389,7 +412,8 @@ public sealed class OrchestrationRunner
                 throw new OrchestrationException($"No agent named '{name}'.");
         }
 
-        var rounds = Math.Clamp(spec.MaxRounds ?? _options.DefaultMaxRounds, 1, Math.Max(1, _options.MaxRoundsCap));
+        var defaultRounds = spec.Kind == OrchestrationKind.Review ? _options.DefaultReviewRounds : _options.DefaultMaxRounds;
+        var rounds = Math.Clamp(spec.MaxRounds ?? defaultRounds, 1, Math.Max(1, _options.MaxRoundsCap));
         return spec with { Agents = agents, MaxRounds = rounds, Lead = lead };
     }
 
@@ -416,6 +440,12 @@ public sealed class OrchestrationRunner
                     .WithHandoffs(specialists, lead!)
                     .Build();
             }
+
+            case OrchestrationKind.Sequential:
+                return AgentWorkflowBuilder.BuildSequential(team);
+
+            case OrchestrationKind.Concurrent:
+                return AgentWorkflowBuilder.BuildConcurrent(team);
 
             default:
                 return AgentWorkflowBuilder

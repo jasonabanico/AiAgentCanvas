@@ -13,6 +13,8 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using McpServerTool = ModelContextProtocol.Server.McpServerTool;
+using McpServerToolCreateOptions = ModelContextProtocol.Server.McpServerToolCreateOptions;
 using Xunit;
 
 namespace AiAgentCanvas.Tests;
@@ -110,5 +112,55 @@ public class McpManagerGovernanceTests
 
         Assert.DoesNotContain(registry.GetAllTools(), t => t is TracedAIFunction);
         Assert.Contains("echo: hi", (await CallAsync(registry, "echo", new() { ["text"] = "hi" }))!.ToString());
+    }
+
+    /// <summary>A server whose tools carry the annotations MCP defines.</summary>
+    private static async Task<(WebApplication App, string Endpoint)> StartAnnotatedServerAsync()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddLogging();
+        builder.Services.AddMcpServer().WithHttpTransport().WithTools(new[]
+        {
+            McpServerTool.Create(() => "gone", new McpServerToolCreateOptions { Name = "wipe_everything", Description = "Deletes it all.", Destructive = true, ReadOnly = false }),
+            McpServerTool.Create(() => "notes", new McpServerToolCreateOptions { Name = "read_notes", Description = "Reads notes.", ReadOnly = true }),
+            McpServerTool.Create(() => "ok", new McpServerToolCreateOptions { Name = "plain_tool", Description = "Makes no claim." }),
+        });
+        var app = builder.Build();
+        app.MapMcp("/mcp");
+        await app.StartAsync();
+
+        var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+        return (app, address + "/mcp");
+    }
+
+    [Fact]
+    public async Task A_tool_the_server_marks_destructive_needs_approval_and_the_others_do_not()
+    {
+        var (app, endpoint) = await StartAnnotatedServerAsync();
+        await using var _ = app;
+        var services = new ServiceCollection().BuildServiceProvider();
+        var registry = new DynamicToolRegistry();
+        await using var manager = new McpConnectionManager(registry, NullLoggerFactory.Instance, services);
+
+        await manager.ConnectAsync("srv", endpoint, "http");
+
+        var tools = registry.GetAllTools().ToDictionary(t => t.Name);
+        Assert.NotNull(tools["wipe_everything"].GetService<ApprovalRequiredAIFunction>());
+        Assert.Null(tools["read_notes"].GetService<ApprovalRequiredAIFunction>());
+        Assert.Null(tools["plain_tool"].GetService<ApprovalRequiredAIFunction>());
+    }
+
+    [Fact]
+    public async Task The_approval_requirement_holds_without_the_governance_wrapping_too()
+    {
+        var (app, endpoint) = await StartAnnotatedServerAsync();
+        await using var _ = app;
+        var registry = new DynamicToolRegistry();
+        await using var manager = new McpConnectionManager(registry, NullLoggerFactory.Instance);
+
+        await manager.ConnectAsync("srv", endpoint, "http");
+
+        Assert.NotNull(registry.GetAllTools().Single(t => t.Name == "wipe_everything").GetService<ApprovalRequiredAIFunction>());
     }
 }

@@ -39,6 +39,9 @@
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.AgentOrchestration\AiAgentCanvas.Capabilities.AgentOrchestration.csproj" />
     <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.McpServer\AiAgentCanvas.Capabilities.McpServer.csproj" />
     <ProjectReference Include="..\..\src\DataConnections\DataConnection.Storage.Sqlite\DataConnection.Storage.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Providers\AiAgentCanvas.Providers.Local\AiAgentCanvas.Providers.Local.csproj" />
+    <ProjectReference Include="..\..\src\Capabilities\AiAgentCanvas.Capabilities.Rag\AiAgentCanvas.Capabilities.Rag.csproj" />
+    <ProjectReference Include="..\..\src\DataConnections\DataConnection.VectorStore.Sqlite\DataConnection.VectorStore.Sqlite.csproj" />
   </ItemGroup>
 
 </Project>

@@ -28,7 +28,7 @@ public sealed class EpisodicMemoryContextProvider : AIContextProvider
     {
         var recent = _store.GetRecent(limit: _maxEpisodes);
         if (recent.Count == 0)
-            return new ValueTask<AIContext>(context.AIContext);
+            return new ValueTask<AIContext>(new AIContext());
 
         var sb = new StringBuilder();
         sb.AppendLine("\n## Episodic Memory (recent sessions)");
@@ -40,9 +40,9 @@ public sealed class EpisodicMemoryContextProvider : AIContextProvider
                 sb.AppendLine($"  Summary: {ep.Summary}");
         }
 
-        context.AIContext.Instructions += sb.ToString();
         _logger.LogDebug("Injected {Count} episodes into context", recent.Count);
 
-        return new ValueTask<AIContext>(context.AIContext);
+        // Only the addition: the agent merges it into the instructions it already has.
+        return new ValueTask<AIContext>(new AIContext { Instructions = sb.ToString() });
     }
 }

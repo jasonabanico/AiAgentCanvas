@@ -23,18 +23,18 @@ public static class OrchestrationToolProvider
         return
         [
             AIFunctionFactory.Create(
-                [Description("Run several named agents together on one task. kind is GroupChat (agents take turns), Handoff (a lead passes work to specialists and takes it back) or Magentic (a manager plans, assigns work and tracks progress). A Magentic run stops for a person to approve its plan unless requireSignoff is false, and returns status WaitingForInput: tell the user the run id and that a person must answer it. Do not try to answer it yourself.")]
+                [Description("Run several named agents together on one task. kind is GroupChat (agents take turns), Handoff (a lead passes work to specialists and takes it back), Magentic (a manager plans, assigns work and tracks progress), Sequential (a pipeline: each agent builds on the one before), Concurrent (all agents answer the same task at once and the answers are gathered) or Review (two agents: the first drafts, the second checks the draft and asks for changes until it approves, the draft limit is reached or a revision changes nothing). A Magentic run stops for a person to approve its plan unless requireSignoff is false, and returns status WaitingForInput: tell the user the run id and that a person must answer it. Do not try to answer it yourself.")]
                 async (
-                    [Description("GroupChat, Handoff or Magentic")] string kind,
+                    [Description("GroupChat, Handoff, Magentic, Sequential, Concurrent or Review")] string kind,
                     [Description("What the agents should work on")] string task,
-                    [Description("Names of the agents that take part")] string[] agents,
+                    [Description("Names of the agents that take part. Sequential runs them in this order. Review takes exactly two: the maker, then the checker")] string[] agents,
                     [Description("Handoff: the agent that starts. Magentic: the manager. Defaults to the first agent or the default agent")] string? lead = null,
-                    [Description("Most turns or rounds")] int? maxRounds = null,
+                    [Description("Most turns or rounds. For Review, the most drafts the maker may write")] int? maxRounds = null,
                     [Description("Magentic only. Stop for a person to approve the plan. Defaults to true")] bool requireSignoff = true,
                     CancellationToken ct = default) =>
                 {
                     if (!Enum.TryParse<OrchestrationKind>(kind, true, out var parsed))
-                        return Error("kind must be GroupChat, Handoff or Magentic.");
+                        return Error("kind must be GroupChat, Handoff, Magentic, Sequential, Concurrent or Review.");
 
                     try
                     {
@@ -92,6 +92,7 @@ public static class OrchestrationToolProvider
         run.Status,
         run.Pending,
         run.Result,
+        run.Termination,
         Transcript = run.Transcript.Select(t => new { t.Agent, Text = Clip(t.Text, 1500) }),
         run.Error,
         note = run.Status == OrchestrationStatus.WaitingForInput

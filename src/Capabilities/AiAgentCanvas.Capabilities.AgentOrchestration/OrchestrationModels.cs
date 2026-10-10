@@ -12,6 +12,19 @@ public enum OrchestrationKind
 
     /// <summary>A manager agent plans, assigns work, tracks progress and replans when stuck.</summary>
     Magentic,
+
+    /// <summary>A pipeline. Each agent receives the conversation so far and adds its step, in the order named.</summary>
+    Sequential,
+
+    /// <summary>Every agent works on the same task at once and the answers are gathered. Use it for independent parts or for voting.</summary>
+    Concurrent,
+
+    /// <summary>
+    /// Maker and checker. The first agent drafts, the second reviews the draft against the task
+    /// and either approves it or says what to change. The loop ends on approval, on the round
+    /// limit, or when a revision comes back unchanged.
+    /// </summary>
+    Review,
 }
 
 public enum OrchestrationStatus
@@ -31,7 +44,7 @@ public enum OrchestrationStatus
 
 /// <summary>What to run. <see cref="Agents"/> are names the agent registry knows.</summary>
 /// <param name="Lead">The first agent for a handoff, or the manager for Magentic. Defaults to the default agent.</param>
-/// <param name="MaxRounds">Turns in a group chat, or coordination rounds in a Magentic run.</param>
+/// <param name="MaxRounds">Turns in a group chat, coordination rounds in a Magentic run, or drafts in a Review run.</param>
 /// <param name="RequireSignoff">Magentic only: stop for a person to approve the plan before any work starts.</param>
 public sealed record OrchestrationSpec(
     OrchestrationKind Kind,
@@ -55,6 +68,13 @@ public sealed class OrchestrationRun
     public OrchestrationStatus Status { get; set; }
     public PendingInput? Pending { get; set; }
     public string? Result { get; set; }
+
+    /// <summary>
+    /// Why a Review run stopped: <see cref="ReviewTermination.Approved"/> is the only success.
+    /// Null for the other kinds.
+    /// </summary>
+    public string? Termination { get; set; }
+
     public List<TranscriptEntry> Transcript { get; set; } = [];
     public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

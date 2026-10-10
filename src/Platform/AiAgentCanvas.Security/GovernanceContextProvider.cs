@@ -19,8 +19,9 @@ public sealed class GovernanceContextProvider : AIContextProvider
     protected override ValueTask<AIContext> ProvideAIContextAsync(
         InvokingContext context, CancellationToken cancellationToken)
     {
+        // It only reads the instructions, so it adds nothing to them.
         if (_kernel.InjectionDetector is null || string.IsNullOrEmpty(context.AIContext.Instructions))
-            return new ValueTask<AIContext>(context.AIContext);
+            return new ValueTask<AIContext>(new AIContext());
 
         var result = _kernel.InjectionDetector.Detect(context.AIContext.Instructions);
         if (result.IsInjection)
@@ -40,6 +41,6 @@ public sealed class GovernanceContextProvider : AIContextProvider
                 });
         }
 
-        return new ValueTask<AIContext>(context.AIContext);
+        return new ValueTask<AIContext>(new AIContext());
     }
 }

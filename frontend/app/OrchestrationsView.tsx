@@ -27,11 +27,18 @@ interface OrchestrationRun {
   status: string;
   pending: Pending | null;
   result: string | null;
+  termination: string | null;
   transcript: TranscriptEntry[];
   error: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+const TERMINATION_TEXT: Record<string, string> = {
+  Approved: "the checker approved the draft",
+  MaxRounds: "stopped at the draft limit without approval",
+  NoProgress: "stopped because a revision changed nothing",
+};
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   WaitingForInput: { bg: "#fffbeb", fg: "#92400e" },
@@ -157,6 +164,7 @@ export default function OrchestrationsView() {
           <div style={styles.meta}>
             <Badge status={selected.status} /> {selected.spec.agents.join(", ")}
             {selected.spec.lead && <> · lead {selected.spec.lead}</>}
+            {selected.termination && <> · {TERMINATION_TEXT[selected.termination] ?? selected.termination}</>}
           </div>
 
           <div style={styles.blockTitle}>Task</div>

@@ -2,33 +2,24 @@ using AiAgentCanvas.Abstractions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.VectorData;
 
 namespace AiAgentCanvas.Capabilities.Rag;
 
+/// <summary>
+/// Searches on each user message and adds the best passages, numbered for citation, to the
+/// agent's instructions. It is the always-on form of retrieval. An agent that should decide
+/// for itself when to look something up uses the <c>rag_search</c> tool instead, with
+/// <see cref="RagOptions.AutoInject"/> off.
+/// </summary>
 public sealed class RagContextProvider : AIContextProvider
 {
-    private readonly VectorStoreCollection<string, DocumentRecord> _collection;
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-    private readonly LlmReranker? _reranker;
+    private readonly RagSearcher _searcher;
     private readonly ILogger<RagContextProvider> _logger;
-    private readonly int _topK;
-    private readonly int _retrieveK;
 
-    public RagContextProvider(
-        VectorStoreCollection<string, DocumentRecord> collection,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        ILogger<RagContextProvider> logger,
-        LlmReranker? reranker = null,
-        int topK = 3,
-        int retrieveK = 10)
+    public RagContextProvider(RagSearcher searcher, ILogger<RagContextProvider> logger)
     {
-        _collection = collection;
-        _embeddingGenerator = embeddingGenerator;
+        _searcher = searcher;
         _logger = logger;
-        _reranker = reranker;
-        _topK = topK;
-        _retrieveK = retrieveK;
     }
 
     protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken)
@@ -37,52 +28,35 @@ public sealed class RagContextProvider : AIContextProvider
             .LastOrDefault(m => m.Role == ChatRole.User)?.Text;
 
         if (string.IsNullOrWhiteSpace(lastUserMessage))
-            return context.AIContext;
+            return new AIContext();
 
         _logger.LogDebug("RAG search for: {Query}", lastUserMessage);
 
-        var queryEmbedding = await _embeddingGenerator.GenerateVectorAsync(lastUserMessage, cancellationToken: cancellationToken);
-
-        var candidates = new List<VectorSearchResult<DocumentRecord>>();
-
-        if (_collection is IHybridSearchable hybridStore)
-        {
-            var ragOptions = new RagSearchOptions { KeywordQuery = lastUserMessage };
-            await foreach (var (record, score) in hybridStore.HybridSearchAsync(queryEmbedding, _retrieveK, ragOptions, cancellationToken))
-                candidates.Add(new VectorSearchResult<DocumentRecord>(record, score));
-        }
-        else
-        {
-            await foreach (var result in _collection.SearchAsync(queryEmbedding, _retrieveK, cancellationToken: cancellationToken))
-                candidates.Add(result);
-        }
-
-        if (candidates.Count == 0)
+        var results = await _searcher.SearchAsync([lastUserMessage], ct: cancellationToken);
+        if (results.Count == 0)
         {
             _logger.LogDebug("No RAG results found");
-            return context.AIContext;
+            return new AIContext();
         }
 
-        var results = _reranker is not null
-            ? await _reranker.RerankAsync(lastUserMessage, candidates, _topK, cancellationToken)
-            : candidates.Take(_topK).ToList();
-
-        _logger.LogInformation("RAG returned {Retrieved} candidates, using {Used} after reranking", candidates.Count, results.Count);
+        _logger.LogInformation("RAG using {Used} passages", results.Count);
 
         var citations = results.Select((r, i) =>
         {
             var source = r.Record.Source ?? "unknown";
-            var score = r.Score?.ToString("F3") ?? "n/a";
+            var score = r.Score?.ToString("F4") ?? "n/a";
             var preview = r.Record.Text.Length > 200 ? r.Record.Text[..200] + "..." : r.Record.Text;
             return $"[{i + 1}] (source: {source}, score: {score})\n{preview}";
         });
 
         var ragContext = string.Join("\n\n---\n\n", citations);
-        context.AIContext.Instructions += $"""
-
-            Relevant context from documents (cite by number when using):
-            {ragContext}
-            """;
-        return context.AIContext;
+        // Only the addition: the agent merges it into the instructions it already has.
+        return new AIContext
+        {
+            Instructions = $"""
+                Relevant context from documents (cite by number when using):
+                {ragContext}
+                """,
+        };
     }
 }

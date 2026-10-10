@@ -11,6 +11,9 @@ public sealed class OrchestrationOptions
 
     public int DefaultMaxRounds { get; set; } = 8;
 
+    /// <summary>Drafts a Review run may produce when the request names no limit. Each draft costs a maker call and a checker call.</summary>
+    public int DefaultReviewRounds { get; set; } = 3;
+
     /// <summary>The most rounds any request may ask for.</summary>
     public int MaxRoundsCap { get; set; } = 30;
 
